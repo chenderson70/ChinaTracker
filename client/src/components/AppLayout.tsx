@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Layout,
@@ -14,6 +14,7 @@ import {
   Statistic,
   Space,
   message,
+  Dropdown,
 } from 'antd';
 import {
   DashboardOutlined,
@@ -22,6 +23,10 @@ import {
   DollarOutlined,
   FileExcelOutlined,
   PlusOutlined,
+  CloudDownloadOutlined,
+  CloudUploadOutlined,
+  DownOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -107,6 +112,49 @@ export default function AppLayout() {
     });
   };
 
+  // Delete current exercise
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => api.deleteExercise(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      setExerciseId(null);
+      localStorage.removeItem('exerciseId');
+      message.success('Exercise deleted');
+    },
+  });
+
+  // JSON export all data
+  const handleBackup = async () => {
+    const json = await api.exportAllData();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ChinaTracker_Backup_${dayjs().format('YYYY-MM-DD')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    message.success('Backup downloaded');
+  };
+
+  // JSON import all data
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const handleRestore = () => fileInputRef.current?.click();
+  const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const json = await file.text();
+      await api.importAllData(json);
+      queryClient.invalidateQueries();
+      setExerciseId(null);
+      localStorage.removeItem('exerciseId');
+      message.success('Data restored from backup');
+    } catch {
+      message.error('Invalid backup file');
+    }
+    e.target.value = '';
+  };
+
   const fmt = (n: number | undefined) => '$' + (n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
 
   const menuItems = [
@@ -171,6 +219,30 @@ export default function AppLayout() {
               <Button icon={<PlusOutlined />} type="primary" onClick={() => setCreateOpen(true)}>
                 New Exercise
               </Button>
+              {exerciseId && (
+                <Button
+                  icon={<DeleteOutlined />}
+                  danger
+                  onClick={() => Modal.confirm({
+                    title: 'Delete this exercise?',
+                    content: 'This will permanently remove all data for this exercise.',
+                    onOk: () => deleteMut.mutate(exerciseId),
+                  })}
+                >
+                  Delete
+                </Button>
+              )}
+              <Dropdown
+                menu={{
+                  items: [
+                    { key: 'backup', icon: <CloudDownloadOutlined />, label: 'Backup All Data', onClick: handleBackup },
+                    { key: 'restore', icon: <CloudUploadOutlined />, label: 'Restore from Backup', onClick: handleRestore },
+                  ],
+                }}
+              >
+                <Button>Data <DownOutlined /></Button>
+              </Dropdown>
+              <input type="file" ref={fileInputRef} accept=".json" style={{ display: 'none' }} onChange={onFileSelected} />
             </Space>
             {budget && (
               <Space size="large">
@@ -200,7 +272,15 @@ export default function AppLayout() {
             <Input placeholder="e.g., China Focus FY26 Spring" />
           </Form.Item>
           <Form.Item name="dates" label="Start / End Date" rules={[{ required: true }]}>
-            <DatePicker.RangePicker style={{ width: '100%' }} />
+            <DatePicker.RangePicker
+              style={{ width: '100%' }}
+              onChange={(dates) => {
+                if (dates && dates[0] && dates[1]) {
+                  const days = dates[1].diff(dates[0], 'day') + 1;
+                  form.setFieldsValue({ defaultDutyDays: days });
+                }
+              }}
+            />
           </Form.Item>
           <Form.Item name="defaultDutyDays" label="Default Duty Days" initialValue={14}>
             <InputNumber min={1} max={365} style={{ width: '100%' }} />

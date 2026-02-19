@@ -2,7 +2,7 @@
 export type UnitCode = 'SG' | 'AE' | 'CAB' | 'A7';
 export type PersonnelRole = 'PLAYER' | 'WHITE_CELL' | 'PLANNING' | 'SUPPORT';
 export type FundingType = 'RPA' | 'OM';
-export type Location = 'GULFPORT' | 'CAMP_SHELBY';
+export type Location = string;
 export type OmCategory =
   | 'CONTRACT'
   | 'TRANSPORTATION'

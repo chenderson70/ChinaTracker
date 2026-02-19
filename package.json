@@ -1,22 +1,11 @@
 {
   "name": "china-tracker",
-  "version": "1.0.0",
-  "description": "Exercise Budget Calculator – Track PAX, RPA, O&M costs across organizational units",
+  "version": "2.0.0",
+  "description": "Exercise Budget Calculator – Static site with IndexedDB storage",
   "private": true,
   "scripts": {
-    "install:all": "cd client && npm install && cd ../server && npm install",
-    "dev:client": "cd client && npm run dev",
-    "dev:server": "cd server && npm run dev",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "build:client": "cd client && npm run build",
-    "build:server": "cd server && npm run build",
-    "build": "npm run build:client && npm run build:server",
-    "start": "cd server && npm start",
-    "db:migrate": "cd server && npx prisma migrate deploy",
-    "db:seed": "cd server && npx prisma db seed",
-    "db:push": "cd server && npx prisma db push"
-  },
-  "devDependencies": {
-    "concurrently": "^9.0.0"
+    "dev": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "preview": "cd client && npm run preview"
   }
 }

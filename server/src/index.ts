@@ -23,6 +23,9 @@ app.use('/api/v1', costLinesRouter);
 app.use('/api/v1/rates', ratesRouter);
 
 // Health check
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -31,7 +34,12 @@ app.get('/api/health', (_req, res) => {
 const publicPath = path.join(__dirname, 'public');
 app.use(express.static(publicPath));
 app.get('*', (_req, res) => {
-  res.sendFile(path.join(publicPath, 'index.html'));
+  const indexPath = path.join(publicPath, 'index.html');
+  if (require('fs').existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({ error: 'Not found' });
+  }
 });
 
 const PORT = process.env.PORT || 3001;

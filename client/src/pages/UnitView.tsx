@@ -21,7 +21,7 @@ import {
   Popconfirm,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../components/AppLayout';
 import * as api from '../services/api';
 import type { PersonnelGroup, UnitBudget, FundingType, UnitCalc, GroupCalc } from '../types';
@@ -29,15 +29,21 @@ import type { PersonnelGroup, UnitBudget, FundingType, UnitCalc, GroupCalc } fro
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
 const RANKS = [
-  'E-1','E-2','E-3','E-4','E-5','E-6','E-7','E-8','E-9',
-  'W-1','W-2','W-3','W-4','W-5',
-  'O-1','O-2','O-3','O-4','O-5','O-6','O-7','O-8','O-9','O-10',
+  'AB','AMN','A1C','SRA','SSGT','TSGT','MSGT','SMSGT','CMSGT',
+  '2LT','1LT','CAPT','MAJ','LTCOL','COL','BG','MG',
 ];
 
 export default function UnitView() {
   const { unitCode } = useParams<{ unitCode: string }>();
   const { exercise, budget, exerciseId, refetchBudget, refetchExercise } = useApp();
   const queryClient = useQueryClient();
+  const { data: perDiemLocations = ['GULFPORT', 'CAMP_SHELBY'] } = useQuery({
+    queryKey: ['perDiemRates'],
+    queryFn: async () => {
+      const rates = await api.getPerDiemRates();
+      return rates.map((r) => r.location);
+    },
+  });
   const [entryModal, setEntryModal] = useState<{ groupId: string } | null>(null);
   const [execModal, setExecModal] = useState(false);
   const [entryForm] = Form.useForm();
@@ -135,10 +141,7 @@ export default function UnitView() {
               value={group.location || 'GULFPORT'}
               style={{ width: '100%' }}
               onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { location: v } })}
-              options={[
-                { value: 'GULFPORT', label: 'Gulfport' },
-                { value: 'CAMP_SHELBY', label: 'Camp Shelby' },
-              ]}
+              options={perDiemLocations.map((loc) => ({ value: loc, label: loc.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }))}
             />
           </Col>
           <Col span={6}>

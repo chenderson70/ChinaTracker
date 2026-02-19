@@ -3,44 +3,15 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-enum UnitCode {
-  SG
-  AE
-  CAB
-  A7
-}
-
-enum PersonnelRole {
-  PLAYER
-  WHITE_CELL
-  PLANNING
-  SUPPORT
-}
-
-enum FundingType {
-  RPA
-  OM
-}
-
-enum Location {
-  GULFPORT
-  CAMP_SHELBY
-}
-
-enum OmCategory {
-  CONTRACT
-  TRANSPORTATION
-  BILLETING
-  PORT_A_POTTY
-  RENTALS_VSCOS
-  CONSUMABLES
-  WRM
-  OTHER
-}
+// UnitCode: SG | AE | CAB | A7
+// PersonnelRole: PLAYER | WHITE_CELL | PLANNING | SUPPORT
+// FundingType: RPA | OM
+// Location: GULFPORT | CAMP_SHELBY
+// OmCategory: CONTRACT | TRANSPORTATION | BILLETING | PORT_A_POTTY | RENTALS_VSCOS | CONSUMABLES | WRM | OTHER
 
 model Exercise {
   id              String         @id @default(uuid())
@@ -60,7 +31,7 @@ model Exercise {
 model UnitBudget {
   id                 String              @id @default(uuid())
   exerciseId         String              @map("exercise_id")
-  unitCode           UnitCode            @map("unit_code")
+  unitCode           String              @map("unit_code")
   exercise           Exercise            @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   personnelGroups    PersonnelGroup[]
   executionCostLines ExecutionCostLine[]
@@ -71,11 +42,11 @@ model UnitBudget {
 model PersonnelGroup {
   id               String           @id @default(uuid())
   unitBudgetId     String           @map("unit_budget_id")
-  role             PersonnelRole
-  fundingType      FundingType      @map("funding_type")
+  role             String
+  fundingType      String           @map("funding_type")
   paxCount         Int              @default(0) @map("pax_count")
   dutyDays         Int?             @map("duty_days")
-  location         Location?
+  location         String?
   isLongTour       Boolean          @default(false) @map("is_long_tour")
   avgCpdOverride   Float?           @map("avg_cpd_override")
   unitBudget       UnitBudget       @relation(fields: [unitBudgetId], references: [id], onDelete: Cascade)
@@ -105,7 +76,7 @@ model RankCpdRate {
 
 model PerDiemRate {
   id            String   @id @default(uuid())
-  location      Location @unique
+  location      String   @unique
   lodgingRate   Float    @map("lodging_rate")
   mieRate       Float    @map("mie_rate")
   effectiveDate DateTime @map("effective_date")
@@ -128,7 +99,7 @@ model TravelConfig {
 model ExecutionCostLine {
   id           String      @id @default(uuid())
   unitBudgetId String      @map("unit_budget_id")
-  fundingType  FundingType @map("funding_type")
+  fundingType  String      @map("funding_type")
   category     String
   amount       Float
   notes        String?
@@ -140,7 +111,7 @@ model ExecutionCostLine {
 model OmCostLine {
   id         String     @id @default(uuid())
   exerciseId String     @map("exercise_id")
-  category   OmCategory
+  category   String
   label      String
   amount     Float
   notes      String?

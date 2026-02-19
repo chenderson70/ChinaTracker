@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Card, Table, InputNumber, Button, Typography, Row, Col, Divider, Space, message, Spin } from 'antd';
-import { SaveOutlined } from '@ant-design/icons';
+import { Card, Table, InputNumber, Button, Typography, Row, Col, Divider, Space, message, Spin, Modal, Input, Popconfirm } from 'antd';
+import { SaveOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '../services/api';
 import { useApp } from '../components/AppLayout';
@@ -42,13 +42,27 @@ export default function RateConfig() {
     mutationFn: () => {
       const rates = perDiemRates.map((r: PerDiemRate) => ({
         location: r.location,
-        lodgingRate: pdEdits[r.location]?.lodging ?? r.lodgingRate,
-        mieRate: pdEdits[r.location]?.mie ?? r.mieRate,
+        lodgingRate: pdEdits[r.id]?.lodging ?? r.lodgingRate,
+        mieRate: pdEdits[r.id]?.mie ?? r.mieRate,
       }));
       return api.updatePerDiemRates(rates);
     },
     onSuccess: () => { invalidate(); setPdEdits({}); message.success('Per diem rates saved'); },
   });
+
+  const addPdMut = useMutation({
+    mutationFn: (data: { location: string; lodging: number; mie: number }) =>
+      api.addPerDiemRate(data.location, data.lodging, data.mie),
+    onSuccess: () => { invalidate(); message.success('Location added'); },
+  });
+
+  const deletePdMut = useMutation({
+    mutationFn: (id: string) => api.deletePerDiemRate(id),
+    onSuccess: () => { invalidate(); message.success('Location removed'); },
+  });
+
+  const [addLocOpen, setAddLocOpen] = useState(false);
+  const [newLoc, setNewLoc] = useState({ name: '', lodging: 0, mie: 0 });
 
   const saveCfgMut = useMutation({
     mutationFn: () => api.updateAppConfig({ ...config, ...cfgEdits }),
@@ -75,7 +89,7 @@ export default function RateConfig() {
   ];
 
   const pdColumns = [
-    { title: 'Location', dataIndex: 'location', width: 140 },
+    { title: 'Location', dataIndex: 'location', width: 160 },
     {
       title: 'Lodging ($/night)',
       dataIndex: 'lodgingRate',
@@ -83,8 +97,8 @@ export default function RateConfig() {
         <InputNumber
           min={0}
           step={0.01}
-          value={pdEdits[row.location]?.lodging ?? val}
-          onChange={(v) => setPdEdits({ ...pdEdits, [row.location]: { ...pdEdits[row.location], lodging: v || 0 } })}
+          value={pdEdits[row.id]?.lodging ?? val}
+          onChange={(v) => setPdEdits({ ...pdEdits, [row.id]: { ...pdEdits[row.id], lodging: v || 0 } })}
           style={{ width: 120 }}
         />
       ),
@@ -96,10 +110,19 @@ export default function RateConfig() {
         <InputNumber
           min={0}
           step={0.01}
-          value={pdEdits[row.location]?.mie ?? val}
-          onChange={(v) => setPdEdits({ ...pdEdits, [row.location]: { ...pdEdits[row.location], mie: v || 0 } })}
+          value={pdEdits[row.id]?.mie ?? val}
+          onChange={(v) => setPdEdits({ ...pdEdits, [row.id]: { ...pdEdits[row.id], mie: v || 0 } })}
           style={{ width: 120 }}
         />
+      ),
+    },
+    {
+      title: '',
+      width: 50,
+      render: (_: unknown, row: PerDiemRate) => (
+        <Popconfirm title="Delete this location?" onConfirm={() => deletePdMut.mutate(row.id)}>
+          <Button type="text" danger icon={<DeleteOutlined />} size="small" />
+        </Popconfirm>
       ),
     },
   ];
@@ -128,7 +151,12 @@ export default function RateConfig() {
       {/* Per Diem Rates */}
       <Card
         title="Per Diem Rates"
-        extra={<Button icon={<SaveOutlined />} type="primary" onClick={() => savePdMut.mutate()} loading={savePdMut.isPending}>Save</Button>}
+        extra={
+          <Space>
+            <Button icon={<PlusOutlined />} onClick={() => setAddLocOpen(true)}>Add Location</Button>
+            <Button icon={<SaveOutlined />} type="primary" onClick={() => savePdMut.mutate()} loading={savePdMut.isPending}>Save</Button>
+          </Space>
+        }
         style={{ marginBottom: 24 }}
       >
         <Table
@@ -138,6 +166,34 @@ export default function RateConfig() {
           columns={pdColumns}
         />
       </Card>
+
+      {/* Add Location modal */}
+      <Modal
+        title="Add Per Diem Location"
+        open={addLocOpen}
+        onOk={() => {
+          if (!newLoc.name.trim()) { message.warning('Enter a location name'); return; }
+          addPdMut.mutate({ location: newLoc.name.trim().toUpperCase().replace(/\s+/g, '_'), lodging: newLoc.lodging, mie: newLoc.mie });
+          setAddLocOpen(false);
+          setNewLoc({ name: '', lodging: 0, mie: 0 });
+        }}
+        onCancel={() => setAddLocOpen(false)}
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <div>
+            <Typography.Text type="secondary">Location Name</Typography.Text>
+            <Input placeholder="e.g., Fort Hood" value={newLoc.name} onChange={(e) => setNewLoc({ ...newLoc, name: e.target.value })} />
+          </div>
+          <div>
+            <Typography.Text type="secondary">Lodging Rate ($/night)</Typography.Text>
+            <InputNumber min={0} step={0.01} value={newLoc.lodging} onChange={(v) => setNewLoc({ ...newLoc, lodging: v || 0 })} style={{ width: '100%' }} />
+          </div>
+          <div>
+            <Typography.Text type="secondary">M&IE Rate ($/day)</Typography.Text>
+            <InputNumber min={0} step={0.01} value={newLoc.mie} onChange={(v) => setNewLoc({ ...newLoc, mie: v || 0 })} style={{ width: '100%' }} />
+          </div>
+        </Space>
+      </Modal>
 
       {/* App Config: Meals & billeting */}
       <Card
