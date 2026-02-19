@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UnitCode {
+  SG
+  AE
+  CAB
+  A7
+}
+
+enum PersonnelRole {
+  PLAYER
+  WHITE_CELL
+  PLANNING
+  SUPPORT
+}
+
+enum FundingType {
+  RPA
+  OM
+}
+
+enum Location {
+  GULFPORT
+  CAMP_SHELBY
+}
+
+enum OmCategory {
+  CONTRACT
+  TRANSPORTATION
+  BILLETING
+  PORT_A_POTTY
+  RENTALS_VSCOS
+  CONSUMABLES
+  WRM
+  OTHER
+}
+
+model Exercise {
+  id              String         @id @default(uuid())
+  name            String
+  startDate       DateTime       @map("start_date")
+  endDate         DateTime       @map("end_date")
+  defaultDutyDays Int            @map("default_duty_days")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  unitBudgets     UnitBudget[]
+  travelConfig    TravelConfig?
+  omCostLines     OmCostLine[]
+
+  @@map("exercises")
+}
+
+model UnitBudget {
+  id                 String              @id @default(uuid())
+  exerciseId         String              @map("exercise_id")
+  unitCode           UnitCode            @map("unit_code")
+  exercise           Exercise            @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  personnelGroups    PersonnelGroup[]
+  executionCostLines ExecutionCostLine[]
+
+  @@map("unit_budgets")
+}
+
+model PersonnelGroup {
+  id               String           @id @default(uuid())
+  unitBudgetId     String           @map("unit_budget_id")
+  role             PersonnelRole
+  fundingType      FundingType      @map("funding_type")
+  paxCount         Int              @default(0) @map("pax_count")
+  dutyDays         Int?             @map("duty_days")
+  location         Location?
+  isLongTour       Boolean          @default(false) @map("is_long_tour")
+  avgCpdOverride   Float?           @map("avg_cpd_override")
+  unitBudget       UnitBudget       @relation(fields: [unitBudgetId], references: [id], onDelete: Cascade)
+  personnelEntries PersonnelEntry[]
+
+  @@map("personnel_groups")
+}
+
+model PersonnelEntry {
+  id               String         @id @default(uuid())
+  personnelGroupId String         @map("personnel_group_id")
+  rankCode         String         @map("rank_code")
+  count            Int
+  personnelGroup   PersonnelGroup @relation(fields: [personnelGroupId], references: [id], onDelete: Cascade)
+
+  @@map("personnel_entries")
+}
+
+model RankCpdRate {
+  id            String   @id @default(uuid())
+  rankCode      String   @unique @map("rank_code")
+  costPerDay    Float    @map("cost_per_day")
+  effectiveDate DateTime @map("effective_date")
+
+  @@map("rank_cpd_rates")
+}
+
+model PerDiemRate {
+  id            String   @id @default(uuid())
+  location      Location @unique
+  lodgingRate   Float    @map("lodging_rate")
+  mieRate       Float    @map("mie_rate")
+  effectiveDate DateTime @map("effective_date")
+
+  @@map("per_diem_rates")
+}
+
+model TravelConfig {
+  id                 String   @id @default(uuid())
+  exerciseId         String   @unique @map("exercise_id")
+  airfarePerPerson   Float    @default(400) @map("airfare_per_person")
+  rentalCarDailyRate Float    @default(50) @map("rental_car_daily_rate")
+  rentalCarCount     Int      @default(0) @map("rental_car_count")
+  rentalCarDays      Int      @default(0) @map("rental_car_days")
+  exercise           Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@map("travel_config")
+}
+
+model ExecutionCostLine {
+  id           String      @id @default(uuid())
+  unitBudgetId String      @map("unit_budget_id")
+  fundingType  FundingType @map("funding_type")
+  category     String
+  amount       Float
+  notes        String?
+  unitBudget   UnitBudget  @relation(fields: [unitBudgetId], references: [id], onDelete: Cascade)
+
+  @@map("execution_cost_lines")
+}
+
+model OmCostLine {
+  id         String     @id @default(uuid())
+  exerciseId String     @map("exercise_id")
+  category   OmCategory
+  label      String
+  amount     Float
+  notes      String?
+  exercise   Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@map("om_cost_lines")
+}
+
+model AppConfig {
+  key   String @id
+  value String
+
+  @@map("app_config")
+}

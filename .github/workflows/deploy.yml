@@ -1,0 +1,68 @@
+name: Build and Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AZURE_WEBAPP_NAME: app-chinatracker-prod
+  NODE_VERSION: '20'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install client dependencies
+        working-directory: ./client
+        run: npm ci
+
+      - name: Build client
+        working-directory: ./client
+        run: npm run build
+
+      - name: Install server dependencies
+        working-directory: ./server
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: ./server
+        run: npx prisma generate
+
+      - name: Build server
+        working-directory: ./server
+        run: npm run build
+
+      - name: Copy client build to server
+        run: |
+          mkdir -p server/dist/public
+          cp -r client/dist/* server/dist/public/
+
+      - name: Run database migrations
+        working-directory: ./server
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Prepare deployment package
+        run: |
+          cd server
+          # Remove dev dependencies to save space
+          npm prune --production
+          # Re-generate prisma client after prune
+          npx prisma generate
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./server
