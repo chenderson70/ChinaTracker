@@ -48,7 +48,7 @@ jobs:
 
       - name: Run database migrations
         working-directory: ./server
-        run: npx prisma migrate deploy
+        run: npx prisma db push --accept-data-loss
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
