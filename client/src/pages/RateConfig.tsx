@@ -69,7 +69,7 @@ export default function RateConfig() {
     onSuccess: () => { invalidate(); setCfgEdits({}); message.success('Config saved'); },
   });
 
-  if (cpdLoading || pdLoading || cfgLoading) return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
+  if (cpdLoading || pdLoading || cfgLoading) return <div className="ct-loading"><Spin size="large" /></div>;
 
   const cpdColumns = [
     { title: 'Rank', dataIndex: 'rankCode', width: 100 },
@@ -131,40 +131,44 @@ export default function RateConfig() {
 
   return (
     <div>
-      <Typography.Title level={4}>Rate Configuration</Typography.Title>
+      <Typography.Title level={4} className="ct-page-title">Rate Configuration</Typography.Title>
 
       {/* CPD Rates */}
       <Card
         title="Composite Pay & Allowance (CPD) Rates"
+        className="ct-config-card"
         extra={<Button icon={<SaveOutlined />} type="primary" onClick={() => saveCpdMut.mutate()} loading={saveCpdMut.isPending}>Save</Button>}
-        style={{ marginBottom: 24 }}
       >
-        <Table
-          size="small"
-          pagination={false}
-          dataSource={cpdRates.map((r: RankCpdRate) => ({ ...r, key: r.id }))}
-          columns={cpdColumns}
-          scroll={{ y: 400 }}
-        />
+        <div className="ct-table">
+          <Table
+            size="small"
+            pagination={false}
+            dataSource={cpdRates.map((r: RankCpdRate) => ({ ...r, key: r.id }))}
+            columns={cpdColumns}
+            scroll={{ y: 400 }}
+          />
+        </div>
       </Card>
 
       {/* Per Diem Rates */}
       <Card
         title="Per Diem Rates"
+        className="ct-config-card"
         extra={
           <Space>
             <Button icon={<PlusOutlined />} onClick={() => setAddLocOpen(true)}>Add Location</Button>
             <Button icon={<SaveOutlined />} type="primary" onClick={() => savePdMut.mutate()} loading={savePdMut.isPending}>Save</Button>
           </Space>
         }
-        style={{ marginBottom: 24 }}
       >
-        <Table
-          size="small"
-          pagination={false}
-          dataSource={perDiemRates.map((r: PerDiemRate) => ({ ...r, key: r.id }))}
-          columns={pdColumns}
-        />
+        <div className="ct-table">
+          <Table
+            size="small"
+            pagination={false}
+            dataSource={perDiemRates.map((r: PerDiemRate) => ({ ...r, key: r.id }))}
+            columns={pdColumns}
+          />
+        </div>
       </Card>
 
       {/* Add Location modal */}
@@ -198,6 +202,7 @@ export default function RateConfig() {
       {/* App Config: Meals & billeting */}
       <Card
         title="Meal Rates & Billeting"
+        className="ct-config-card"
         extra={<Button icon={<SaveOutlined />} type="primary" onClick={() => saveCfgMut.mutate()} loading={saveCfgMut.isPending}>Save</Button>}
       >
         <Row gutter={24}>
@@ -259,8 +264,8 @@ export default function RateConfig() {
             <InputNumber
               min={0}
               step={1}
-              value={cfgVal('RENTAL_CAR_DAILY_RATE')}
-              onChange={(v) => setCfgEdits({ ...cfgEdits, RENTAL_CAR_DAILY_RATE: String(v || 0) })}
+              value={cfgVal('DEFAULT_RENTAL_CAR_DAILY')}
+              onChange={(v) => setCfgEdits({ ...cfgEdits, DEFAULT_RENTAL_CAR_DAILY: String(v || 0) })}
               style={{ width: '100%' }}
             />
           </Col>

@@ -26,6 +26,30 @@ const ROLES_BY_UNIT: Record<string, string[]> = {
 };
 const FUNDING_TYPES = ['RPA', 'OM'] as const;
 
+function rolesForUnit(unitCode: string, template?: 'STANDARD' | 'A7'): string[] {
+  if (template === 'A7') return ['PLANNING', 'SUPPORT'];
+  return ROLES_BY_UNIT[unitCode] ?? ['PLAYER', 'WHITE_CELL'];
+}
+
+async function seedPersonnelGroupsForUnit(unitBudgetId: string, unitCode: string, template?: 'STANDARD' | 'A7') {
+  const roles = rolesForUnit(unitCode, template);
+  for (const role of roles) {
+    for (const ft of FUNDING_TYPES) {
+      await db.personnelGroups.add({
+        id: uid(),
+        unitBudgetId,
+        role,
+        fundingType: ft,
+        paxCount: 0,
+        dutyDays: null,
+        location: null,
+        isLongTour: false,
+        avgCpdOverride: null,
+      });
+    }
+  }
+}
+
 // ── helpers ──
 function uid(): string {
   return crypto.randomUUID();
@@ -95,22 +119,7 @@ export async function createExercise(data: {
   for (const unitCode of UNIT_CODES) {
     const ubId = uid();
     await db.unitBudgets.add({ id: ubId, exerciseId, unitCode });
-    const roles = ROLES_BY_UNIT[unitCode];
-    for (const role of roles) {
-      for (const ft of FUNDING_TYPES) {
-        await db.personnelGroups.add({
-          id: uid(),
-          unitBudgetId: ubId,
-          role,
-          fundingType: ft,
-          paxCount: 0,
-          dutyDays: null,
-          location: null,
-          isLongTour: false,
-          avgCpdOverride: null,
-        });
-      }
-    }
+    await seedPersonnelGroupsForUnit(ubId, unitCode);
   }
 
   // Create default travel config
@@ -145,6 +154,48 @@ export async function deleteExercise(id: string): Promise<void> {
   await db.travelConfigs.where('exerciseId').equals(id).delete();
   await db.omCostLines.where('exerciseId').equals(id).delete();
   await db.exercises.delete(id);
+}
+
+export async function addUnitBudget(
+  exerciseId: string,
+  data: { unitCode: string; template?: 'STANDARD' | 'A7' },
+): Promise<ExerciseDetail> {
+  const normalizedUnitCode = data.unitCode.trim().toUpperCase();
+  if (!normalizedUnitCode) {
+    throw new Error('Unit code is required');
+  }
+
+  const existing = await db.unitBudgets.where('exerciseId').equals(exerciseId).toArray();
+  if (existing.some((unit) => unit.unitCode.toUpperCase() === normalizedUnitCode)) {
+    throw new Error('Unit already exists for this exercise');
+  }
+
+  const unitBudgetId = uid();
+  await db.unitBudgets.add({ id: unitBudgetId, exerciseId, unitCode: normalizedUnitCode });
+  await seedPersonnelGroupsForUnit(unitBudgetId, normalizedUnitCode, data.template);
+
+  return getExercise(exerciseId);
+}
+
+export async function deleteUnitBudget(exerciseId: string, unitCode: string): Promise<ExerciseDetail> {
+  const normalizedUnitCode = unitCode.trim().toUpperCase();
+  const units = await db.unitBudgets.where('exerciseId').equals(exerciseId).toArray();
+  const unit = units.find((candidate) => candidate.unitCode.toUpperCase() === normalizedUnitCode);
+
+  if (!unit) {
+    throw new Error('Unit not found');
+  }
+
+  const groups = await db.personnelGroups.where('unitBudgetId').equals(unit.id).toArray();
+  for (const group of groups) {
+    await db.personnelEntries.where('personnelGroupId').equals(group.id).delete();
+  }
+
+  await db.personnelGroups.where('unitBudgetId').equals(unit.id).delete();
+  await db.executionCostLines.where('unitBudgetId').equals(unit.id).delete();
+  await db.unitBudgets.delete(unit.id);
+
+  return getExercise(exerciseId);
 }
 
 // ── Travel Config ──

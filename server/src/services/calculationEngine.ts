@@ -106,10 +106,10 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
       unitTotal: 0,
     };
 
-    // Rental cars split evenly across units (simple approach)
+    // Rental cars split proportionally so totals never exceed configured exercise travel cost.
     const unitCount = (exercise.unitBudgets || []).length || 1;
-    const rentalCarsPerUnit = Math.ceil(travel.rentalCarCount / unitCount);
-    const rentalCost = rentalCarsPerUnit * travel.rentalCarDailyRate * travel.rentalCarDays;
+    const totalRentalCost = travel.rentalCarCount * travel.rentalCarDailyRate * travel.rentalCarDays;
+    const rentalCost = totalRentalCost / unitCount;
 
     for (const pg of ub.personnelGroups || []) {
       const days = pg.dutyDays || defaultDays;

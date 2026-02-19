@@ -7,31 +7,37 @@ async function main() {
 
   // --- Rank CPD Rates (FY26 approximate) ---
   const cpdRates = [
-    { rankCode: 'E-1', costPerDay: 117 },
-    { rankCode: 'E-2', costPerDay: 131 },
-    { rankCode: 'E-3', costPerDay: 138 },
-    { rankCode: 'E-4', costPerDay: 153 },
-    { rankCode: 'E-5', costPerDay: 169 },
-    { rankCode: 'E-6', costPerDay: 185 },
-    { rankCode: 'E-7', costPerDay: 214 },
-    { rankCode: 'E-8', costPerDay: 245 },
-    { rankCode: 'E-9', costPerDay: 280 },
-    { rankCode: 'W-1', costPerDay: 198 },
-    { rankCode: 'W-2', costPerDay: 226 },
-    { rankCode: 'W-3', costPerDay: 256 },
-    { rankCode: 'W-4', costPerDay: 280 },
-    { rankCode: 'W-5', costPerDay: 310 },
-    { rankCode: 'O-1', costPerDay: 175 },
-    { rankCode: 'O-2', costPerDay: 202 },
-    { rankCode: 'O-3', costPerDay: 240 },
-    { rankCode: 'O-4', costPerDay: 275 },
-    { rankCode: 'O-5', costPerDay: 320 },
-    { rankCode: 'O-6', costPerDay: 370 },
-    { rankCode: 'O-7', costPerDay: 420 },
-    { rankCode: 'O-8', costPerDay: 480 },
-    { rankCode: 'O-9', costPerDay: 540 },
-    { rankCode: 'O-10', costPerDay: 600 },
+    { rankCode: 'AB', costPerDay: 191 },
+    { rankCode: 'AMN', costPerDay: 185 },
+    { rankCode: 'A1C', costPerDay: 194 },
+    { rankCode: 'SRA', costPerDay: 209 },
+    { rankCode: 'SSGT', costPerDay: 253 },
+    { rankCode: 'TSGT', costPerDay: 300 },
+    { rankCode: 'MSGT', costPerDay: 350 },
+    { rankCode: 'SMSGT', costPerDay: 401 },
+    { rankCode: 'CMSGT', costPerDay: 476 },
+    { rankCode: '2LT', costPerDay: 332 },
+    { rankCode: '1LT', costPerDay: 386 },
+    { rankCode: 'CAPT', costPerDay: 457 },
+    { rankCode: 'MAJ', costPerDay: 545 },
+    { rankCode: 'LTCOL', costPerDay: 635 },
+    { rankCode: 'COL', costPerDay: 744 },
+    { rankCode: 'BG', costPerDay: 861 },
+    { rankCode: 'MG', costPerDay: 960 },
   ];
+
+  // Remove legacy grade-format rows so the UI/rate tables remain consistent.
+  await prisma.rankCpdRate.deleteMany({
+    where: {
+      rankCode: {
+        in: [
+          'E-1', 'E-2', 'E-3', 'E-4', 'E-5', 'E-6', 'E-7', 'E-8', 'E-9',
+          'W-1', 'W-2', 'W-3', 'W-4', 'W-5',
+          'O-1', 'O-2', 'O-3', 'O-4', 'O-5', 'O-6', 'O-7', 'O-8', 'O-9', 'O-10',
+        ],
+      },
+    },
+  });
 
   for (const rate of cpdRates) {
     await prisma.rankCpdRate.upsert({

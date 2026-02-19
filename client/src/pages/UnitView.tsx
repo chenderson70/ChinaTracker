@@ -16,7 +16,6 @@ import {
   Space,
   Divider,
   Spin,
-  Statistic,
   message,
   Popconfirm,
 } from 'antd';
@@ -39,10 +38,14 @@ export default function UnitView() {
   const queryClient = useQueryClient();
   const { data: perDiemLocations = ['GULFPORT', 'CAMP_SHELBY'] } = useQuery({
     queryKey: ['perDiemRates'],
-    queryFn: async () => {
-      const rates = await api.getPerDiemRates();
-      return rates.map((r) => r.location);
-    },
+    queryFn: api.getPerDiemRates,
+    select: (rates) => Array.from(
+      new Set(
+        rates
+          .map((r) => r.location)
+          .filter((location): location is string => typeof location === 'string' && location.trim().length > 0),
+      ),
+    ),
   });
   const [entryModal, setEntryModal] = useState<{ groupId: string } | null>(null);
   const [execModal, setExecModal] = useState(false);
@@ -79,7 +82,7 @@ export default function UnitView() {
     onSuccess: invalidate,
   });
 
-  if (!exercise || !budget || !unitCode) return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
+  if (!exercise || !budget || !unitCode) return <div className="ct-loading"><Spin size="large" /></div>;
 
   const ub = exercise.unitBudgets.find((u: UnitBudget) => u.unitCode === unitCode);
   const unitCalc = budget.units[unitCode];
@@ -88,8 +91,8 @@ export default function UnitView() {
   const findGroup = (role: string, ft: FundingType) =>
     ub.personnelGroups.find((g: PersonnelGroup) => g.role === role && g.fundingType === ft);
 
-  const isA7 = unitCode === 'A7';
-  const roles = isA7 ? ['PLANNING', 'SUPPORT'] : ['PLAYER', 'WHITE_CELL'];
+  const hasPlanningSupport = ub.personnelGroups.some((group) => group.role === 'PLANNING' || group.role === 'SUPPORT');
+  const roles = hasPlanningSupport ? ['PLANNING', 'SUPPORT'] : ['PLAYER', 'WHITE_CELL'];
   const roleLabels: Record<string, string> = {
     PLAYER: 'Player',
     WHITE_CELL: 'White Cell',
@@ -111,10 +114,15 @@ export default function UnitView() {
 
     return (
       <Card
-        title={`${roleLabels[role]} — ${ft}`}
+        title={
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {roleLabels[role]}
+            <span className={ft === 'RPA' ? 'ct-badge-rpa' : 'ct-badge-om'}>{ft}</span>
+          </span>
+        }
         size="small"
-        style={{ marginBottom: 16 }}
-        extra={<Typography.Text strong>{fmt(calc.subtotal)}</Typography.Text>}
+        className="ct-personnel-card"
+        extra={<span style={{ fontSize: 16, fontWeight: 700, color: ft === 'RPA' ? '#1677ff' : '#52c41a' }}>{fmt(calc.subtotal)}</span>}
       >
         <Row gutter={16} style={{ marginBottom: 12 }}>
           <Col span={6}>
@@ -156,11 +164,11 @@ export default function UnitView() {
 
         {/* Cost breakdown */}
         <Row gutter={16} style={{ marginBottom: 12 }}>
-          {calc.milPay > 0 && <Col><Statistic title="Mil Pay" value={fmt(calc.milPay)} valueStyle={{ fontSize: 14 }} /></Col>}
-          {calc.perDiem > 0 && <Col><Statistic title="Per Diem" value={fmt(calc.perDiem)} valueStyle={{ fontSize: 14 }} /></Col>}
-          {calc.meals > 0 && <Col><Statistic title="Meals" value={fmt(calc.meals)} valueStyle={{ fontSize: 14 }} /></Col>}
-          {calc.travel > 0 && <Col><Statistic title="Travel" value={fmt(calc.travel)} valueStyle={{ fontSize: 14 }} /></Col>}
-          {calc.billeting > 0 && <Col><Statistic title="Billeting" value={fmt(calc.billeting)} valueStyle={{ fontSize: 14 }} /></Col>}
+          {calc.milPay > 0 && <Col><div><span style={{ fontSize: 12, color: '#8c8c8c', display: 'block' }}>Mil Pay</span><span style={{ fontSize: 14, fontWeight: 600 }}>{fmt(calc.milPay)}</span></div></Col>}
+          {calc.perDiem > 0 && <Col><div><span style={{ fontSize: 12, color: '#8c8c8c', display: 'block' }}>Per Diem</span><span style={{ fontSize: 14, fontWeight: 600 }}>{fmt(calc.perDiem)}</span></div></Col>}
+          {calc.meals > 0 && <Col><div><span style={{ fontSize: 12, color: '#8c8c8c', display: 'block' }}>Meals</span><span style={{ fontSize: 14, fontWeight: 600 }}>{fmt(calc.meals)}</span></div></Col>}
+          {calc.travel > 0 && <Col><div><span style={{ fontSize: 12, color: '#8c8c8c', display: 'block' }}>Travel</span><span style={{ fontSize: 14, fontWeight: 600 }}>{fmt(calc.travel)}</span></div></Col>}
+          {calc.billeting > 0 && <Col><div><span style={{ fontSize: 12, color: '#8c8c8c', display: 'block' }}>Billeting</span><span style={{ fontSize: 14, fontWeight: 600 }}>{fmt(calc.billeting)}</span></div></Col>}
         </Row>
 
         {/* Rank-level detail */}
@@ -215,13 +223,34 @@ export default function UnitView() {
 
   return (
     <div>
-      <Typography.Title level={4}>{unitCode} — Unit Budget</Typography.Title>
+      <Typography.Title level={4} className="ct-page-title">{unitCode} — Unit Budget</Typography.Title>
 
       {/* Summary */}
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col><Statistic title="Unit RPA" value={fmt(unitCalc.unitTotalRpa)} valueStyle={{ color: '#1677ff' }} /></Col>
-        <Col><Statistic title="Unit O&M" value={fmt(unitCalc.unitTotalOm)} valueStyle={{ color: '#52c41a' }} /></Col>
-        <Col><Statistic title="Unit Total" value={fmt(unitCalc.unitTotal)} /></Col>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger">
+        <Col xs={8}>
+          <Card size="small" className="ct-stat-card ct-stat-blue" style={{ padding: '4px 0' }}>
+            <div style={{ padding: '4px 12px' }}>
+              <div className="ct-stat-label">Unit RPA</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#1677ff', lineHeight: 1.1 }}>{fmt(unitCalc.unitTotalRpa)}</div>
+            </div>
+          </Card>
+        </Col>
+        <Col xs={8}>
+          <Card size="small" className="ct-stat-card ct-stat-green" style={{ padding: '4px 0' }}>
+            <div style={{ padding: '4px 12px' }}>
+              <div className="ct-stat-label">Unit O&M</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#52c41a', lineHeight: 1.1 }}>{fmt(unitCalc.unitTotalOm)}</div>
+            </div>
+          </Card>
+        </Col>
+        <Col xs={8}>
+          <Card size="small" className="ct-stat-card ct-stat-purple" style={{ padding: '4px 0' }}>
+            <div style={{ padding: '4px 12px' }}>
+              <div className="ct-stat-label">Unit Total</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#1a1a2e', lineHeight: 1.1 }}>{fmt(unitCalc.unitTotal)}</div>
+            </div>
+          </Card>
+        </Col>
       </Row>
 
       <Divider />
@@ -229,12 +258,12 @@ export default function UnitView() {
       {/* Personnel panels */}
       <Row gutter={16}>
         <Col xs={24} lg={12}>
-          <Typography.Title level={5}>{roleLabels[roles[0]]} ({isA7 ? 'A7 Planning' : 'Players'})</Typography.Title>
+          <Typography.Title level={5}>{roleLabels[roles[0]]} ({hasPlanningSupport ? 'Planning Cell' : 'Players'})</Typography.Title>
           <PersonnelPanel role={roles[0]} ft="RPA" />
           <PersonnelPanel role={roles[0]} ft="OM" />
         </Col>
         <Col xs={24} lg={12}>
-          <Typography.Title level={5}>{roleLabels[roles[1]]} ({isA7 ? 'A7 Support' : 'White Cell'})</Typography.Title>
+          <Typography.Title level={5}>{roleLabels[roles[1]]} ({hasPlanningSupport ? 'Support Cell' : 'White Cell'})</Typography.Title>
           <PersonnelPanel role={roles[1]} ft="RPA" />
           <PersonnelPanel role={roles[1]} ft="OM" />
         </Col>
@@ -245,15 +274,18 @@ export default function UnitView() {
       {/* Execution cost lines */}
       <Card
         title="Execution Cost Lines"
-        extra={<Button icon={<PlusOutlined />} onClick={() => setExecModal(true)}>Add Cost</Button>}
+        className="ct-section-card"
+        extra={<Button icon={<PlusOutlined />} type="primary" onClick={() => setExecModal(true)}>Add Cost</Button>}
       >
-        <Table
-          size="small"
-          pagination={false}
-          dataSource={ub.executionCostLines.map((l) => ({ ...l, key: l.id }))}
-          columns={execColumns}
-          locale={{ emptyText: 'No execution cost lines yet' }}
-        />
+        <div className="ct-table">
+          <Table
+            size="small"
+            pagination={false}
+            dataSource={ub.executionCostLines.map((l) => ({ ...l, key: l.id }))}
+            columns={execColumns}
+            locale={{ emptyText: 'No execution cost lines yet' }}
+          />
+        </div>
       </Card>
 
       {/* Add rank entry modal */}

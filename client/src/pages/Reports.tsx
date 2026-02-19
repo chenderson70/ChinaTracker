@@ -34,7 +34,7 @@ export default function Reports() {
     },
   });
 
-  if (!exercise || !budget) return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
+  if (!exercise || !budget) return <div className="ct-loading"><Spin size="large" /></div>;
 
   const handleExport = () => api.exportExcel(exerciseId!);
   const handlePrint = () => window.print();
@@ -70,9 +70,9 @@ export default function Reports() {
 
   return (
     <div>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
-          <Typography.Title level={4} style={{ margin: 0 }}>Reports & Export</Typography.Title>
+          <Typography.Title level={4} className="ct-page-title" style={{ marginBottom: 0 }}>Reports & Export</Typography.Title>
         </Col>
         <Col>
           <Space>
@@ -83,7 +83,7 @@ export default function Reports() {
       </Row>
 
       {/* Exercise info */}
-      <Card title="Exercise Details" style={{ marginBottom: 24 }}>
+      <Card title="Exercise Details" className="ct-section-card" style={{ marginBottom: 24 }}>
         <Descriptions column={4} size="small">
           <Descriptions.Item label="Name">{exercise.name}</Descriptions.Item>
           <Descriptions.Item label="Start">{dayjs(exercise.startDate).format('DD MMM YYYY')}</Descriptions.Item>
@@ -103,6 +103,7 @@ export default function Reports() {
       {/* Travel Config */}
       <Card
         title="Travel Configuration"
+        className="ct-section-card"
         style={{ marginBottom: 24 }}
         extra={
           editTravel ? (
@@ -148,12 +149,14 @@ export default function Reports() {
       </Card>
 
       {/* Full budget table */}
-      <Card title="Full Budget Breakdown" style={{ marginBottom: 24 }}>
-        <Table size="small" pagination={false} dataSource={unitData} columns={columns} scroll={{ x: 1100 }} />
+      <Card title="Full Budget Breakdown" className="ct-section-card" style={{ marginBottom: 24 }}>
+        <div className="ct-table">
+          <Table size="small" pagination={false} dataSource={unitData} columns={columns} scroll={{ x: 1100 }} />
+        </div>
       </Card>
 
       {/* Grand totals */}
-      <Card title="Grand Totals">
+      <Card title="Grand Totals" className="ct-section-card">
         <Descriptions column={3}>
           <Descriptions.Item label="Total RPA"><Typography.Text strong style={{ color: '#1677ff' }}>{fmt(budget.totalRpa)}</Typography.Text></Descriptions.Item>
           <Descriptions.Item label="Total O&M"><Typography.Text strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm)}</Typography.Text></Descriptions.Item>

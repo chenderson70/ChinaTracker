@@ -1,5 +1,5 @@
 // ──────────── Enums ────────────
-export type UnitCode = 'SG' | 'AE' | 'CAB' | 'A7';
+export type UnitCode = string;
 export type PersonnelRole = 'PLAYER' | 'WHITE_CELL' | 'PLANNING' | 'SUPPORT';
 export type FundingType = 'RPA' | 'OM';
 export type Location = string;

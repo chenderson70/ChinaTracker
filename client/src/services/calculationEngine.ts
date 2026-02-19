@@ -71,8 +71,8 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
     };
 
     const unitCount = (exercise.unitBudgets || []).length || 1;
-    const rentalCarsPerUnit = Math.ceil(travel.rentalCarCount / unitCount);
-    const rentalCost = rentalCarsPerUnit * travel.rentalCarDailyRate * travel.rentalCarDays;
+    const totalRentalCost = travel.rentalCarCount * travel.rentalCarDailyRate * travel.rentalCarDays;
+    const rentalCost = totalRentalCost / unitCount;
 
     for (const pg of ub.personnelGroups || []) {
       const days = pg.dutyDays || defaultDays;

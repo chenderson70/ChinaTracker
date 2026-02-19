@@ -40,7 +40,7 @@ export default function OmCostCenter() {
     onSuccess: () => { invalidate(); message.success('Removed'); },
   });
 
-  if (!exercise || !budget) return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
+  if (!exercise || !budget) return <div className="ct-loading"><Spin size="large" /></div>;
 
   const columns = [
     { title: 'Category', dataIndex: 'category', width: 160, render: (v: string) => OM_CATEGORIES.find((c) => c.value === v)?.label || v },
@@ -63,25 +63,28 @@ export default function OmCostCenter() {
 
   return (
     <div>
-      <Typography.Title level={4}>Exercise-Level O&M Costs</Typography.Title>
+      <Typography.Title level={4} className="ct-page-title">Exercise-Level O&M Costs</Typography.Title>
 
       <Card
+        className="ct-section-card"
         extra={<Button icon={<PlusOutlined />} type="primary" onClick={() => setModalOpen(true)}>Add O&M Cost</Button>}
       >
-        <Table
-          size="small"
-          columns={columns}
-          dataSource={data}
-          pagination={false}
-          locale={{ emptyText: 'No exercise-level O&M costs yet' }}
-          summary={() => (
-            <Table.Summary.Row>
-              <Table.Summary.Cell index={0} colSpan={2}><strong>Total Exercise O&M</strong></Table.Summary.Cell>
-              <Table.Summary.Cell index={1}><strong>{fmt(total)}</strong></Table.Summary.Cell>
-              <Table.Summary.Cell index={2} colSpan={2} />
-            </Table.Summary.Row>
-          )}
-        />
+        <div className="ct-table">
+          <Table
+            size="small"
+            columns={columns}
+            dataSource={data}
+            pagination={false}
+            locale={{ emptyText: 'No exercise-level O&M costs yet' }}
+            summary={() => (
+              <Table.Summary.Row>
+                <Table.Summary.Cell index={0} colSpan={2}><strong>Total Exercise O&M</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={1}><strong style={{ color: '#52c41a' }}>{fmt(total)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={2} colSpan={2} />
+              </Table.Summary.Row>
+            )}
+          />
+        </div>
       </Card>
 
       <Modal
