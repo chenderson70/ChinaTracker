@@ -32,6 +32,15 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Validate frontend deploy inputs
+        run: |
+          if [ -z "${AZURE_STORAGE_ACCOUNT}" ]; then
+            echo "AZURE_STORAGE_ACCOUNT secret is required"
+            exit 1
+          fi
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+
       - name: Enable static website hosting
         run: |
           az storage blob service-properties update \

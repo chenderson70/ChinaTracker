@@ -42,11 +42,22 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Validate backend deploy inputs
+        run: |
+          if [ -z "${AZURE_WEBAPP_NAME}" ]; then
+            echo "AZURE_WEBAPP_NAME secret is required"
+            exit 1
+          fi
+        env:
+          AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
+
       - name: Deploy backend package
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
           package: backend.zip
+        env:
+          AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
 
       - name: Post-deploy backend health check
         run: |
