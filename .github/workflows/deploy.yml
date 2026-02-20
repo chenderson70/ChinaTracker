@@ -7,6 +7,11 @@ on:
 jobs:
   build-and-deploy-frontend:
     runs-on: ubuntu-latest
+    env:
+      STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+      SWA_TOKEN_PRIMARY: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+      SWA_TOKEN_SECONDARY: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_LIVELY_FOREST_08A97020F }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -28,43 +33,39 @@ jobs:
         run: npm run build
 
       - name: Azure Login
-        if: ${{ secrets.AZURE_STORAGE_ACCOUNT != '' }}
+        if: ${{ env.STORAGE_ACCOUNT != '' }}
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Validate frontend deploy inputs
         run: |
-          if [ -z "${AZURE_STORAGE_ACCOUNT}" ] && [ -z "${AZURE_STATIC_WEB_APPS_API_TOKEN}" ] && [ -z "${AZURE_STATIC_WEB_APPS_API_TOKEN_LIVELY}" ]; then
+          if [ -z "${STORAGE_ACCOUNT}" ] && [ -z "${SWA_TOKEN_PRIMARY}" ] && [ -z "${SWA_TOKEN_SECONDARY}" ]; then
             echo "Set either AZURE_STORAGE_ACCOUNT or Azure Static Web Apps token secret"
             exit 1
           fi
-        env:
-          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
-          AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          AZURE_STATIC_WEB_APPS_API_TOKEN_LIVELY: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_LIVELY_FOREST_08A97020F }}
 
       - name: Enable static website hosting
-        if: ${{ secrets.AZURE_STORAGE_ACCOUNT != '' }}
+        if: ${{ env.STORAGE_ACCOUNT != '' }}
         run: |
           az storage blob service-properties update \
-            --account-name "${{ secrets.AZURE_STORAGE_ACCOUNT }}" \
+            --account-name "${STORAGE_ACCOUNT}" \
             --static-website \
             --index-document index.html \
             --404-document index.html
 
       - name: Upload static website files
-        if: ${{ secrets.AZURE_STORAGE_ACCOUNT != '' }}
+        if: ${{ env.STORAGE_ACCOUNT != '' }}
         run: |
           az storage blob upload-batch \
-            --account-name "${{ secrets.AZURE_STORAGE_ACCOUNT }}" \
+            --account-name "${STORAGE_ACCOUNT}" \
             --auth-mode login \
             --destination '$web' \
             --source client/dist \
             --overwrite
 
       - name: Deploy to Azure Static Web Apps
-        if: ${{ secrets.AZURE_STORAGE_ACCOUNT == '' }}
+        if: ${{ env.STORAGE_ACCOUNT == '' }}
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_LIVELY_FOREST_08A97020F || secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
