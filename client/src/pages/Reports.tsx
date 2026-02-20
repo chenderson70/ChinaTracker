@@ -67,6 +67,7 @@ export default function Reports() {
   ];
 
   const travel = exercise.travelConfig;
+  const totalBudgetLeft = (exercise.totalBudget || 0) - budget.grandTotal;
 
   return (
     <div>
@@ -88,6 +89,15 @@ export default function Reports() {
           <Descriptions.Item label="Name">{exercise.name}</Descriptions.Item>
           <Descriptions.Item label="Start">{dayjs(exercise.startDate).format('DD MMM YYYY')}</Descriptions.Item>
           <Descriptions.Item label="End">{dayjs(exercise.endDate).format('DD MMM YYYY')}</Descriptions.Item>
+          <Descriptions.Item label="Total Budget ($)">
+            <InputNumber
+              size="small"
+              min={0}
+              value={exercise.totalBudget}
+              onChange={(v) => v !== null && exerciseMut.mutate({ totalBudget: v })}
+              style={{ width: 130 }}
+            />
+          </Descriptions.Item>
           <Descriptions.Item label="Duty Days">
             <InputNumber
               size="small"
@@ -158,6 +168,7 @@ export default function Reports() {
       {/* Grand totals */}
       <Card title="Grand Totals" className="ct-section-card">
         <Descriptions column={3}>
+          <Descriptions.Item label="Total Budget Left"><Typography.Text strong>{fmt(totalBudgetLeft)}</Typography.Text></Descriptions.Item>
           <Descriptions.Item label="Total RPA"><Typography.Text strong style={{ color: '#1677ff' }}>{fmt(budget.totalRpa)}</Typography.Text></Descriptions.Item>
           <Descriptions.Item label="Total O&M"><Typography.Text strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm)}</Typography.Text></Descriptions.Item>
           <Descriptions.Item label="Grand Total"><Typography.Title level={4} style={{ margin: 0 }}>{fmt(budget.grandTotal)}</Typography.Title></Descriptions.Item>

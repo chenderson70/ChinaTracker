@@ -3,6 +3,7 @@ import Dexie, { type Table } from 'dexie';
 // ── Interfaces stored in IndexedDB ──
 export interface ExerciseRow {
   id: string;
+  ownerUserId: string;
   name: string;
   startDate: string;
   endDate: string;
@@ -120,6 +121,30 @@ class ChinaTrackerDB extends Dexie {
     // v3: clear duplicate per diem rows
     this.version(3).stores({}).upgrade((tx) => {
       tx.table('perDiemRates').clear();
+    });
+
+    // v4: add exercise ownership for per-user saved work.
+    this.version(4).stores({
+      exercises: 'id, ownerUserId, [ownerUserId+updatedAt], createdAt, updatedAt',
+      unitBudgets: 'id, exerciseId',
+      personnelGroups: 'id, unitBudgetId',
+      personnelEntries: 'id, personnelGroupId',
+      travelConfigs: 'id, exerciseId',
+      executionCostLines: 'id, unitBudgetId',
+      omCostLines: 'id, exerciseId',
+      rankCpdRates: 'id, rankCode',
+      perDiemRates: 'id, location',
+      appConfig: 'key',
+    }).upgrade((tx) => {
+      const fallbackUserId = 'legacy-local-user';
+      return tx
+        .table('exercises')
+        .toCollection()
+        .modify((exercise: ExerciseRow & { ownerUserId?: string }) => {
+          if (!exercise.ownerUserId) {
+            exercise.ownerUserId = fallbackUserId;
+          }
+        });
     });
   }
 }

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../index';
+import { prisma } from '../db';
 import { calculateBudget, RateInputs } from '../services/calculationEngine';
+import { getRequestUserId } from '../services/auth';
 import * as XLSX from 'xlsx';
 
 const router = Router();
@@ -39,6 +40,13 @@ async function loadFullExercise(id: string) {
       omCostLines: true,
     },
   });
+}
+
+async function loadOwnedExercise(id: string, ownerUserId: string) {
+  const exercise = await loadFullExercise(id);
+  if (!exercise) return null;
+  if (exercise.ownerUserId !== ownerUserId) return null;
+  return exercise;
 }
 
 // Helper: seed default unit budgets and personnel groups for a new exercise
@@ -92,7 +100,11 @@ async function seedExerciseDefaults(exerciseId: string) {
 // ─── LIST EXERCISES ───
 router.get('/', async (_req: Request, res: Response) => {
   try {
-    const exercises = await prisma.exercise.findMany({ orderBy: { createdAt: 'desc' } });
+    const userId = getRequestUserId(_req);
+    const exercises = await prisma.exercise.findMany({
+      where: { ownerUserId: userId },
+      orderBy: { createdAt: 'desc' },
+    });
     res.json(exercises);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -102,10 +114,14 @@ router.get('/', async (_req: Request, res: Response) => {
 // ─── CREATE EXERCISE ───
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { name, startDate, endDate, defaultDutyDays } = req.body;
+    const userId = getRequestUserId(req);
+    const { name, startDate, endDate, defaultDutyDays, totalBudget } = req.body;
+    const parsedTotalBudget = Number(totalBudget);
     const exercise = await prisma.exercise.create({
       data: {
+        ownerUserId: userId,
         name,
+        totalBudget: Number.isFinite(parsedTotalBudget) ? parsedTotalBudget : 0,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
         defaultDutyDays: defaultDutyDays || 14,
@@ -122,7 +138,8 @@ router.post('/', async (req: Request, res: Response) => {
 // ─── GET EXERCISE (full detail) ───
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const exercise = await loadFullExercise(req.params.id);
+    const userId = getRequestUserId(req);
+    const exercise = await loadOwnedExercise(req.params.id, userId);
     if (!exercise) return res.status(404).json({ error: 'Exercise not found' });
     res.json(exercise);
   } catch (err: any) {
@@ -133,12 +150,23 @@ router.get('/:id', async (req: Request, res: Response) => {
 // ─── UPDATE EXERCISE ───
 router.put('/:id', async (req: Request, res: Response) => {
   try {
-    const { name, startDate, endDate, defaultDutyDays } = req.body;
+    const userId = getRequestUserId(req);
+    const existing = await prisma.exercise.findFirst({ where: { id: req.params.id, ownerUserId: userId } });
+    if (!existing) return res.status(404).json({ error: 'Exercise not found' });
+
+    const { name, startDate, endDate, defaultDutyDays, totalBudget } = req.body;
     const data: any = {};
     if (name !== undefined) data.name = name;
     if (startDate !== undefined) data.startDate = new Date(startDate);
     if (endDate !== undefined) data.endDate = new Date(endDate);
     if (defaultDutyDays !== undefined) data.defaultDutyDays = defaultDutyDays;
+    if (totalBudget !== undefined) {
+      const parsedTotalBudget = Number(totalBudget);
+      if (!Number.isFinite(parsedTotalBudget)) {
+        return res.status(400).json({ error: 'Total budget must be a valid number' });
+      }
+      data.totalBudget = parsedTotalBudget;
+    }
     const exercise = await prisma.exercise.update({ where: { id: req.params.id }, data });
     res.json(exercise);
   } catch (err: any) {
@@ -149,6 +177,9 @@ router.put('/:id', async (req: Request, res: Response) => {
 // ─── DELETE EXERCISE ───
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
+    const userId = getRequestUserId(req);
+    const existing = await prisma.exercise.findFirst({ where: { id: req.params.id, ownerUserId: userId } });
+    if (!existing) return res.status(404).json({ error: 'Exercise not found' });
     await prisma.exercise.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err: any) {
@@ -159,6 +190,10 @@ router.delete('/:id', async (req: Request, res: Response) => {
 // ─── UPDATE TRAVEL CONFIG ───
 router.put('/:id/travel', async (req: Request, res: Response) => {
   try {
+    const userId = getRequestUserId(req);
+    const existing = await prisma.exercise.findFirst({ where: { id: req.params.id, ownerUserId: userId } });
+    if (!existing) return res.status(404).json({ error: 'Exercise not found' });
+
     const config = await prisma.travelConfig.upsert({
       where: { exerciseId: req.params.id },
       update: req.body,
@@ -173,7 +208,8 @@ router.put('/:id/travel', async (req: Request, res: Response) => {
 // ─── CALCULATE BUDGET ───
 router.get('/:id/calculate', async (req: Request, res: Response) => {
   try {
-    const exercise = await loadFullExercise(req.params.id);
+    const userId = getRequestUserId(req);
+    const exercise = await loadOwnedExercise(req.params.id, userId);
     if (!exercise) return res.status(404).json({ error: 'Exercise not found' });
     const rates = await loadRates();
     const budget = calculateBudget(exercise, rates);
@@ -186,7 +222,8 @@ router.get('/:id/calculate', async (req: Request, res: Response) => {
 // ─── EXPORT TO EXCEL ───
 router.get('/:id/export', async (req: Request, res: Response) => {
   try {
-    const exercise = await loadFullExercise(req.params.id);
+    const userId = getRequestUserId(req);
+    const exercise = await loadOwnedExercise(req.params.id, userId);
     if (!exercise) return res.status(404).json({ error: 'Exercise not found' });
     const rates = await loadRates();
     const budget = calculateBudget(exercise, rates);
@@ -271,6 +308,63 @@ router.get('/:id/export', async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${exercise.name.replace(/\s/g, '_')}_Budget.xlsx"`);
     res.send(buf);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/units', async (req: Request, res: Response) => {
+  try {
+    const userId = getRequestUserId(req);
+    const exercise = await prisma.exercise.findFirst({ where: { id: req.params.id, ownerUserId: userId } });
+    if (!exercise) return res.status(404).json({ error: 'Exercise not found' });
+
+    const unitCodeRaw = String(req.body?.unitCode || '').trim().toUpperCase();
+    if (!unitCodeRaw) return res.status(400).json({ error: 'Unit code is required' });
+
+    const existing = await prisma.unitBudget.findFirst({ where: { exerciseId: req.params.id, unitCode: unitCodeRaw } });
+    if (existing) return res.status(409).json({ error: 'Unit already exists for this exercise' });
+
+    const ub = await prisma.unitBudget.create({ data: { exerciseId: req.params.id, unitCode: unitCodeRaw } });
+    const template = String(req.body?.template || 'STANDARD').toUpperCase();
+    const roles = template === 'A7' ? ['PLANNING', 'SUPPORT'] : ['PLAYER', 'WHITE_CELL'];
+    const fundingTypes = ['RPA', 'OM'];
+
+    for (const role of roles) {
+      for (const fundingType of fundingTypes) {
+        await prisma.personnelGroup.create({
+          data: {
+            unitBudgetId: ub.id,
+            role,
+            fundingType,
+            location: 'GULFPORT',
+          },
+        });
+      }
+    }
+
+    const full = await loadFullExercise(req.params.id);
+    res.status(201).json(full);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/:id/units/:unitCode', async (req: Request, res: Response) => {
+  try {
+    const userId = getRequestUserId(req);
+    const exercise = await prisma.exercise.findFirst({ where: { id: req.params.id, ownerUserId: userId } });
+    if (!exercise) return res.status(404).json({ error: 'Exercise not found' });
+
+    const unitCode = String(req.params.unitCode || '').trim().toUpperCase();
+    if (!unitCode) return res.status(400).json({ error: 'Unit code is required' });
+
+    const ub = await prisma.unitBudget.findFirst({ where: { exerciseId: req.params.id, unitCode } });
+    if (!ub) return res.status(404).json({ error: 'Unit not found' });
+
+    await prisma.unitBudget.delete({ where: { id: ub.id } });
+    const full = await loadFullExercise(req.params.id);
+    res.json(full);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

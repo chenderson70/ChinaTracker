@@ -1,25 +1,29 @@
 import { Card, Row, Col, Table, Typography, Spin } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
   CartesianGrid,
 } from 'recharts';
 import {
   DollarOutlined, TeamOutlined, RocketOutlined, SafetyCertificateOutlined,
-  UserOutlined, ApartmentOutlined, CarOutlined, ToolOutlined,
+  UserOutlined, CarOutlined, ToolOutlined,
 } from '@ant-design/icons';
 import { useApp } from '../components/AppLayout';
+import * as api from '../services/api';
 
 const COLORS = ['#1677ff', '#52c41a', '#faad14', '#f5222d', '#722ed1', '#13c2c2', '#eb2f96', '#fa8c16'];
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
 export default function Dashboard() {
   const { exercise, budget } = useApp();
+  const { data: appConfig = {} } = useQuery({ queryKey: ['appConfig'], queryFn: api.getAppConfig });
 
   if (!exercise || !budget) return <div className="ct-loading"><Spin size="large" /></div>;
 
   const unitData = Object.values(budget.units).map((u) => ({
     key: u.unitCode,
     unitCode: u.unitCode,
+    totalPax: u.totalPax,
     rpa: u.unitTotalRpa,
     om: u.unitTotalOm,
     total: u.unitTotal,
@@ -33,10 +37,20 @@ export default function Dashboard() {
   const columns = [
     { title: 'Unit', dataIndex: 'unitCode', key: 'unitCode', width: 80,
       render: (v: string) => <span style={{ fontWeight: 600, color: '#1a1a2e' }}>{v}</span> },
+    { title: 'Total PAX', dataIndex: 'totalPax', key: 'totalPax', width: 100 },
     { title: 'RPA', dataIndex: 'rpa', key: 'rpa', render: (v: number) => <span style={{ color: '#1677ff' }}>{fmt(v)}</span> },
     { title: 'O&M', dataIndex: 'om', key: 'om', render: (v: number) => <span style={{ color: '#52c41a' }}>{fmt(v)}</span> },
     { title: 'Total', dataIndex: 'total', key: 'total', render: (v: number) => <strong>{fmt(v)}</strong> },
   ];
+
+  const targetRpa = Number(appConfig.BUDGET_TARGET_RPA || 0);
+  const targetOm = Number(appConfig.BUDGET_TARGET_OM || 0);
+  const totalBudget = Number(exercise.totalBudget || 0);
+  const totalBudgetLeft = totalBudget - budget.grandTotal;
+  const rpaDelta = targetRpa - budget.totalRpa;
+  const omDelta = targetOm - budget.totalOm;
+  const rpaStatus = targetRpa > 0 ? (rpaDelta >= 0 ? 'Under' : 'Over') : 'No target';
+  const omStatus = targetOm > 0 ? (omDelta >= 0 ? 'Under' : 'Over') : 'No target';
 
   const statCards = [
     { label: 'Grand Total', value: fmt(budget.grandTotal), color: '#1a1a2e', accent: 'ct-stat-purple', icon: <DollarOutlined /> },
@@ -47,7 +61,7 @@ export default function Dashboard() {
 
   const detailCards = [
     { label: 'Players', value: budget.totalPlayers.toString(), icon: <UserOutlined /> },
-    { label: 'White Cell', value: budget.totalWhiteCell.toString(), icon: <ApartmentOutlined /> },
+    { label: 'White Cell', value: budget.totalWhiteCell.toString(), icon: <UserOutlined /> },
     { label: 'RPA Travel', value: fmt(budget.rpaTravel), icon: <CarOutlined /> },
     { label: 'WRM', value: fmt(budget.wrm), icon: <ToolOutlined /> },
   ];
@@ -106,14 +120,22 @@ export default function Dashboard() {
 
       {/* Unit table */}
       <Card title="Unit Budget Summary" className="ct-section-card" style={{ marginBottom: 28 }}>
+        <Typography.Paragraph style={{ marginBottom: 10 }}>
+          <strong>Total Budget Left:</strong> {fmt(totalBudgetLeft)}
+          {' • '}
+          <strong>RPA:</strong> {rpaStatus} by {fmt(Math.abs(rpaDelta))} {targetRpa > 0 ? `(Target ${fmt(targetRpa)})` : ''}
+          {' • '}
+          <strong>O&amp;M:</strong> {omStatus} by {fmt(Math.abs(omDelta))} {targetOm > 0 ? `(Target ${fmt(targetOm)})` : ''}
+        </Typography.Paragraph>
         <div className="ct-table">
           <Table dataSource={unitData} columns={columns} pagination={false} size="small"
             summary={() => (
               <Table.Summary.Row>
                 <Table.Summary.Cell index={0}><strong>Total</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={1}><strong style={{ color: '#1677ff' }}>{fmt(budget.totalRpa)}</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={2}><strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm - budget.exerciseOmTotal)}</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={3}><strong>{fmt(unitData.reduce((s, u) => s + u.total, 0))}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={1}><strong>{budget.totalPax}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={2}><strong style={{ color: '#1677ff' }}>{fmt(budget.totalRpa)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={3}><strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm - budget.exerciseOmTotal)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={4}><strong>{fmt(unitData.reduce((s, u) => s + u.total, 0))}</strong></Table.Summary.Cell>
               </Table.Summary.Row>
             )}
           />

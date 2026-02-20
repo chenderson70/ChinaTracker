@@ -69,11 +69,16 @@ body {
   background: var(--ct-sidebar-bg) !important;
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .ct-sider {
-  position: relative;
+  position: sticky !important;
+  top: 0;
+  height: 100vh;
   overflow: hidden;
+  align-self: flex-start;
 }
 
 .ct-sider::before {

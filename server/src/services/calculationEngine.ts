@@ -21,6 +21,7 @@ export interface GroupCalc {
 
 export interface UnitCalc {
   unitCode: string;
+  totalPax: number;
   whiteCellRpa: GroupCalc;
   whiteCellOm: GroupCalc;
   playerRpa: GroupCalc;
@@ -52,19 +53,17 @@ function emptyGroup(pax = 0, days = 0): GroupCalc {
 
 function calcMilPay(
   group: any,
-  entries: any[],
+  entry: any,
   rates: RateInputs,
   dutyDays: number
 ): number {
   if (group.isLongTour) return 0;
-  if (entries && entries.length > 0) {
-    return entries.reduce((sum: number, e: any) => {
-      const cpd = rates.cpdRates[e.rankCode] || 0;
-      return sum + e.count * cpd * dutyDays;
-    }, 0);
+  if (entry?.rankCode) {
+    const cpd = rates.cpdRates[entry.rankCode] || 0;
+    return (entry.count || 0) * cpd * dutyDays;
   }
   const avgCpd = group.avgCpdOverride || 200;
-  return group.paxCount * avgCpd * dutyDays;
+  return (group.paxCount || 0) * avgCpd * dutyDays;
 }
 
 export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult {
@@ -95,6 +94,7 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
   for (const ub of exercise.unitBudgets || []) {
     const unitCalc: UnitCalc = {
       unitCode: ub.unitCode,
+      totalPax: 0,
       whiteCellRpa: emptyGroup(),
       whiteCellOm: emptyGroup(),
       playerRpa: emptyGroup(),
@@ -112,46 +112,102 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
     const rentalCost = totalRentalCost / unitCount;
 
     for (const pg of ub.personnelGroups || []) {
-      const days = pg.dutyDays || defaultDays;
-      const pax = pg.paxCount || 0;
       const entries = pg.personnelEntries || [];
-      const isWhiteCell = pg.role === 'WHITE_CELL' || pg.role === 'PLANNING' || pg.role === 'SUPPORT';
-      const isPlayer = pg.role === 'PLAYER';
-      const loc = pg.location || 'GULFPORT';
-      const pdRates = rates.perDiemRates[loc] || { lodging: 0, mie: 0 };
+      const entryPax = entries.reduce((sum: number, entry: any) => sum + (entry.count || 0), 0);
+      const pax = pg.paxCount || entryPax || 0;
+      const isPlanning = pg.role === 'PLANNING';
+      const isSupport = pg.role === 'SUPPORT';
+      const isWhiteCell = pg.role === 'WHITE_CELL' || isSupport;
+      const isPlayer = pg.role === 'PLAYER' || isPlanning;
+      const airfarePerPerson = pg.airfarePerPerson ?? travel.airfarePerPerson;
+      const hasGroupRental = (pg.rentalCarCount || 0) > 0 || (pg.rentalCarDays || 0) > 0 || pg.rentalCarDaily !== null;
+      const rentalDaily = pg.rentalCarDaily ?? travel.rentalCarDailyRate;
+      const groupRentalCost = (pg.rentalCarCount || 0) * rentalDaily * (pg.rentalCarDays || 0);
+      const appliedRentalCost = hasGroupRental ? groupRentalCost : rentalCost;
+      unitCalc.totalPax += pax;
+
+      const calcEntries = entries.length > 0
+        ? entries
+        : [{
+            count: pax,
+            rankCode: null,
+            dutyDays: pg.dutyDays,
+            location: pg.location,
+            isLocal: pg.isLocal,
+          }];
+
+      let groupMilPay = 0;
+      let groupPerDiem = 0;
+      let groupMeals = 0;
+      let groupTravel = 0;
+      let groupBilleting = 0;
+      let dutyDaysAccumulator = 0;
+
+      for (const entry of calcEntries) {
+        const entryCount = entry.count || 0;
+        const entryDays = entry.dutyDays || pg.dutyDays || defaultDays;
+        const entryLoc = entry.location || pg.location || 'GULFPORT';
+        const entryIsLocal = !!(entry.isLocal ?? pg.isLocal);
+        const pdRates = rates.perDiemRates[entryLoc] || { lodging: 0, mie: 0 };
+
+        dutyDaysAccumulator += entryDays * entryCount;
+
+        if (isWhiteCell && pg.fundingType === 'RPA') {
+          groupMilPay += calcMilPay(pg, entry, rates, entryDays);
+          groupPerDiem += entryCount * (pdRates.lodging + pdRates.mie) * entryDays;
+          groupTravel += entryIsLocal ? 0 : (entryCount * airfarePerPerson);
+        } else if (isWhiteCell && pg.fundingType === 'OM') {
+          groupPerDiem += entryCount * (pdRates.lodging + pdRates.mie) * entryDays;
+          groupTravel += entryIsLocal ? 0 : (entryCount * airfarePerPerson);
+        } else if (isPlayer && pg.fundingType === 'RPA') {
+          groupMilPay += calcMilPay(pg, entry, rates, entryDays);
+          groupMeals += entryCount * mealsPerDay * entryDays;
+        } else if (isPlayer && pg.fundingType === 'OM') {
+          groupPerDiem += entryIsLocal ? 0 : (entryCount * (pdRates.lodging + pdRates.mie) * entryDays);
+          groupTravel += entryIsLocal ? 0 : (entryCount * airfarePerPerson);
+          const nights = Math.max(entryDays, 0);
+          groupBilleting += entryIsLocal ? 0 : (entryCount * rates.playerBilletingPerNight * nights);
+        }
+      }
+
+      if (isWhiteCell && groupTravel > 0 && !calcEntries.every((entry: any) => !!(entry.isLocal ?? pg.isLocal))) {
+        groupTravel += appliedRentalCost;
+      }
+
+      const avgDays = pax > 0 ? dutyDaysAccumulator / pax : (pg.dutyDays || defaultDays);
 
       if (isWhiteCell && pg.fundingType === 'RPA') {
-        const g = emptyGroup(pax, days);
-        g.milPay = calcMilPay(pg, entries, rates, days);
-        g.perDiem = pax * (pdRates.lodging + pdRates.mie) * days;
-        g.travel = pax * travel.airfarePerPerson + rentalCost;
+        const g = emptyGroup(pax, avgDays);
+        g.milPay = groupMilPay;
+        g.perDiem = groupPerDiem;
+        g.travel = groupTravel;
         g.subtotal = g.milPay + g.perDiem + g.travel;
         unitCalc.whiteCellRpa = g;
         result.totalWhiteCell += pax;
         if (pg.isLongTour) result.rpaTravel += g.travel;
       } else if (isWhiteCell && pg.fundingType === 'OM') {
-        const g = emptyGroup(pax, days);
-        g.perDiem = pax * (pdRates.lodging + pdRates.mie) * days;
-        g.travel = pax * travel.airfarePerPerson + rentalCost;
+        const g = emptyGroup(pax, avgDays);
+        g.perDiem = groupPerDiem;
+        g.travel = groupTravel;
         g.subtotal = g.perDiem + g.travel;
         unitCalc.whiteCellOm = g;
         result.totalWhiteCell += pax;
       } else if (isPlayer && pg.fundingType === 'RPA') {
-        const g = emptyGroup(pax, days);
-        g.milPay = calcMilPay(pg, entries, rates, days);
-        g.meals = pax * mealsPerDay * days;
-        if (pg.isLongTour) {
-          g.travel = pax * travel.airfarePerPerson;
-          result.rpaTravel += g.travel;
-        }
-        g.subtotal = g.milPay + g.meals + g.travel;
+        const g = emptyGroup(pax, avgDays);
+        g.milPay = groupMilPay;
+        g.meals = groupMeals;
+        g.travel = 0;
+        g.perDiem = 0;
+        g.billeting = 0;
+        g.subtotal = g.milPay + g.meals;
         unitCalc.playerRpa = g;
         result.totalPlayers += pax;
       } else if (isPlayer && pg.fundingType === 'OM') {
-        const g = emptyGroup(pax, days);
-        const nights = Math.max(days - 1, 0);
-        g.billeting = pax * rates.playerBilletingPerNight * nights;
-        g.subtotal = g.billeting;
+        const g = emptyGroup(pax, avgDays);
+        g.travel = groupTravel;
+        g.perDiem = groupPerDiem;
+        g.billeting = groupBilleting;
+        g.subtotal = g.travel + g.perDiem + g.billeting;
         unitCalc.playerOm = g;
         result.totalPlayers += pax;
       }

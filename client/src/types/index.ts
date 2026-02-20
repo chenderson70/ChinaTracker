@@ -16,7 +16,9 @@ export type OmCategory =
 // ──────────── Models ────────────
 export interface Exercise {
   id: string;
+  ownerUserId?: string;
   name: string;
+  totalBudget: number;
   startDate: string;
   endDate: string;
   defaultDutyDays: number;
@@ -47,6 +49,11 @@ export interface PersonnelGroup {
   dutyDays: number | null;
   location: Location | null;
   isLongTour: boolean;
+  isLocal: boolean;
+  airfarePerPerson: number | null;
+  rentalCarCount: number;
+  rentalCarDaily: number | null;
+  rentalCarDays: number;
   avgCpdOverride: number | null;
   personnelEntries: PersonnelEntry[];
 }
@@ -56,6 +63,9 @@ export interface PersonnelEntry {
   personnelGroupId: string;
   rankCode: string;
   count: number;
+  dutyDays: number | null;
+  location: Location | null;
+  isLocal: boolean;
 }
 
 export interface TravelConfig {
@@ -100,6 +110,25 @@ export interface PerDiemRate {
   effectiveDate: string;
 }
 
+export interface PerDiemMasterRecord {
+  id: string;
+  state: string;
+  destination: string;
+  countyOrLocationDefined: string;
+  seasonBegin: string;
+  seasonEnd: string;
+  fy26LodgingRate: number;
+  fy26Mie: number;
+}
+
+export interface PerDiemMasterData {
+  title: string;
+  sourceFile: string;
+  generatedAt: string;
+  recordCount: number;
+  records: PerDiemMasterRecord[];
+}
+
 // ──────────── Calculation Result ────────────
 export interface GroupCalc {
   paxCount: number;
@@ -114,6 +143,7 @@ export interface GroupCalc {
 
 export interface UnitCalc {
   unitCode: string;
+  totalPax: number;
   whiteCellRpa: GroupCalc;
   whiteCellOm: GroupCalc;
   playerRpa: GroupCalc;
@@ -137,4 +167,10 @@ export interface BudgetResult {
   totalPax: number;
   totalPlayers: number;
   totalWhiteCell: number;
+}
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  name: string;
 }

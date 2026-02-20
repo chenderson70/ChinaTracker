@@ -1,8 +1,3 @@
-// Local data service — replaces server API calls with IndexedDB (Dexie) operations.
-// Each function mirrors the old api.ts signature so page components need minimal changes.
-
-import { db } from './db';
-import { calculateBudget as calcEngine, type RateInputs } from './calculationEngine';
 import type {
   Exercise,
   ExerciseDetail,
@@ -15,247 +10,166 @@ import type {
   OmCostLine,
   TravelConfig,
   UnitBudget,
+  PerDiemMasterData,
+  PerDiemMasterRecord,
+  AuthUser,
 } from '../types';
+import { clearAuthSession, getAuthToken, setAuthSession } from './auth';
 
-const UNIT_CODES = ['SG', 'AE', 'CAB', 'A7'] as const;
-const ROLES_BY_UNIT: Record<string, string[]> = {
-  SG: ['PLAYER', 'WHITE_CELL'],
-  AE: ['PLAYER', 'WHITE_CELL'],
-  CAB: ['PLAYER', 'WHITE_CELL'],
-  A7: ['PLANNING', 'SUPPORT'],
-};
-const FUNDING_TYPES = ['RPA', 'OM'] as const;
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  '/api/v1';
 
-function rolesForUnit(unitCode: string, template?: 'STANDARD' | 'A7'): string[] {
-  if (template === 'A7') return ['PLANNING', 'SUPPORT'];
-  return ROLES_BY_UNIT[unitCode] ?? ['PLAYER', 'WHITE_CELL'];
+let perDiemMasterCache: PerDiemMasterRecord[] | null = null;
+
+interface RequestOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  body?: unknown;
+  includeAuth?: boolean;
 }
 
-async function seedPersonnelGroupsForUnit(unitBudgetId: string, unitCode: string, template?: 'STANDARD' | 'A7') {
-  const roles = rolesForUnit(unitCode, template);
-  for (const role of roles) {
-    for (const ft of FUNDING_TYPES) {
-      await db.personnelGroups.add({
-        id: uid(),
-        unitBudgetId,
-        role,
-        fundingType: ft,
-        paxCount: 0,
-        dutyDays: null,
-        location: null,
-        isLongTour: false,
-        avgCpdOverride: null,
-      });
+async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (options.includeAuth !== false) {
+    const token = getAuthToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
   }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: options.method || 'GET',
+    headers,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthSession();
+    }
+
+    let message = `Request failed (${response.status})`;
+    try {
+      const errorData = await response.json();
+      if (errorData?.error) message = String(errorData.error);
+    } catch {
+      // ignore JSON parse failures
+    }
+    throw new Error(message);
+  }
+
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
 }
 
-// ── helpers ──
-function uid(): string {
-  return crypto.randomUUID();
+interface AuthResponse {
+  token: string;
+  user: AuthUser;
 }
 
-function now(): string {
-  return new Date().toISOString();
+export async function registerAccount(data: { username: string; password: string; name?: string }): Promise<AuthUser> {
+  const result = await apiRequest<AuthResponse>('/auth/register', {
+    method: 'POST',
+    body: data,
+    includeAuth: false,
+  });
+  setAuthSession(result.token, result.user);
+  return result.user;
+}
+
+export async function loginAccount(data: { username: string; password: string }): Promise<AuthUser> {
+  const result = await apiRequest<AuthResponse>('/auth/login', {
+    method: 'POST',
+    body: data,
+    includeAuth: false,
+  });
+  setAuthSession(result.token, result.user);
+  return result.user;
+}
+
+export async function getCurrentUser(): Promise<AuthUser> {
+  return apiRequest<AuthUser>('/auth/me');
+}
+
+function findGroup(unit: UnitBudget, role: string, fundingType: string): PersonnelGroup | undefined {
+  return unit.personnelGroups.find((group) => group.role === role && group.fundingType === fundingType);
 }
 
 // ── Exercises ──
 export async function getExercises(): Promise<Exercise[]> {
-  return db.exercises.toArray();
+  return apiRequest<Exercise[]>('/exercises');
 }
 
 export async function getExercise(id: string): Promise<ExerciseDetail> {
-  const ex = await db.exercises.get(id);
-  if (!ex) throw new Error('Exercise not found');
-
-  const unitBudgets = await db.unitBudgets.where('exerciseId').equals(id).toArray();
-  const ubDetails: UnitBudget[] = [];
-
-  for (const ub of unitBudgets) {
-    const groups = await db.personnelGroups.where('unitBudgetId').equals(ub.id).toArray();
-    const pgs: PersonnelGroup[] = [];
-    for (const g of groups) {
-      const entries = await db.personnelEntries.where('personnelGroupId').equals(g.id).toArray();
-      pgs.push({ ...g, personnelEntries: entries } as PersonnelGroup);
-    }
-    const execLines = await db.executionCostLines.where('unitBudgetId').equals(ub.id).toArray();
-    ubDetails.push({
-      ...ub,
-      personnelGroups: pgs,
-      executionCostLines: execLines,
-    } as UnitBudget);
-  }
-
-  const travelConfig = (await db.travelConfigs.where('exerciseId').equals(id).first()) || null;
-  const omCostLines = await db.omCostLines.where('exerciseId').equals(id).toArray();
-
-  return {
-    ...ex,
-    unitBudgets: ubDetails,
-    travelConfig: travelConfig as TravelConfig | null,
-    omCostLines: omCostLines as OmCostLine[],
-  };
+  return apiRequest<ExerciseDetail>(`/exercises/${id}`);
 }
 
 export async function createExercise(data: {
   name: string;
+  totalBudget: number;
   startDate: string;
   endDate: string;
   defaultDutyDays: number;
 }): Promise<ExerciseDetail> {
-  const ts = now();
-  const exerciseId = uid();
-  await db.exercises.add({
-    id: exerciseId,
-    name: data.name,
-    startDate: data.startDate,
-    endDate: data.endDate,
-    defaultDutyDays: data.defaultDutyDays,
-    createdAt: ts,
-    updatedAt: ts,
-  });
-
-  // Create 4 unit budgets each with 4 personnel groups
-  for (const unitCode of UNIT_CODES) {
-    const ubId = uid();
-    await db.unitBudgets.add({ id: ubId, exerciseId, unitCode });
-    await seedPersonnelGroupsForUnit(ubId, unitCode);
-  }
-
-  // Create default travel config
-  await db.travelConfigs.add({
-    id: uid(),
-    exerciseId,
-    airfarePerPerson: 400,
-    rentalCarDailyRate: 50,
-    rentalCarCount: 0,
-    rentalCarDays: 0,
-  });
-
-  return getExercise(exerciseId);
+  return apiRequest<ExerciseDetail>('/exercises', { method: 'POST', body: data });
 }
 
 export async function updateExercise(id: string, data: Partial<Exercise>): Promise<Exercise> {
-  await db.exercises.update(id, { ...data, updatedAt: now() });
-  return (await db.exercises.get(id))!;
+  return apiRequest<Exercise>(`/exercises/${id}`, { method: 'PUT', body: data });
 }
 
 export async function deleteExercise(id: string): Promise<void> {
-  const ubs = await db.unitBudgets.where('exerciseId').equals(id).toArray();
-  for (const ub of ubs) {
-    const groups = await db.personnelGroups.where('unitBudgetId').equals(ub.id).toArray();
-    for (const g of groups) {
-      await db.personnelEntries.where('personnelGroupId').equals(g.id).delete();
-    }
-    await db.personnelGroups.where('unitBudgetId').equals(ub.id).delete();
-    await db.executionCostLines.where('unitBudgetId').equals(ub.id).delete();
-  }
-  await db.unitBudgets.where('exerciseId').equals(id).delete();
-  await db.travelConfigs.where('exerciseId').equals(id).delete();
-  await db.omCostLines.where('exerciseId').equals(id).delete();
-  await db.exercises.delete(id);
+  await apiRequest<{ success: boolean }>(`/exercises/${id}`, { method: 'DELETE' });
 }
 
 export async function addUnitBudget(
   exerciseId: string,
   data: { unitCode: string; template?: 'STANDARD' | 'A7' },
 ): Promise<ExerciseDetail> {
-  const normalizedUnitCode = data.unitCode.trim().toUpperCase();
-  if (!normalizedUnitCode) {
-    throw new Error('Unit code is required');
-  }
-
-  const existing = await db.unitBudgets.where('exerciseId').equals(exerciseId).toArray();
-  if (existing.some((unit) => unit.unitCode.toUpperCase() === normalizedUnitCode)) {
-    throw new Error('Unit already exists for this exercise');
-  }
-
-  const unitBudgetId = uid();
-  await db.unitBudgets.add({ id: unitBudgetId, exerciseId, unitCode: normalizedUnitCode });
-  await seedPersonnelGroupsForUnit(unitBudgetId, normalizedUnitCode, data.template);
-
-  return getExercise(exerciseId);
+  return apiRequest<ExerciseDetail>(`/exercises/${exerciseId}/units`, { method: 'POST', body: data });
 }
 
 export async function deleteUnitBudget(exerciseId: string, unitCode: string): Promise<ExerciseDetail> {
-  const normalizedUnitCode = unitCode.trim().toUpperCase();
-  const units = await db.unitBudgets.where('exerciseId').equals(exerciseId).toArray();
-  const unit = units.find((candidate) => candidate.unitCode.toUpperCase() === normalizedUnitCode);
-
-  if (!unit) {
-    throw new Error('Unit not found');
-  }
-
-  const groups = await db.personnelGroups.where('unitBudgetId').equals(unit.id).toArray();
-  for (const group of groups) {
-    await db.personnelEntries.where('personnelGroupId').equals(group.id).delete();
-  }
-
-  await db.personnelGroups.where('unitBudgetId').equals(unit.id).delete();
-  await db.executionCostLines.where('unitBudgetId').equals(unit.id).delete();
-  await db.unitBudgets.delete(unit.id);
-
-  return getExercise(exerciseId);
+  return apiRequest<ExerciseDetail>(`/exercises/${exerciseId}/units/${encodeURIComponent(unitCode)}`, {
+    method: 'DELETE',
+  });
 }
 
 // ── Travel Config ──
 export async function updateTravelConfig(exerciseId: string, data: Partial<TravelConfig>): Promise<TravelConfig> {
-  const tc = await db.travelConfigs.where('exerciseId').equals(exerciseId).first();
-  if (tc) {
-    await db.travelConfigs.update(tc.id, data);
-    return (await db.travelConfigs.get(tc.id))! as TravelConfig;
-  }
-  const newTc = { id: uid(), exerciseId, airfarePerPerson: 400, rentalCarDailyRate: 50, rentalCarCount: 0, rentalCarDays: 0, ...data };
-  await db.travelConfigs.add(newTc);
-  return newTc as TravelConfig;
+  return apiRequest<TravelConfig>(`/exercises/${exerciseId}/travel`, { method: 'PUT', body: data });
 }
 
 // ── Calculate budget ──
-export async function getRateInputs(): Promise<RateInputs> {
-  const cpdRows = await db.rankCpdRates.toArray();
-  const cpdRates: Record<string, number> = {};
-  for (const r of cpdRows) cpdRates[r.rankCode] = r.costPerDay;
-
-  const pdRows = await db.perDiemRates.toArray();
-  const perDiemRates: Record<string, { lodging: number; mie: number }> = {};
-  for (const r of pdRows) perDiemRates[r.location] = { lodging: r.lodgingRate, mie: r.mieRate };
-
-  const cfgMap = await getAppConfig();
-  return {
-    cpdRates,
-    perDiemRates,
-    mealRates: {
-      breakfast: parseFloat(cfgMap['BREAKFAST_COST'] || '14'),
-      lunchMre: parseFloat(cfgMap['LUNCH_MRE_COST'] || '15.91'),
-      dinner: parseFloat(cfgMap['DINNER_COST'] || '14'),
-    },
-    playerBilletingPerNight: parseFloat(cfgMap['PLAYER_BILLETING_NIGHT'] || '27'),
-  };
-}
-
 export async function calculateBudget(exerciseId: string): Promise<BudgetResult> {
-  const ex = await getExercise(exerciseId);
-  const rates = await getRateInputs();
-  return calcEngine(ex, rates);
+  return apiRequest<BudgetResult>(`/exercises/${exerciseId}/calculate`);
 }
 
 // ── Personnel Groups ──
 export async function updatePersonnelGroup(groupId: string, data: Partial<PersonnelGroup>): Promise<PersonnelGroup> {
-  await db.personnelGroups.update(groupId, data);
-  const row = await db.personnelGroups.get(groupId);
-  const entries = await db.personnelEntries.where('personnelGroupId').equals(groupId).toArray();
-  return { ...row!, personnelEntries: entries } as PersonnelGroup;
+  return apiRequest<PersonnelGroup>(`/personnel-groups/${groupId}`, { method: 'PUT', body: data });
 }
 
 // ── Personnel Entries ──
-export async function addPersonnelEntry(groupId: string, data: { rankCode: string; count: number }): Promise<PersonnelEntry> {
-  const entry = { id: uid(), personnelGroupId: groupId, ...data };
-  await db.personnelEntries.add(entry);
-  return entry as PersonnelEntry;
+export async function addPersonnelEntry(
+  groupId: string,
+  data: { rankCode: string; count: number; dutyDays?: number | null; location?: string | null; isLocal?: boolean },
+): Promise<PersonnelEntry> {
+  return apiRequest<PersonnelEntry>(`/personnel-groups/${groupId}/entries`, { method: 'POST', body: data });
+}
+
+export async function updatePersonnelEntry(
+  entryId: string,
+  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'dutyDays' | 'location' | 'isLocal'>>,
+): Promise<PersonnelEntry> {
+  return apiRequest<PersonnelEntry>(`/personnel-entries/${entryId}`, { method: 'PUT', body: data });
 }
 
 export async function deletePersonnelEntry(entryId: string): Promise<void> {
-  await db.personnelEntries.delete(entryId);
+  await apiRequest<{ success: boolean }>(`/personnel-entries/${entryId}`, { method: 'DELETE' });
 }
 
 // ── Execution Cost Lines ──
@@ -263,13 +177,11 @@ export async function addExecutionCost(
   unitId: string,
   data: { fundingType: string; category: string; amount: number; notes?: string | null },
 ): Promise<ExecutionCostLine> {
-  const line = { id: uid(), unitBudgetId: unitId, notes: null, ...data };
-  await db.executionCostLines.add(line);
-  return line as ExecutionCostLine;
+  return apiRequest<ExecutionCostLine>(`/units/${unitId}/execution-costs`, { method: 'POST', body: data });
 }
 
 export async function deleteExecutionCost(lineId: string): Promise<void> {
-  await db.executionCostLines.delete(lineId);
+  await apiRequest<{ success: boolean }>(`/execution-costs/${lineId}`, { method: 'DELETE' });
 }
 
 // ── O&M Cost Lines ──
@@ -277,20 +189,18 @@ export async function addOmCost(
   exerciseId: string,
   data: { category: string; label: string; amount: number; notes?: string | null },
 ): Promise<OmCostLine> {
-  const line = { id: uid(), exerciseId, notes: null, ...data };
-  await db.omCostLines.add(line);
-  return line as OmCostLine;
+  return apiRequest<OmCostLine>(`/exercises/${exerciseId}/om-costs`, { method: 'POST', body: data });
 }
 
 export async function deleteOmCost(lineId: string): Promise<void> {
-  await db.omCostLines.delete(lineId);
+  await apiRequest<{ success: boolean }>(`/om-costs/${lineId}`, { method: 'DELETE' });
 }
 
 // ── Rates ──
 const RANK_ORDER = ['AB','AMN','A1C','SRA','SSGT','TSGT','MSGT','SMSGT','CMSGT','2LT','1LT','CAPT','MAJ','LTCOL','COL','BG','MG'];
 
 export async function getCpdRates(): Promise<RankCpdRate[]> {
-  const rates = await db.rankCpdRates.toArray() as RankCpdRate[];
+  const rates = await apiRequest<RankCpdRate[]>('/rates/cpd');
   rates.sort((a, b) => {
     const ai = RANK_ORDER.indexOf(a.rankCode);
     const bi = RANK_ORDER.indexOf(b.rankCode);
@@ -300,160 +210,347 @@ export async function getCpdRates(): Promise<RankCpdRate[]> {
 }
 
 export async function updateCpdRates(rates: { rankCode: string; costPerDay: number }[]): Promise<RankCpdRate[]> {
-  for (const r of rates) {
-    const existing = await db.rankCpdRates.where('rankCode').equals(r.rankCode).first();
-    if (existing) {
-      await db.rankCpdRates.update(existing.id, { costPerDay: r.costPerDay });
-    }
-  }
-  return getCpdRates();
+  return apiRequest<RankCpdRate[]>('/rates/cpd', { method: 'PUT', body: { rates } });
 }
 
 export async function getPerDiemRates(): Promise<PerDiemRate[]> {
-  return db.perDiemRates.toArray() as Promise<PerDiemRate[]>;
+  return apiRequest<PerDiemRate[]>('/rates/per-diem');
 }
 
 export async function updatePerDiemRates(rates: { location: string; lodgingRate: number; mieRate: number }[]): Promise<PerDiemRate[]> {
-  for (const r of rates) {
-    const existing = await db.perDiemRates.where('location').equals(r.location).first();
-    if (existing) {
-      await db.perDiemRates.update(existing.id, { lodgingRate: r.lodgingRate, mieRate: r.mieRate });
-    }
-  }
-  return getPerDiemRates();
+  return apiRequest<PerDiemRate[]>('/rates/per-diem', { method: 'PUT', body: { rates } });
+}
+
+export function normalizePerDiemLocation(value: string): string {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
 }
 
 export async function addPerDiemRate(location: string, lodgingRate: number, mieRate: number): Promise<PerDiemRate[]> {
-  await db.perDiemRates.add({
-    id: crypto.randomUUID(),
-    location,
-    lodgingRate,
-    mieRate,
-    effectiveDate: new Date().toISOString().slice(0, 10),
-  });
-  return getPerDiemRates();
+  const normalizedLocation = normalizePerDiemLocation(location);
+  if (!normalizedLocation) throw new Error('Location is required');
+
+  const current = await getPerDiemRates();
+  const existing = current.find((row) => row.location === normalizedLocation);
+  const next = existing
+    ? current.map((row) => row.location === normalizedLocation ? { location: row.location, lodgingRate, mieRate } : { location: row.location, lodgingRate: row.lodgingRate, mieRate: row.mieRate })
+    : [...current.map((row) => ({ location: row.location, lodgingRate: row.lodgingRate, mieRate: row.mieRate })), { location: normalizedLocation, lodgingRate, mieRate }];
+
+  return updatePerDiemRates(next);
 }
 
 export async function deletePerDiemRate(id: string): Promise<PerDiemRate[]> {
-  await db.perDiemRates.delete(id);
-  return getPerDiemRates();
+  const current = await getPerDiemRates();
+  const next = current.filter((row) => row.id !== id).map((row) => ({
+    location: row.location,
+    lodgingRate: row.lodgingRate,
+    mieRate: row.mieRate,
+  }));
+
+  return updatePerDiemRates(next);
+}
+
+export async function addOrUpdatePerDiemRate(location: string, lodgingRate: number, mieRate: number): Promise<PerDiemRate[]> {
+  return addPerDiemRate(location, lodgingRate, mieRate);
+}
+
+export async function getPerDiemMasterRates(): Promise<PerDiemMasterRecord[]> {
+  if (perDiemMasterCache) return perDiemMasterCache;
+
+  const response = await fetch('/FY2026_PerDiemMasterRatesFile.json');
+  if (!response.ok) {
+    throw new Error('Unable to load FY2026 per diem dataset');
+  }
+
+  const data = (await response.json()) as PerDiemMasterData;
+  const records = Array.isArray(data.records) ? data.records : [];
+
+  perDiemMasterCache = records
+    .filter((row) => typeof row.destination === 'string' && row.destination.trim().length > 0)
+    .sort((a, b) => `${a.state} ${a.destination}`.localeCompare(`${b.state} ${b.destination}`));
+
+  return perDiemMasterCache;
 }
 
 export async function getAppConfig(): Promise<Record<string, string>> {
-  const rows = await db.appConfig.toArray();
-  const map: Record<string, string> = {};
-  for (const row of rows) map[row.key] = row.value;
-  return map;
+  return apiRequest<Record<string, string>>('/rates/config');
 }
 
 export async function updateAppConfig(config: Record<string, string>): Promise<Record<string, string>> {
-  for (const [key, value] of Object.entries(config)) {
-    await db.appConfig.put({ key, value });
-  }
-  return getAppConfig();
+  return apiRequest<Record<string, string>>('/rates/config', { method: 'PUT', body: config });
 }
 
-// ── Excel Export (client-side) ──
+// ── Excel Export (server-side) ──
 export async function exportExcel(exerciseId: string): Promise<void> {
-  const { utils, writeFile } = await import('xlsx');
-  const ex = await getExercise(exerciseId);
-  const rates = await getRateInputs();
-  const budget = calcEngine(ex, rates);
+  const token = getAuthToken();
+  const response = await fetch(`${API_BASE}/exercises/${exerciseId}/export`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
 
-  const wb = utils.book_new();
+  if (!response.ok) throw new Error(`Export failed (${response.status})`);
 
-  // Summary sheet
-  const summaryData = [
-    ['Exercise', ex.name],
-    ['Start Date', ex.startDate],
-    ['End Date', ex.endDate],
-    ['Duty Days', ex.defaultDutyDays],
-    [],
-    ['Unit', 'RPA', 'O&M', 'Total'],
-    ...Object.values(budget.units).map((u) => [u.unitCode, u.unitTotalRpa, u.unitTotalOm, u.unitTotal]),
-    [],
-    ['Grand Total', budget.grandTotal],
-    ['Total RPA', budget.totalRpa],
-    ['Total O&M', budget.totalOm],
-    ['Total PAX', budget.totalPax],
-  ];
-  utils.book_append_sheet(wb, utils.aoa_to_sheet(summaryData), 'Summary');
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get('content-disposition') || '';
+  const fileNameMatch = /filename="([^"]+)"/.exec(contentDisposition);
+  const fileName = fileNameMatch?.[1] || `exercise_${exerciseId}_budget.xlsx`;
 
-  // Unit sheets
-  for (const ub of ex.unitBudgets) {
-    const uc = budget.units[ub.unitCode];
-    if (!uc) continue;
-    const rows = [
-      ['Category', 'PAX', 'Days', 'Mil Pay', 'Per Diem', 'Meals', 'Travel', 'Billeting', 'Subtotal'],
-      ['WC RPA', uc.whiteCellRpa.paxCount, uc.whiteCellRpa.dutyDays, uc.whiteCellRpa.milPay, uc.whiteCellRpa.perDiem, uc.whiteCellRpa.meals, uc.whiteCellRpa.travel, uc.whiteCellRpa.billeting, uc.whiteCellRpa.subtotal],
-      ['WC O&M', uc.whiteCellOm.paxCount, uc.whiteCellOm.dutyDays, uc.whiteCellOm.milPay, uc.whiteCellOm.perDiem, uc.whiteCellOm.meals, uc.whiteCellOm.travel, uc.whiteCellOm.billeting, uc.whiteCellOm.subtotal],
-      ['Player RPA', uc.playerRpa.paxCount, uc.playerRpa.dutyDays, uc.playerRpa.milPay, uc.playerRpa.perDiem, uc.playerRpa.meals, uc.playerRpa.travel, uc.playerRpa.billeting, uc.playerRpa.subtotal],
-      ['Player O&M', uc.playerOm.paxCount, uc.playerOm.dutyDays, uc.playerOm.milPay, uc.playerOm.perDiem, uc.playerOm.meals, uc.playerOm.travel, uc.playerOm.billeting, uc.playerOm.subtotal],
-      [],
-      ['Exec RPA', uc.executionRpa],
-      ['Exec O&M', uc.executionOm],
-      ['Unit Total RPA', uc.unitTotalRpa],
-      ['Unit Total O&M', uc.unitTotalOm],
-      ['Unit Total', uc.unitTotal],
-    ];
-    utils.book_append_sheet(wb, utils.aoa_to_sheet(rows), ub.unitCode);
-  }
-
-  // O&M Detail sheet
-  const omRows = [['Category', 'Label', 'Amount', 'Notes'], ...ex.omCostLines.map((l) => [l.category, l.label, l.amount, l.notes || ''])];
-  utils.book_append_sheet(wb, utils.aoa_to_sheet(omRows), 'O&M Detail');
-
-  writeFile(wb, `${ex.name.replace(/[^a-zA-Z0-9]/g, '_')}_Budget.xlsx`);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
-// ── JSON Import / Export (for data portability) ──
+// ── JSON Import / Export ──
 export async function exportAllData(): Promise<string> {
+  const exercises = await getExercises();
+  const fullExercises = await Promise.all(exercises.map((exercise) => getExercise(exercise.id)));
+
+  const unitBudgets = fullExercises.flatMap((exercise) =>
+    exercise.unitBudgets.map((unit) => ({
+      id: unit.id,
+      exerciseId: exercise.id,
+      unitCode: unit.unitCode,
+    })),
+  );
+
+  const personnelGroups = fullExercises.flatMap((exercise) =>
+    exercise.unitBudgets.flatMap((unit) =>
+      unit.personnelGroups.map((group) => ({
+        id: group.id,
+        unitBudgetId: unit.id,
+        role: group.role,
+        fundingType: group.fundingType,
+        paxCount: group.paxCount,
+        dutyDays: group.dutyDays,
+        location: group.location,
+        isLongTour: group.isLongTour,
+        avgCpdOverride: group.avgCpdOverride,
+      })),
+    ),
+  );
+
+  const personnelEntries = fullExercises.flatMap((exercise) =>
+    exercise.unitBudgets.flatMap((unit) =>
+      unit.personnelGroups.flatMap((group) =>
+        group.personnelEntries.map((entry) => ({
+          id: entry.id,
+          personnelGroupId: group.id,
+          rankCode: entry.rankCode,
+          count: entry.count,
+          dutyDays: entry.dutyDays,
+          location: entry.location,
+          isLocal: entry.isLocal,
+        })),
+      ),
+    ),
+  );
+
+  const travelConfigs = fullExercises
+    .filter((exercise) => exercise.travelConfig)
+    .map((exercise) => exercise.travelConfig!);
+
+  const executionCostLines = fullExercises.flatMap((exercise) =>
+    exercise.unitBudgets.flatMap((unit) => unit.executionCostLines),
+  );
+
+  const omCostLines = fullExercises.flatMap((exercise) => exercise.omCostLines);
+
   const data = {
-    exercises: await db.exercises.toArray(),
-    unitBudgets: await db.unitBudgets.toArray(),
-    personnelGroups: await db.personnelGroups.toArray(),
-    personnelEntries: await db.personnelEntries.toArray(),
-    travelConfigs: await db.travelConfigs.toArray(),
-    executionCostLines: await db.executionCostLines.toArray(),
-    omCostLines: await db.omCostLines.toArray(),
-    rankCpdRates: await db.rankCpdRates.toArray(),
-    perDiemRates: await db.perDiemRates.toArray(),
-    appConfig: await db.appConfig.toArray(),
+    exercises,
+    unitBudgets,
+    personnelGroups,
+    personnelEntries,
+    travelConfigs,
+    executionCostLines,
+    omCostLines,
+    rankCpdRates: await getCpdRates(),
+    perDiemRates: await getPerDiemRates(),
+    appConfig: Object.entries(await getAppConfig()).map(([key, value]) => ({ key, value })),
   };
+
   return JSON.stringify(data, null, 2);
 }
 
 export async function importAllData(json: string): Promise<void> {
-  const data = JSON.parse(json);
+  const data = JSON.parse(json) as {
+    exercises?: Exercise[];
+    unitBudgets?: Array<{ id: string; exerciseId: string; unitCode: string }>;
+    personnelGroups?: Array<{
+      id: string;
+      unitBudgetId: string;
+      role: string;
+      fundingType: string;
+      paxCount: number;
+      dutyDays: number | null;
+      location: string | null;
+      isLongTour: boolean;
+      avgCpdOverride: number | null;
+    }>;
+    personnelEntries?: Array<{
+      personnelGroupId: string;
+      rankCode: string;
+      count: number;
+      dutyDays?: number | null;
+      location?: string | null;
+      isLocal?: boolean;
+    }>;
+    travelConfigs?: Array<{
+      exerciseId: string;
+      airfarePerPerson: number;
+      rentalCarDailyRate: number;
+      rentalCarCount: number;
+      rentalCarDays: number;
+    }>;
+    executionCostLines?: Array<{
+      unitBudgetId: string;
+      fundingType: string;
+      category: string;
+      amount: number;
+      notes: string | null;
+    }>;
+    omCostLines?: Array<{
+      exerciseId: string;
+      category: string;
+      label: string;
+      amount: number;
+      notes: string | null;
+    }>;
+    rankCpdRates?: Array<{ rankCode: string; costPerDay: number }>;
+    perDiemRates?: Array<{ location: string; lodgingRate: number; mieRate: number }>;
+    appConfig?: Array<{ key: string; value: string }>;
+  };
 
-  await db.transaction('rw',
-    [db.exercises, db.unitBudgets, db.personnelGroups, db.personnelEntries,
-    db.travelConfigs, db.executionCostLines, db.omCostLines,
-    db.rankCpdRates, db.perDiemRates, db.appConfig],
-    async () => {
-      // Clear everything
-      await db.exercises.clear();
-      await db.unitBudgets.clear();
-      await db.personnelGroups.clear();
-      await db.personnelEntries.clear();
-      await db.travelConfigs.clear();
-      await db.executionCostLines.clear();
-      await db.omCostLines.clear();
-      await db.rankCpdRates.clear();
-      await db.perDiemRates.clear();
-      await db.appConfig.clear();
+  const currentExercises = await getExercises();
+  for (const exercise of currentExercises) {
+    await deleteExercise(exercise.id);
+  }
 
-      // Bulk insert
-      if (data.exercises?.length) await db.exercises.bulkAdd(data.exercises);
-      if (data.unitBudgets?.length) await db.unitBudgets.bulkAdd(data.unitBudgets);
-      if (data.personnelGroups?.length) await db.personnelGroups.bulkAdd(data.personnelGroups);
-      if (data.personnelEntries?.length) await db.personnelEntries.bulkAdd(data.personnelEntries);
-      if (data.travelConfigs?.length) await db.travelConfigs.bulkAdd(data.travelConfigs);
-      if (data.executionCostLines?.length) await db.executionCostLines.bulkAdd(data.executionCostLines);
-      if (data.omCostLines?.length) await db.omCostLines.bulkAdd(data.omCostLines);
-      if (data.rankCpdRates?.length) await db.rankCpdRates.bulkAdd(data.rankCpdRates);
-      if (data.perDiemRates?.length) await db.perDiemRates.bulkAdd(data.perDiemRates);
-      if (data.appConfig?.length) await db.appConfig.bulkAdd(data.appConfig);
-    },
-  );
+  if (data.rankCpdRates?.length) {
+    await updateCpdRates(data.rankCpdRates.map((row) => ({ rankCode: row.rankCode, costPerDay: row.costPerDay })));
+  }
+
+  if (data.perDiemRates?.length) {
+    await updatePerDiemRates(
+      data.perDiemRates.map((row) => ({
+        location: normalizePerDiemLocation(row.location),
+        lodgingRate: row.lodgingRate,
+        mieRate: row.mieRate,
+      })),
+    );
+  }
+
+  if (data.appConfig?.length) {
+    await updateAppConfig(Object.fromEntries(data.appConfig.map((row) => [row.key, row.value])));
+  }
+
+  const sourceExercises = data.exercises || [];
+  const sourceUnits = data.unitBudgets || [];
+  const sourceGroups = data.personnelGroups || [];
+  const sourceEntries = data.personnelEntries || [];
+  const sourceTravel = data.travelConfigs || [];
+  const sourceExec = data.executionCostLines || [];
+  const sourceOm = data.omCostLines || [];
+
+  for (const sourceExercise of sourceExercises) {
+    let created = await createExercise({
+      name: sourceExercise.name,
+      totalBudget: sourceExercise.totalBudget ?? 0,
+      startDate: sourceExercise.startDate,
+      endDate: sourceExercise.endDate,
+      defaultDutyDays: sourceExercise.defaultDutyDays,
+    });
+
+    const sourceExerciseUnits = sourceUnits.filter((unit) => unit.exerciseId === sourceExercise.id);
+    for (const sourceUnit of sourceExerciseUnits) {
+      const exists = created.unitBudgets.some((unit) => unit.unitCode === sourceUnit.unitCode);
+      if (!exists) {
+        const sourceUnitGroups = sourceGroups.filter((group) => group.unitBudgetId === sourceUnit.id);
+        const wantsA7 = sourceUnitGroups.some((group) => group.role === 'PLANNING' || group.role === 'SUPPORT');
+        created = await addUnitBudget(created.id, {
+          unitCode: sourceUnit.unitCode,
+          template: wantsA7 ? 'A7' : 'STANDARD',
+        });
+      }
+    }
+
+    const remoteByUnitCode = new Map(created.unitBudgets.map((unit) => [unit.unitCode, unit]));
+    const sourceByUnitCode = new Map(sourceExerciseUnits.map((unit) => [unit.unitCode, unit]));
+
+    const groupIdMap = new Map<string, string>();
+
+    for (const [unitCode, remoteUnit] of remoteByUnitCode) {
+      const sourceUnit = sourceByUnitCode.get(unitCode);
+      if (!sourceUnit) continue;
+
+      const sourceUnitGroups = sourceGroups.filter((group) => group.unitBudgetId === sourceUnit.id);
+      const sourceUnitExec = sourceExec.filter((line) => line.unitBudgetId === sourceUnit.id);
+
+      for (const sourceGroup of sourceUnitGroups) {
+        const remoteGroup = findGroup(remoteUnit, sourceGroup.role, sourceGroup.fundingType);
+        if (!remoteGroup) continue;
+
+        groupIdMap.set(sourceGroup.id, remoteGroup.id);
+
+        await updatePersonnelGroup(remoteGroup.id, {
+          paxCount: sourceGroup.paxCount,
+          dutyDays: sourceGroup.dutyDays,
+          location: sourceGroup.location,
+          isLongTour: sourceGroup.isLongTour,
+          avgCpdOverride: sourceGroup.avgCpdOverride,
+        });
+      }
+
+      for (const line of sourceUnitExec) {
+        await addExecutionCost(remoteUnit.id, {
+          fundingType: line.fundingType,
+          category: line.category,
+          amount: line.amount,
+          notes: line.notes,
+        });
+      }
+    }
+
+    for (const sourceGroup of sourceGroups) {
+      const mappedGroupId = groupIdMap.get(sourceGroup.id);
+      if (!mappedGroupId) continue;
+      const entries = sourceEntries.filter((entry) => entry.personnelGroupId === sourceGroup.id);
+      for (const entry of entries) {
+        await addPersonnelEntry(mappedGroupId, {
+          rankCode: entry.rankCode,
+          count: entry.count,
+          dutyDays: entry.dutyDays ?? null,
+          location: entry.location ?? null,
+          isLocal: !!entry.isLocal,
+        });
+      }
+    }
+
+    const travel = sourceTravel.find((config) => config.exerciseId === sourceExercise.id);
+    if (travel) {
+      await updateTravelConfig(created.id, {
+        airfarePerPerson: travel.airfarePerPerson,
+        rentalCarDailyRate: travel.rentalCarDailyRate,
+        rentalCarCount: travel.rentalCarCount,
+        rentalCarDays: travel.rentalCarDays,
+      });
+    }
+
+    for (const line of sourceOm.filter((row) => row.exerciseId === sourceExercise.id)) {
+      await addOmCost(created.id, {
+        category: line.category,
+        label: line.label,
+        amount: line.amount,
+        notes: line.notes,
+      });
+    }
+  }
 }

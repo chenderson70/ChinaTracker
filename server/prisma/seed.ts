@@ -83,6 +83,8 @@ async function main() {
     { key: 'PLAYER_BILLETING_NIGHT', value: '27.00' },
     { key: 'DEFAULT_AIRFARE', value: '400.00' },
     { key: 'DEFAULT_RENTAL_CAR_DAILY', value: '50.00' },
+    { key: 'BUDGET_TARGET_RPA', value: '0.00' },
+    { key: 'BUDGET_TARGET_OM', value: '0.00' },
   ];
 
   for (const cfg of configs) {

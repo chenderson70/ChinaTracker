@@ -1,10 +1,23 @@
-import { useState } from 'react';
-import { Card, Table, InputNumber, Button, Typography, Row, Col, Divider, Space, message, Spin, Modal, Input, Popconfirm } from 'antd';
+import { useMemo, useState } from 'react';
+import { Card, Table, InputNumber, Button, Typography, Row, Col, Divider, Space, message, Spin, Modal, Input, Popconfirm, Select } from 'antd';
 import { SaveOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '../services/api';
 import { useApp } from '../components/AppLayout';
-import type { RankCpdRate, PerDiemRate } from '../types';
+import type { RankCpdRate, PerDiemRate, PerDiemMasterRecord } from '../types';
+
+const STATE_NAMES: Record<string, string> = {
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut',
+  DE: 'Delaware', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa',
+  KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan',
+  MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire',
+  NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio',
+  OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota',
+  TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia',
+  WI: 'Wisconsin', WY: 'Wyoming', DC: 'District of Columbia',
+};
+
+type MasterSearchField = 'all' | 'destination' | 'state' | 'county';
 
 export default function RateConfig() {
   const { exerciseId } = useApp();
@@ -13,12 +26,15 @@ export default function RateConfig() {
   // Fetch rates & config
   const { data: cpdRates = [], isLoading: cpdLoading } = useQuery({ queryKey: ['cpdRates'], queryFn: api.getCpdRates });
   const { data: perDiemRates = [], isLoading: pdLoading } = useQuery({ queryKey: ['perDiemRates'], queryFn: api.getPerDiemRates });
+  const { data: masterRates = [], isLoading: masterLoading } = useQuery({ queryKey: ['perDiemMasterRates'], queryFn: api.getPerDiemMasterRates });
   const { data: config = {}, isLoading: cfgLoading } = useQuery({ queryKey: ['appConfig'], queryFn: api.getAppConfig });
 
   // Local editable state
   const [cpdEdits, setCpdEdits] = useState<Record<string, number>>({});
   const [pdEdits, setPdEdits] = useState<Record<string, { lodging?: number; mie?: number }>>({});
   const [cfgEdits, setCfgEdits] = useState<Record<string, string>>({});
+  const [pdSearch, setPdSearch] = useState('');
+  const [pdSearchField, setPdSearchField] = useState<MasterSearchField>('all');
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['cpdRates'] });
@@ -61,8 +77,42 @@ export default function RateConfig() {
     onSuccess: () => { invalidate(); message.success('Location removed'); },
   });
 
+  const importMasterRateMut = useMutation({
+    mutationFn: (row: PerDiemMasterRecord) =>
+      api.addOrUpdatePerDiemRate(
+        row.destination,
+        row.fy26LodgingRate,
+        row.fy26Mie,
+      ),
+    onSuccess: () => { invalidate(); message.success('Rate added to system locations'); },
+  });
+
   const [addLocOpen, setAddLocOpen] = useState(false);
   const [newLoc, setNewLoc] = useState({ name: '', lodging: 0, mie: 0 });
+
+  const filteredMasterRates = useMemo(() => {
+    const safeLower = (value: unknown) => (typeof value === 'string' ? value.toLowerCase() : '');
+    const safeUpper = (value: unknown) => (typeof value === 'string' ? value.toUpperCase() : '');
+    const stateFullName = (stateCode: unknown) => STATE_NAMES[safeUpper(stateCode).trim()] ?? '';
+    const matches = (value: string, q: string) => value.includes(q);
+
+    const q = pdSearch.trim().toLowerCase();
+    if (!q) return masterRates;
+
+    return masterRates
+      .filter((row) => {
+        const destination = safeLower(row.destination);
+        const stateCode = safeLower(row.state).trim();
+        const stateName = safeLower(stateFullName(row.state));
+        const county = safeLower(row.countyOrLocationDefined);
+
+        if (pdSearchField === 'destination') return matches(destination, q);
+        if (pdSearchField === 'state') return matches(stateCode, q) || matches(stateName, q);
+        if (pdSearchField === 'county') return matches(county, q);
+
+        return matches(destination, q) || matches(stateCode, q) || matches(stateName, q) || matches(county, q);
+      });
+  }, [masterRates, pdSearch, pdSearchField]);
 
   const saveCfgMut = useMutation({
     mutationFn: () => api.updateAppConfig({ ...config, ...cfgEdits }),
@@ -127,6 +177,50 @@ export default function RateConfig() {
     },
   ];
 
+  const masterPdColumns = [
+    {
+      title: 'Destination',
+      dataIndex: 'destination',
+      width: 180,
+      render: (val: string) => val?.toUpperCase(),
+    },
+    {
+      title: 'State',
+      dataIndex: 'state',
+      width: 90,
+      render: (val: string) => {
+        const stateCode = typeof val === 'string' ? val.trim().toUpperCase() : '';
+        const stateName = STATE_NAMES[stateCode];
+        return stateName ? `${stateName} (${stateCode})` : stateCode;
+      },
+    },
+    {
+      title: 'Lodging ($/night)',
+      dataIndex: 'fy26LodgingRate',
+      width: 140,
+      render: (v: number) => v.toFixed(2),
+    },
+    {
+      title: 'M&IE ($/day)',
+      dataIndex: 'fy26Mie',
+      width: 120,
+      render: (v: number) => v.toFixed(2),
+    },
+    {
+      title: '',
+      width: 120,
+      render: (_: unknown, row: PerDiemMasterRecord) => (
+        <Button
+          size="small"
+          onClick={() => importMasterRateMut.mutate(row)}
+          loading={importMasterRateMut.isPending}
+        >
+          Use Rate
+        </Button>
+      ),
+    },
+  ];
+
   const cfgVal = (key: string) => parseFloat(cfgEdits[key] ?? config[key] ?? '0');
 
   return (
@@ -161,6 +255,41 @@ export default function RateConfig() {
           </Space>
         }
       >
+        <Space direction="vertical" style={{ width: '100%', marginBottom: 12 }}>
+          <Typography.Text type="secondary">Search FY2026 master per diem file and add a location/rate into system rates.</Typography.Text>
+          <Space.Compact style={{ width: '100%' }}>
+            <Select<MasterSearchField>
+              value={pdSearchField}
+              onChange={setPdSearchField}
+              style={{ width: 220 }}
+              options={[
+                { value: 'all', label: 'All Columns' },
+                { value: 'destination', label: 'Destination' },
+                { value: 'state', label: 'State (Code/Name)' },
+                { value: 'county', label: 'County / Location' },
+              ]}
+            />
+            <Input
+              allowClear
+              placeholder={pdSearchField === 'state' ? 'Search state code or full state name (e.g., CO or Colorado)...' : 'Search per selected column...'}
+              value={pdSearch}
+              onChange={(e) => setPdSearch(e.target.value)}
+            />
+          </Space.Compact>
+        </Space>
+        <div className="ct-table" style={{ marginBottom: 12 }}>
+          <Table
+            size="small"
+            loading={masterLoading}
+            pagination={{ pageSize: 8 }}
+            dataSource={filteredMasterRates.map((r, idx) => ({
+              ...r,
+              key: `${r.id ?? 'NA'}-${r.state ?? 'NA'}-${r.destination ?? 'NA'}-${r.seasonBegin ?? 'NA'}-${r.seasonEnd ?? 'NA'}-${r.fy26LodgingRate}-${r.fy26Mie}-${idx}`,
+            }))}
+            rowKey="key"
+            columns={masterPdColumns}
+          />
+        </div>
         <div className="ct-table">
           <Table
             size="small"
@@ -266,6 +395,26 @@ export default function RateConfig() {
               step={1}
               value={cfgVal('DEFAULT_RENTAL_CAR_DAILY')}
               onChange={(v) => setCfgEdits({ ...cfgEdits, DEFAULT_RENTAL_CAR_DAILY: String(v || 0) })}
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col span={6}>
+            <Typography.Text type="secondary">RPA Budget Target ($)</Typography.Text>
+            <InputNumber
+              min={0}
+              step={1000}
+              value={cfgVal('BUDGET_TARGET_RPA')}
+              onChange={(v) => setCfgEdits({ ...cfgEdits, BUDGET_TARGET_RPA: String(v || 0) })}
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col span={6}>
+            <Typography.Text type="secondary">O&amp;M Budget Target ($)</Typography.Text>
+            <InputNumber
+              min={0}
+              step={1000}
+              value={cfgVal('BUDGET_TARGET_OM')}
+              onChange={(v) => setCfgEdits({ ...cfgEdits, BUDGET_TARGET_OM: String(v || 0) })}
               style={{ width: '100%' }}
             />
           </Col>

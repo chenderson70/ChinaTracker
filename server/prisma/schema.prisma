@@ -15,7 +15,9 @@ datasource db {
 
 model Exercise {
   id              String         @id @default(uuid())
+  ownerUserId     String         @map("owner_user_id")
   name            String
+  totalBudget     Float          @default(0) @map("total_budget")
   startDate       DateTime       @map("start_date")
   endDate         DateTime       @map("end_date")
   defaultDutyDays Int            @map("default_duty_days")
@@ -25,7 +27,20 @@ model Exercise {
   travelConfig    TravelConfig?
   omCostLines     OmCostLine[]
 
+  @@index([ownerUserId, updatedAt])
   @@map("exercises")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  email        String?
+  name         String
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
 }
 
 model UnitBudget {
@@ -48,6 +63,11 @@ model PersonnelGroup {
   dutyDays         Int?             @map("duty_days")
   location         String?
   isLongTour       Boolean          @default(false) @map("is_long_tour")
+  isLocal          Boolean          @default(false) @map("is_local")
+  airfarePerPerson Float?           @map("airfare_per_person")
+  rentalCarCount   Int              @default(0) @map("rental_car_count")
+  rentalCarDaily   Float?           @map("rental_car_daily")
+  rentalCarDays    Int              @default(0) @map("rental_car_days")
   avgCpdOverride   Float?           @map("avg_cpd_override")
   unitBudget       UnitBudget       @relation(fields: [unitBudgetId], references: [id], onDelete: Cascade)
   personnelEntries PersonnelEntry[]
@@ -60,6 +80,9 @@ model PersonnelEntry {
   personnelGroupId String         @map("personnel_group_id")
   rankCode         String         @map("rank_code")
   count            Int
+  dutyDays         Int?           @map("duty_days")
+  location         String?
+  isLocal          Boolean        @default(false) @map("is_local")
   personnelGroup   PersonnelGroup @relation(fields: [personnelGroupId], references: [id], onDelete: Cascade)
 
   @@map("personnel_entries")

@@ -16,7 +16,6 @@ import {
   Space,
   Divider,
   Spin,
-  message,
   Popconfirm,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
@@ -34,7 +33,7 @@ const RANKS = [
 
 export default function UnitView() {
   const { unitCode } = useParams<{ unitCode: string }>();
-  const { exercise, budget, exerciseId, refetchBudget, refetchExercise } = useApp();
+  const { exercise, budget, exerciseId } = useApp();
   const queryClient = useQueryClient();
   const { data: perDiemLocations = ['GULFPORT', 'CAMP_SHELBY'] } = useQuery({
     queryKey: ['perDiemRates'],
@@ -69,6 +68,11 @@ export default function UnitView() {
 
   const deleteEntryMut = useMutation({
     mutationFn: (id: string) => api.deletePersonnelEntry(id),
+    onSuccess: invalidate,
+  });
+
+  const updateEntryMut = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.updatePersonnelEntry(id, data),
     onSuccess: invalidate,
   });
 
@@ -111,6 +115,11 @@ export default function UnitView() {
     const group = findGroup(role, ft);
     const calc = getCalc(role, ft);
     if (!group) return null;
+    const isPlayerLike = role === 'PLAYER' || role === 'PLANNING';
+    const isPlayerRpa = isPlayerLike && ft === 'RPA';
+    const isPlayerOm = isPlayerLike && ft === 'OM';
+
+    const totalEntryPax = group.personnelEntries.reduce((sum, entry) => sum + entry.count, 0);
 
     return (
       <Card
@@ -122,54 +131,61 @@ export default function UnitView() {
         }
         size="small"
         className="ct-personnel-card"
-        extra={<span style={{ fontSize: 16, fontWeight: 700, color: ft === 'RPA' ? '#1677ff' : '#52c41a' }}>{fmt(calc.subtotal)}</span>}
+        extra={<Space><strong>PAX: {group.paxCount || totalEntryPax}</strong><span style={{ fontSize: 16, fontWeight: 700, color: ft === 'RPA' ? '#1677ff' : '#52c41a' }}>{fmt(calc.subtotal)}</span></Space>}
       >
         <Row gutter={16} style={{ marginBottom: 12 }}>
-          <Col span={6}>
-            <Typography.Text type="secondary">PAX Count</Typography.Text>
-            <InputNumber
-              min={0}
-              value={group.paxCount}
-              style={{ width: '100%' }}
-              onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { paxCount: v || 0 } })}
-            />
-          </Col>
-          <Col span={6}>
-            <Typography.Text type="secondary">Duty Days</Typography.Text>
-            <InputNumber
-              min={1}
-              value={group.dutyDays || exercise!.defaultDutyDays}
-              style={{ width: '100%' }}
-              onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { dutyDays: v } })}
-            />
-          </Col>
-          <Col span={6}>
-            <Typography.Text type="secondary">Location</Typography.Text>
-            <Select
-              value={group.location || 'GULFPORT'}
-              style={{ width: '100%' }}
-              onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { location: v } })}
-              options={perDiemLocations.map((loc) => ({ value: loc, label: loc.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }))}
-            />
-          </Col>
-          <Col span={6}>
-            <Typography.Text type="secondary">Long Tour</Typography.Text>
-            <br />
-            <Switch
-              checked={group.isLongTour}
-              onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { isLongTour: v } })}
-            />
-          </Col>
+          {!isPlayerRpa && (
+            <Col span={6}>
+              <Typography.Text type="secondary">Airfare/POV ($/person)</Typography.Text>
+              <InputNumber
+                min={0}
+                value={group.airfarePerPerson ?? 400}
+                style={{ width: '100%' }}
+                onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { airfarePerPerson: v || 0 } })}
+              />
+            </Col>
+          )}
+          {(role === 'WHITE_CELL' || role === 'SUPPORT') && (
+            <>
+              <Col span={4}>
+                <Typography.Text type="secondary">Rental Cars (#)</Typography.Text>
+                <InputNumber
+                  min={0}
+                  value={group.rentalCarCount || 0}
+                  style={{ width: '100%' }}
+                  onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { rentalCarCount: v || 0 } })}
+                />
+              </Col>
+              <Col span={4}>
+                <Typography.Text type="secondary">Rental Rate ($/day)</Typography.Text>
+                <InputNumber
+                  min={0}
+                  value={group.rentalCarDaily ?? 50}
+                  style={{ width: '100%' }}
+                  onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { rentalCarDaily: v || 0 } })}
+                />
+              </Col>
+              <Col span={4}>
+                <Typography.Text type="secondary">Rental Days</Typography.Text>
+                <InputNumber
+                  min={0}
+                  value={group.rentalCarDays || 0}
+                  style={{ width: '100%' }}
+                  onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { rentalCarDays: v || 0 } })}
+                />
+              </Col>
+            </>
+          )}
         </Row>
 
         {/* Cost breakdown */}
-        <Row gutter={16} style={{ marginBottom: 12 }}>
-          {calc.milPay > 0 && <Col><div><span style={{ fontSize: 12, color: '#8c8c8c', display: 'block' }}>Mil Pay</span><span style={{ fontSize: 14, fontWeight: 600 }}>{fmt(calc.milPay)}</span></div></Col>}
-          {calc.perDiem > 0 && <Col><div><span style={{ fontSize: 12, color: '#8c8c8c', display: 'block' }}>Per Diem</span><span style={{ fontSize: 14, fontWeight: 600 }}>{fmt(calc.perDiem)}</span></div></Col>}
-          {calc.meals > 0 && <Col><div><span style={{ fontSize: 12, color: '#8c8c8c', display: 'block' }}>Meals</span><span style={{ fontSize: 14, fontWeight: 600 }}>{fmt(calc.meals)}</span></div></Col>}
-          {calc.travel > 0 && <Col><div><span style={{ fontSize: 12, color: '#8c8c8c', display: 'block' }}>Travel</span><span style={{ fontSize: 14, fontWeight: 600 }}>{fmt(calc.travel)}</span></div></Col>}
-          {calc.billeting > 0 && <Col><div><span style={{ fontSize: 12, color: '#8c8c8c', display: 'block' }}>Billeting</span><span style={{ fontSize: 14, fontWeight: 600 }}>{fmt(calc.billeting)}</span></div></Col>}
-        </Row>
+        <Typography.Text style={{ color: '#1677ff', fontWeight: 600, display: 'block', marginBottom: 10 }}>
+          {isPlayerRpa
+            ? `Mil Pay: ${fmt(calc.milPay)} • Meals: ${fmt(calc.meals)} • Total: ${fmt(calc.subtotal)}`
+            : isPlayerOm
+              ? `Travel Pay: ${fmt(calc.travel)} • Per Diem: ${fmt(calc.perDiem)} • Billeting: ${fmt(calc.billeting)} • Total: ${fmt(calc.subtotal)}`
+              : `Mil Pay: ${fmt(calc.milPay)} • Travel Pay: ${fmt(calc.travel)} • Per Diem: ${fmt(calc.perDiem)} • Meals: ${fmt(calc.meals)} • Billeting: ${fmt(calc.billeting)} • Total: ${fmt(calc.subtotal)}`}
+        </Typography.Text>
 
         {/* Rank-level detail */}
         {group.personnelEntries.length > 0 && (
@@ -178,8 +194,74 @@ export default function UnitView() {
             pagination={false}
             dataSource={group.personnelEntries.map((e) => ({ ...e, key: e.id }))}
             columns={[
-              { title: 'Rank', dataIndex: 'rankCode', width: 100 },
-              { title: 'Count', dataIndex: 'count', width: 80 },
+              {
+                title: 'Rank',
+                dataIndex: 'rankCode',
+                width: 110,
+                render: (value, row) => (
+                  <Select
+                    size="small"
+                    value={value}
+                    style={{ width: '100%' }}
+                    options={RANKS.map((r) => ({ value: r, label: r }))}
+                    onChange={(v) => updateEntryMut.mutate({ id: row.id, data: { rankCode: v } })}
+                  />
+                ),
+              },
+              {
+                title: 'Count',
+                dataIndex: 'count',
+                width: 90,
+                render: (value, row) => (
+                  <InputNumber
+                    size="small"
+                    min={1}
+                    value={value}
+                    style={{ width: '100%' }}
+                    onChange={(v) => updateEntryMut.mutate({ id: row.id, data: { count: v || 1 } })}
+                  />
+                ),
+              },
+              {
+                title: 'Duty Days',
+                dataIndex: 'dutyDays',
+                width: 110,
+                render: (value, row) => (
+                  <InputNumber
+                    size="small"
+                    min={1}
+                    value={value ?? exercise!.defaultDutyDays}
+                    style={{ width: '100%' }}
+                    onChange={(v) => updateEntryMut.mutate({ id: row.id, data: { dutyDays: v || 1 } })}
+                  />
+                ),
+              },
+              {
+                title: 'Location',
+                dataIndex: 'location',
+                width: 160,
+                render: (value, row) => (
+                  <Select
+                    size="small"
+                    value={value || 'GULFPORT'}
+                    style={{ width: '100%' }}
+                    options={perDiemLocations.map((loc) => ({ value: loc, label: loc }))}
+                    onChange={(v) => updateEntryMut.mutate({ id: row.id, data: { location: v } })}
+                  />
+                ),
+              },
+              {
+                title: 'No Travel',
+                dataIndex: 'isLocal',
+                width: 100,
+                render: (value, row) => (
+                  <Switch
+                    size="small"
+                    checked={!!value}
+                    onChange={(v) => updateEntryMut.mutate({ id: row.id, data: { isLocal: v } })}
+                  />
+                ),
+              },
               {
                 title: '',
                 width: 50,
@@ -199,7 +281,7 @@ export default function UnitView() {
           style={{ marginTop: 8 }}
           onClick={() => setEntryModal({ groupId: group.id })}
         >
-          Add Rank Detail
+          + Add Details
         </Button>
       </Card>
     );
@@ -290,13 +372,19 @@ export default function UnitView() {
 
       {/* Add rank entry modal */}
       <Modal
-        title="Add Rank Detail"
+        title="Add Detail"
         open={!!entryModal}
-        onOk={() =>
-          entryForm.validateFields().then((v) =>
-            addEntryMut.mutate({ groupId: entryModal!.groupId, data: v })
-          )
-        }
+        onOk={async () => {
+          const values = await entryForm.validateFields();
+          const payload = {
+            rankCode: values.rankCode,
+            count: values.count,
+            dutyDays: values.dutyDays,
+            location: values.location,
+            isLocal: !!values.isLocal,
+          };
+          addEntryMut.mutate({ groupId: entryModal!.groupId, data: payload });
+        }}
         onCancel={() => setEntryModal(null)}
       >
         <Form form={entryForm} layout="vertical">
@@ -305,6 +393,15 @@ export default function UnitView() {
           </Form.Item>
           <Form.Item name="count" label="Count" initialValue={1} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="dutyDays" label="Duty Days" initialValue={exercise.defaultDutyDays} rules={[{ required: true }]}>
+            <InputNumber min={1} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="location" label="Location" initialValue={perDiemLocations[0] || 'GULFPORT'} rules={[{ required: true }]}>
+            <Select options={perDiemLocations.map((loc) => ({ value: loc, label: loc }))} />
+          </Form.Item>
+          <Form.Item name="isLocal" label="No Travel Expenses" valuePropName="checked" initialValue={false}>
+            <Switch />
           </Form.Item>
         </Form>
       </Modal>

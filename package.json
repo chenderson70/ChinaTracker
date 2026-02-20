@@ -4,8 +4,13 @@
   "description": "Exercise Budget Calculator – Static site with IndexedDB storage",
   "private": true,
   "scripts": {
-    "dev": "cd client && npm run dev",
+    "dev": "concurrently -n server,client \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "dev:client": "npm --prefix client run dev",
+    "dev:server": "npm --prefix server run dev",
     "build": "cd client && npm run build",
     "preview": "cd client && npm run preview"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

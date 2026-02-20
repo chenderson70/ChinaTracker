@@ -29,11 +29,13 @@ import {
   ThunderboltOutlined,
   DatabaseOutlined,
   ArrowRightOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import * as api from '../services/api';
 import type { Exercise, ExerciseDetail, BudgetResult } from '../types';
+import { clearAuthSession, getStoredUser } from '../services/auth';
 
 const { Header, Sider, Content } = Layout;
 
@@ -59,6 +61,8 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const currentUser = getStoredUser();
+  const apiErrorNotifiedRef = useRef(false);
   const [exerciseId, setExerciseId] = useState<string | null>(localStorage.getItem('exerciseId'));
   const [createOpen, setCreateOpen] = useState(false);
   const [addUnitOpen, setAddUnitOpen] = useState(false);
@@ -68,10 +72,18 @@ export default function AppLayout() {
   const [removeUnitForm] = Form.useForm();
 
   // Fetch exercise list
-  const { data: exercises = [] } = useQuery({ queryKey: ['exercises'], queryFn: api.getExercises });
+  const {
+    data: exercises = [],
+    isFetched: exercisesFetched,
+    isError: exercisesLoadError,
+  } = useQuery({ queryKey: ['exercises'], queryFn: api.getExercises });
 
   // Fetch current exercise detail
-  const { data: exercise = null, refetch: refetchExercise } = useQuery({
+  const {
+    data: exercise = null,
+    refetch: refetchExercise,
+    isError: exerciseLoadError,
+  } = useQuery({
     queryKey: ['exercise', exerciseId],
     queryFn: () => api.getExercise(exerciseId!),
     enabled: !!exerciseId,
@@ -87,6 +99,9 @@ export default function AppLayout() {
   // Auto-select first exercise
   useEffect(() => {
     if (exercises.length === 0) {
+      if (exercisesFetched && exerciseId) {
+        setExerciseId(null);
+      }
       return;
     }
 
@@ -99,7 +114,20 @@ export default function AppLayout() {
     if (!exists) {
       setExerciseId(exercises[0].id);
     }
-  }, [exercises, exerciseId]);
+  }, [exercises, exerciseId, exercisesFetched]);
+
+  useEffect(() => {
+    if (!exerciseId || !exerciseLoadError) return;
+    setExerciseId(null);
+    localStorage.removeItem('exerciseId');
+    message.warning('Saved exercise could not be loaded. Please select or create an exercise.');
+  }, [exerciseId, exerciseLoadError]);
+
+  useEffect(() => {
+    if (!exercisesLoadError || apiErrorNotifiedRef.current) return;
+    apiErrorNotifiedRef.current = true;
+    message.error('Unable to reach the API. Start the server and refresh.');
+  }, [exercisesLoadError]);
 
   useEffect(() => {
     if (exerciseId) localStorage.setItem('exerciseId', exerciseId);
@@ -116,12 +144,16 @@ export default function AppLayout() {
       form.resetFields();
       message.success('Exercise created');
     },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to create exercise');
+    },
   });
 
   const handleCreate = () => {
     form.validateFields().then((vals) => {
       createMut.mutate({
         name: vals.name,
+        totalBudget: vals.totalBudget,
         startDate: vals.dates[0].format('YYYY-MM-DD'),
         endDate: vals.dates[1].format('YYYY-MM-DD'),
         defaultDutyDays: vals.defaultDutyDays,
@@ -273,6 +305,14 @@ export default function AppLayout() {
 
   const selectedKey = location.pathname;
 
+  const handleLogout = () => {
+    clearAuthSession();
+    queryClient.clear();
+    setExerciseId(null);
+    navigate('/auth');
+    message.success('Signed out');
+  };
+
   return (
     <AppContext.Provider value={{ exercise, budget, exerciseId, setExerciseId, refetchBudget, refetchExercise }}>
       <Layout style={{ minHeight: '100vh' }}>
@@ -361,6 +401,14 @@ export default function AppLayout() {
               >
                 <Button icon={<DatabaseOutlined />}>Data <DownOutlined /></Button>
               </Dropdown>
+              <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
+                {currentUser?.username || currentUser?.name}
+              </Typography.Text>
+              <Tooltip title="Sign out">
+                <Button icon={<LogoutOutlined />} onClick={handleLogout}>
+                  Logout
+                </Button>
+              </Tooltip>
               <input type="file" ref={fileInputRef} accept=".json" style={{ display: 'none' }} onChange={onFileSelected} />
             </div>
             {budget && (
@@ -425,6 +473,14 @@ export default function AppLayout() {
           </Form.Item>
           <Form.Item name="defaultDutyDays" label="Default Duty Days" initialValue={14}>
             <InputNumber min={1} max={365} style={{ width: '100%' }} size="large" />
+          </Form.Item>
+          <Form.Item
+            name="totalBudget"
+            label="Total Exercise Budget ($)"
+            initialValue={5000000}
+            rules={[{ required: true, message: 'Enter total exercise budget' }]}
+          >
+            <InputNumber min={0} style={{ width: '100%' }} size="large" />
           </Form.Item>
         </Form>
       </Modal>
