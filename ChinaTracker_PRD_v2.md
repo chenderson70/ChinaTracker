@@ -26,7 +26,7 @@
 
 ## 1. Executive Summary
 
-China Tracker is an Azure-hosted web application and exercise budget calculator that allows exercise planners to input personnel counts (PAX) across multiple organizational units, personnel types, and funding categories, producing a real-time, dynamic cost estimate for the entire exercise — augmented by Azure Machine Learning for predictive analytics, anomaly detection, and intelligent optimization.
+China Tracker is an Azure-hosted web application and exercise budget calculator that allows exercise planners to input personnel counts (PAX) across multiple organizational units, personnel types, and funding categories, producing a real-time, dynamic cost estimate for the entire exercise.
 
 The application replaces manual spreadsheet work with a structured, formula-driven tracker that:
 
@@ -35,8 +35,8 @@ The application replaces manual spreadsheet work with a structured, formula-driv
 - Separates every cost into **RPA** (Reserve Personnel Appropriation — Traditional Reservists) and **O&M** (Operations & Maintenance — AGRs and Civilians)
 - Breaks costs out by four organizational units: **SG**, **AE**, **CAB**, and **A7**
 - Rolls everything up into a single-page executive summary with total RPA, total O&M, and overall exercise cost
-- **Uses Azure ML to forecast final budgets, detect anomalous cost entries, optimize PAX allocations within constraints, auto-classify costs via NLP, score budget health, and benchmark against peer exercises**
-- **Hosted entirely on Azure** (App Service, PostgreSQL Flexible Server, Redis Cache, Blob Storage, Key Vault, Static Web Apps, ML Workspace) with Azure Entra ID SSO
+- Supports authenticated user accounts with saved sessions and persistent exercise data
+- **Hosted on Azure with split deployment**: static frontend on Storage Static Website + backend API on App Service/Container Apps + PostgreSQL
 
 ---
 
@@ -49,8 +49,8 @@ The application replaces manual spreadsheet work with a structured, formula-driv
 | Toggle-friendly | User can adjust white cell staff and player counts and instantly see budget impact |
 | Export-ready | Budget can be exported to Excel/CSV for inclusion in official documents |
 | Auditability | Every cost line traces back to its formula and rate inputs |
-| ML-enhanced decisions | Budget forecast, anomaly flags, optimization, and health score available within 2 seconds |
-| Azure-native hosting | Fully hosted on Azure with SSO, auto-scaling, managed backups, and IaC |
+| Persistent authentication | Session restore works across browser restarts via refresh-token backed server sessions |
+| Azure-native hosting | Frontend and API deploy independently with managed PostgreSQL persistence |
 
 ---
 
@@ -60,54 +60,31 @@ The application replaces manual spreadsheet work with a structured, formula-driv
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                  AZURE STATIC WEB APPS                          │
-│  React Frontend (Dashboard │ Units │ Rates │ Reports │ ML)     │
+│        AZURE STORAGE STATIC WEBSITE ($web container)            │
+│          React Frontend (Dashboard/Units/Rates/Reports)         │
 └──────────────────────────────┬──────────────────────────────────┘
-                               │ REST API / JSON
+                               │ HTTPS JSON
 ┌──────────────────────────────▼──────────────────────────────────┐
-│              AZURE APP SERVICE (Node/Express API)                │
-│  Auth │ Calc Engine │ Per Diem Lookup │ CRUD │ Export           │
-│  ML Orchestrator │ WebSocket (live updates)                      │
-└────────┬──────────────┬──────────────┬─────────────────────────┘
-         │              │              │
-┌────────▼────────┐ ┌──▼───────────┐ ┌▼────────────────────────┐
-│ AZURE DB FOR    │ │ AZURE ML     │ │ AZURE BLOB STORAGE      │
-│ POSTGRESQL      │ │ WORKSPACE    │ │ Exports, Snapshots,     │
-│ Flexible Server │ │              │ │ ML Datasets, Rosters    │
-│                 │ │ ┌──────────┐ │ └─────────────────────────┘
-│ Exercises       │ │ │Endpoints:│ │
-│ Units           │ │ │• Forecast│ │ ┌─────────────────────────┐
-│ Personnel       │ │ │• Anomaly │ │ │ AZURE REDIS CACHE       │
-│ Rates           │ │ │• Optimize│ │ │ Per diem rates, session  │
-│ O&M Lines       │ │ │• NLP     │ │ │ calc cache, ML results  │
-│ ML Predictions  │ │ └──────────┘ │ └─────────────────────────┘
-└─────────────────┘ └──────────────┘
-                                       ┌─────────────────────────┐
-                                       │ AZURE KEY VAULT         │
-                                       │ DB creds, API keys,     │
-                                       │ JWT secrets, ML keys    │
-                                       └─────────────────────────┘
-
-         ┌──────────────────────────────────────────┐
-         │ AZURE MONITOR + APPLICATION INSIGHTS      │
-         │ Logging, metrics, alerting, dashboards    │
-         └──────────────────────────────────────────┘
+│           AZURE APP SERVICE / CONTAINER APPS (API)             │
+│      Auth │ Sessions │ Calculation Engine │ CRUD │ Export       │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+                  ┌────────────▼────────────┐
+                  │ AZURE POSTGRESQL        │
+                  │ users, sessions, rates, │
+                  │ exercises, cost lines   │
+                  └─────────────────────────┘
 ```
 
 ### 3.2 Azure Services Breakdown
 
 | Service | Purpose | SKU / Tier |
 |---------|---------|------------|
-| **Azure Static Web Apps** | Host React SPA with built-in CI/CD from GitHub | Standard |
-| **Azure App Service** | Node.js API backend | B2 (dev) → P1v3 (prod) |
-| **Azure Database for PostgreSQL** | Primary relational data store | Flexible Server, Burstable B1ms (dev) → General Purpose D2s (prod) |
-| **Azure Machine Learning** | ML workspace for training, endpoints, and managed inference | Basic workspace + managed online endpoints |
-| **Azure Blob Storage** | Excel/CSV exports, ML training datasets, roster uploads, snapshots | Standard LRS |
-| **Azure Cache for Redis** | Session cache, per diem rate cache, ML prediction cache | Basic C0 (dev) → Standard C1 (prod) |
-| **Azure Key Vault** | Secrets management (DB connection strings, API keys, JWT secrets) | Standard |
-| **Azure Monitor + App Insights** | APM, logging, alerting, custom metrics for budget thresholds | Pay-as-you-go |
-| **Azure Active Directory (Entra ID)** | SSO authentication, role-based access control | Included with tenant |
-| **Azure Container Registry** | Store Docker images for API and ML training containers | Basic |
+| **Azure Storage Account (Static Website)** | Host built React SPA files from `$web` container | Standard LRS |
+| **Azure App Service / Container Apps** | Node.js API backend | B1/B2 (dev) → scaled tiers (prod) |
+| **Azure Database for PostgreSQL** | Primary relational data store | Flexible Server, Burstable B1ms+ |
+| **Azure Key Vault** | Secrets management (`DATABASE_URL`, JWT secrets) | Standard |
+| **Azure Monitor + App Insights** | APM, logging, and alerting | Pay-as-you-go |
 
 ---
 

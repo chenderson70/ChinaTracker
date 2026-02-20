@@ -14,7 +14,14 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+const corsOrigins = String(process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: corsOrigins.length === 0 ? true : corsOrigins,
+}));
 app.use(express.json());
 
 // API Routes

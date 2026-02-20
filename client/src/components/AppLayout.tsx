@@ -35,7 +35,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import * as api from '../services/api';
 import type { Exercise, ExerciseDetail, BudgetResult } from '../types';
-import { clearAuthSession, getStoredUser } from '../services/auth';
+import { getStoredUser } from '../services/auth';
 
 const { Header, Sider, Content } = Layout;
 
@@ -305,8 +305,8 @@ export default function AppLayout() {
 
   const selectedKey = location.pathname;
 
-  const handleLogout = () => {
-    clearAuthSession();
+  const handleLogout = async () => {
+    await api.logoutAccount();
     queryClient.clear();
     setExerciseId(null);
     navigate('/auth');

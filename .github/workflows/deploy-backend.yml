@@ -1,0 +1,67 @@
+name: Build & Deploy Backend API to Azure Web App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy-backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Build server
+        working-directory: server
+        run: npm run build
+
+      - name: Create deployment archive
+        working-directory: server
+        run: |
+          zip -r ../backend.zip . \
+            -x "src/*" \
+               "node_modules/.cache/*"
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy backend package
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          package: backend.zip
+
+      - name: Post-deploy backend health check
+        if: ${{ secrets.BACKEND_HEALTH_URL != '' }}
+        run: |
+          echo "Checking ${BACKEND_HEALTH_URL}"
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "${BACKEND_HEALTH_URL}" || true)
+            if [ "$code" = "200" ]; then
+              echo "Backend health check passed"
+              exit 0
+            fi
+            echo "Attempt $i failed with status ${code}; retrying in 10s"
+            sleep 10
+          done
+          echo "Backend health check failed"
+          exit 1
+        env:
+          BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}

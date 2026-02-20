@@ -126,3 +126,14 @@ Each unit below requires its own section with **RPA** and **O&M** sub-categories
 - [ ] Single spreadsheet captures all data
 - [ ] RPA travel-only section for long-tour-order personnel
 - [ ] Per diem auto-populated for Gulfport and Camp Shelby, MS (if possible)
+
+---
+
+## Deployment & Authentication Requirements
+
+- [ ] Frontend must build to static assets and be deployable to Azure Storage Static Website (`$web` container)
+- [ ] Frontend must call backend via configurable API base URL (`VITE_API_BASE_URL`)
+- [ ] Backend API must be deployed separately (Azure App Service or Container Apps)
+- [ ] Login must support persisted sessions using access token + refresh token flow
+- [ ] Session revocation on logout must invalidate server-side session records
+- [ ] Production data persistence must use PostgreSQL (local SQLite only for dev)

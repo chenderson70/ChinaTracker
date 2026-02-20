@@ -1,10 +1,16 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-type AuthTokenPayload = {
+type AccessTokenPayload = {
   sub: string;
   username: string;
   name: string;
+};
+
+type RefreshTokenPayload = {
+  sub: string;
+  sid: string;
+  type: 'refresh';
 };
 
 export type AuthUser = {
@@ -14,7 +20,9 @@ export type AuthUser = {
 };
 
 const JWT_SECRET = process.env.JWT_SECRET || 'china-tracker-dev-secret-change-me';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || `${JWT_SECRET}-refresh`;
+const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '30d';
 
 declare global {
   namespace Express {
@@ -38,6 +46,22 @@ export function createAuthToken(user: AuthUser): string {
   );
 }
 
+export function createRefreshToken(userId: string, sessionId: string): string {
+  return jwt.sign(
+    {
+      sub: userId,
+      sid: sessionId,
+      type: 'refresh',
+    },
+    JWT_REFRESH_SECRET,
+    { expiresIn: JWT_REFRESH_EXPIRES_IN as jwt.SignOptions['expiresIn'] },
+  );
+}
+
+export function verifyRefreshToken(token: string): RefreshTokenPayload {
+  return jwt.verify(token, JWT_REFRESH_SECRET) as RefreshTokenPayload;
+}
+
 function parseBearerToken(req: Request): string | null {
   const authHeader = req.header('authorization');
   if (!authHeader) return null;
@@ -54,7 +78,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as AuthTokenPayload;
+    const payload = jwt.verify(token, JWT_SECRET) as AccessTokenPayload;
     req.userId = payload.sub;
     req.username = payload.username;
     req.userName = payload.name;

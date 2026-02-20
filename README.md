@@ -1,63 +1,77 @@
 # China Tracker – Exercise Budget Calculator
 
-A web application for military exercise planners to input PAX (personnel counts) and dynamically generate budget estimates broken out by RPA and O&M across organizational units (SG, AE, CAB, A7).
+China Tracker is a React + Express application for military exercise budget planning with authenticated multi-user data, persisted exercises, and real-time RPA/O&M calculation.
 
-## Features
+## Current Architecture
 
-- **Real-time budget calculation** — change PAX counts and see costs update instantly
-- **RPA / O&M separation** — every cost broken into Reserve Personnel Appropriation and Operations & Maintenance
-- **4 organizational units** — SG, AE, CAB, A7 with independent budget tracking
-- **Rank-level CPD** — cost-per-day rates by military rank
-- **Per diem auto-lookup** — GSA rates for Gulfport and Camp Shelby, MS
-- **Meal and billeting costs** — configurable player meal rates and billeting
-- **O&M Cost Center** — contracts, transportation, rentals, WRM, and more
-- **Excel/CSV export** — download formatted budget workbooks
-- **Dashboard** — executive summary with charts and totals
+- **Frontend (static):** React 18 + TypeScript + Vite, deployed as static files
+- **Backend API:** Node.js + Express + Prisma (`/api/v1`)
+- **Database:** SQLite for local development, PostgreSQL for Azure
+- **Auth:** Username/password login with JWT access tokens and refresh-token backed server sessions
+- **Target Azure hosting:**
+	- Frontend in **Azure Storage Static Website** (`$web` container)
+	- Backend API on **Azure App Service** (or Azure Container Apps)
+	- Database on **Azure Database for PostgreSQL**
 
-## Tech Stack
+## Key Features
 
-- **Frontend:** React 18 + TypeScript, Ant Design, Recharts, Vite
-- **Backend:** Node.js 20, Express, Prisma ORM
-- **Database:** PostgreSQL 16
-- **Hosting:** Azure App Service + Azure Database for PostgreSQL
+- Real-time unit and exercise budget rollups (RPA + O&M)
+- Exercise ownership and saved data by login
+- Player/white-cell and role-based calculation rules
+- Rank-level personnel detail and per-detail travel/per diem controls
+- Dashboard + reports with export and budget-left tracking
 
-## Quick Start (Local Development)
+## Local Development
 
 ```bash
-# 1. Start PostgreSQL via Docker
-docker-compose up -d
+# 1) Install dependencies
+npm install
+npm --prefix client install
+npm --prefix server install
 
-# 2. Copy environment config
+# 2) Configure server env
 cp .env.example server/.env
 
-# 3. Install dependencies
-npm run install:all
-
-# 4. Run database migrations and seed
+# 3) Generate Prisma client and apply migrations
 cd server
-npx prisma migrate dev --name init
+npx prisma generate
+npx prisma migrate dev
 npx prisma db seed
 cd ..
 
-# 5. Start dev servers (API + React)
+# 4) Run API + frontend
 npm run dev
 ```
 
-- Frontend: http://localhost:5173
-- API: http://localhost:3001/api/v1
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:3001/api/v1`
 
-## Project Structure
+## Environment Variables
 
-```
-ChinaTracker/
-├── client/          # React frontend (Vite + TypeScript)
-├── server/          # Express API (TypeScript + Prisma)
-│   └── prisma/      # Schema + migrations + seed
-├── .github/         # CI/CD workflows
-├── docker-compose.yml
-└── package.json     # Root workspace scripts
-```
+- Server (`server/.env`)
+	- `DATABASE_URL`
+	- `JWT_SECRET`
+	- `JWT_EXPIRES_IN` (default `15m`)
+	- `JWT_REFRESH_SECRET`
+	- `JWT_REFRESH_EXPIRES_IN` (default `30d`)
+	- `CORS_ORIGIN` (comma-separated origins for deployed frontend)
+- Client (`client/.env`)
+	- `VITE_API_BASE_URL` (e.g. `https://<api-host>/api/v1`)
 
-## Azure Deployment
+## Azure Deployment (Current Repo Behavior)
 
-See [AZURE_COSTS.md](AZURE_COSTS.md) for cost analysis. The GitHub Actions workflow auto-deploys on push to `main`.
+- GitHub Actions workflow [.github/workflows/deploy.yml](.github/workflows/deploy.yml) builds `client/` and uploads `client/dist` to Azure Storage static website.
+- GitHub Actions workflow [.github/workflows/deploy-backend.yml](.github/workflows/deploy-backend.yml) builds and deploys `server/` to Azure Web App.
+- Required GitHub secrets for frontend deploy:
+	- `AZURE_CREDENTIALS`
+	- `AZURE_STORAGE_ACCOUNT`
+	- `VITE_API_BASE_URL`
+
+- Required GitHub secrets for backend deploy:
+	- `AZURE_CREDENTIALS`
+	- `AZURE_WEBAPP_NAME`
+	- `BACKEND_HEALTH_URL` (optional, e.g. `https://<your-api>.azurewebsites.net/health`)
+
+## Important Deployment Note
+
+Frontend deployment and backend deployment are separate. Pushing to `main` deploys the static frontend files only; backend API deployment must be configured independently for Azure App Service/Container Apps.

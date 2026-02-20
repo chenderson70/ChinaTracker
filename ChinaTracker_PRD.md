@@ -26,9 +26,13 @@
 
 ## 1. Executive Summary
 
-China Tracker is a **100% client-side static web application** and exercise budget calculator that allows exercise planners to input personnel counts (PAX) across multiple organizational units, personnel types, and funding categories, producing a real-time, dynamic cost estimate for the entire exercise.
+China Tracker is an Azure-hosted exercise budget calculator with a **static React frontend** and a **Node/Express backend API**. The system supports authenticated users, saved exercises by account, and persistent cloud data storage.
 
-The application runs entirely in the browser with **zero server infrastructure**. All data is stored locally in the browser's IndexedDB via Dexie.js. The app is hosted as static files on GitHub Pages at no cost.
+The current deployment model is split-host:
+
+- Frontend static files hosted on Azure Storage Static Website
+- Backend API hosted separately (Azure App Service or Container Apps)
+- Database persistence in PostgreSQL for production
 
 The application replaces manual spreadsheet work with a structured, formula-driven tracker that:
 
@@ -51,8 +55,8 @@ The application replaces manual spreadsheet work with a structured, formula-driv
 | Toggle-friendly | User can adjust white cell staff and player counts and instantly see budget impact |
 | Export-ready | Budget can be exported to Excel for inclusion in official documents |
 | Auditability | Every cost line traces back to its formula and rate inputs |
-| Zero cost hosting | Hosted on GitHub Pages — $0/month |
-| No server dependency | Works entirely offline after initial page load; no API calls, no database server |
+| Cloud persistence | User logins and exercise data persist across sessions/devices |
+| Deployment clarity | Frontend and API are independently deployable in Azure |
 | Data portability | Full JSON backup/restore enables moving data between browsers or machines |
 
 ---
@@ -99,12 +103,12 @@ The application replaces manual spreadsheet work with a structured, formula-driv
 
 | Decision | Rationale |
 |----------|-----------|
-| **No server** | All calculations are pure math — no external APIs, authentication, or multi-user data sharing required |
-| **IndexedDB via Dexie.js** | Persistent, structured, high-capacity client-side storage; survives browser reloads and closures |
-| **HashRouter** | GitHub Pages doesn't support server-side URL rewriting; hash-based routing works with static hosts |
-| **Client-side Excel export** | SheetJS (xlsx) generates .xlsx files entirely in the browser — no server needed |
-| **JSON backup/restore** | Since data lives in the browser, JSON export provides portability and disaster recovery |
-| **GitHub Pages hosting** | Free, reliable, automatic deployment via GitHub Actions on push to main |
+| **Split hosting** | Static frontend on Azure Storage, API on App Service/Container Apps, DB on PostgreSQL |
+| **JWT + refresh sessions** | Access tokens for API calls; refresh-token-backed server sessions for persistent login |
+| **HashRouter** | Works reliably on static hosts without server-side route rewrite complexity |
+| **Client-side Excel export** | SheetJS (xlsx) generates .xlsx files in-browser; no export service required |
+| **JSON backup/restore** | Portability and recovery path in addition to cloud persistence |
+| **GitHub Actions frontend deploy** | Push-to-main build and upload of static assets to Azure Storage `$web` |
 
 ---
 
@@ -799,13 +803,13 @@ To move data between browsers or machines:
 
 ## 12. Hosting & Deployment
 
-### 12.1 GitHub Pages
+### 12.1 Frontend Hosting (Azure Storage Static Website)
 
-The app is hosted on **GitHub Pages** — a free static file host provided by GitHub.
+The React SPA is deployed as static assets to Azure Storage static website hosting.
 
-- **Repository:** `github.com/chenderson70/ChinaTracker`
-- **URL:** `https://chenderson70.github.io/ChinaTracker/`
-- **Cost:** $0/month
+- Build output: `client/dist`
+- Destination: Storage account `$web` container
+- Live static URL example: `https://<storage-static-host>/#/`
 
 ### 12.2 CI/CD Pipeline
 
@@ -816,19 +820,28 @@ A GitHub Actions workflow (`.github/workflows/deploy.yml`) handles deployment:
 # Steps:
 1. Checkout code
 2. Install Node.js 20
-3. npm install
-4. npm run build (Vite production build → client/dist/)
-5. Upload client/dist/ as GitHub Pages artifact
-6. Deploy to GitHub Pages
+3. Install client dependencies
+4. Build client with VITE_API_BASE_URL
+5. Azure login using AZURE_CREDENTIALS
+6. Upload client/dist to storage account $web container
 ```
 
 ### 12.3 Vite Configuration
 
-- `base: './'` — all asset paths are relative (required for GitHub Pages subdirectory hosting)
-- No proxy configuration (no server to proxy to)
+- `base: './'` — relative asset paths for static hosting
+- Local proxy exists for development only
 - React plugin for JSX/TSX support
 
-### 12.4 Build Output
+### 12.4 Backend Deployment
+
+Backend API deployment is managed separately from the frontend static site.
+
+- API host target: Azure App Service or Azure Container Apps
+- API base path: `/api/v1`
+- Required runtime config: `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `CORS_ORIGIN`
+- Production data store: PostgreSQL
+
+### 12.5 Build Output
 
 The `npm run build` command produces:
 
@@ -925,6 +938,7 @@ RPA Total                            = $26,100.00
 | 1.0 | Feb 19, 2026 | Initial PRD — spreadsheet replacement concept |
 | 2.0 | Feb 19, 2026 | Added Azure hosting, ML integration, full backend, CI/CD |
 | 3.0 | Feb 19, 2026 | **Complete rewrite to 100% client-side static site.** Removed all server/backend, Azure infrastructure, ML, PostgreSQL, Redis, Key Vault. Replaced with IndexedDB (Dexie.js), GitHub Pages hosting, JSON backup/restore. $0/month hosting cost. |
+| 3.1 | Feb 19, 2026 | Realigned to implemented codebase: static frontend deployment to Azure Storage, separate Express API deployment, and refresh-token backed persisted login sessions. |
 
 ---
 

@@ -69,7 +69,7 @@ The application:
 Open your browser and navigate to:
 
 ```
-https://app-chinatracker-prod.azurewebsites.net
+https://lively-forest-08a97020f.6.azurestaticapps.net/#/
 ```
 
 ### Create Your First Exercise
@@ -578,17 +578,22 @@ ChinaTracker/
 Every push to the `main` branch triggers a **GitHub Actions** workflow that:
 
 1. Installs client dependencies and builds the React app
-2. Installs server dependencies and compiles TypeScript
-3. Copies the built frontend into `server/dist/public/`
-4. Pushes the database schema to Azure PostgreSQL
-5. Deploys the server package to Azure App Service
+2. Uses `VITE_API_BASE_URL` at build time to point frontend calls to the deployed API host
+3. Uploads `client/dist` to Azure Storage static website (`$web` container)
+
+Backend deployment is handled by a separate workflow that:
+
+1. Builds the `server/` API
+2. Deploys it to Azure Web App
+3. Optionally runs a `/health` endpoint check after deployment
 
 ### Architecture
-- **Azure App Service (Free F1)** — serves both the React frontend and the Express API
-- **Azure PostgreSQL Flexible Server (B1ms)** — stores all exercise and rate data
-- **GitHub Actions** — automated build and deploy on every push
+- **Azure Storage Static Website** — serves React frontend assets
+- **Azure App Service (or Container Apps)** — serves Express API (`/api/v1`)
+- **Azure PostgreSQL Flexible Server** — stores users, exercises, rates, and session records
+- **GitHub Actions** — automated frontend build and upload on every push
 
-### Monthly Cost: ~$12.81
+### Monthly Cost: ~$26–$34 (typical split-host baseline)
 See `AZURE_COSTS.md` for the full breakdown.
 
 ---

@@ -14,9 +14,10 @@ import type {
   PerDiemMasterRecord,
   AuthUser,
 } from '../types';
-import { clearAuthSession, getAuthToken, setAuthSession } from './auth';
+import { clearAuthSession, getAuthToken, getRefreshToken, setAuthSession } from './auth';
 
 const API_BASE =
+  import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_API_BASE_URL ||
   '/api/v1';
 
@@ -26,6 +27,62 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
   includeAuth?: boolean;
+  retryOnAuthFail?: boolean;
+}
+
+interface AuthResponse {
+  token: string;
+  refreshToken?: string;
+  user: AuthUser;
+}
+
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefreshSession(): Promise<boolean> {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  refreshInFlight = (async () => {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) {
+      clearAuthSession();
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) {
+        clearAuthSession();
+        return false;
+      }
+
+      const data = await response.json() as AuthResponse;
+      if (!data.token || !data.user) {
+        clearAuthSession();
+        return false;
+      }
+
+      setAuthSession(data.token, data.user, data.refreshToken);
+      return true;
+    } catch {
+      clearAuthSession();
+      return false;
+    }
+  })();
+
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
 }
 
 async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -47,6 +104,13 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
   });
 
   if (!response.ok) {
+    if (response.status === 401 && options.includeAuth !== false && options.retryOnAuthFail !== false) {
+      const refreshed = await tryRefreshSession();
+      if (refreshed) {
+        return apiRequest<T>(path, { ...options, retryOnAuthFail: false });
+      }
+    }
+
     if (response.status === 401) {
       clearAuthSession();
     }
@@ -65,18 +129,13 @@ async function apiRequest<T>(path: string, options: RequestOptions = {}): Promis
   return response.json() as Promise<T>;
 }
 
-interface AuthResponse {
-  token: string;
-  user: AuthUser;
-}
-
 export async function registerAccount(data: { username: string; password: string; name?: string }): Promise<AuthUser> {
   const result = await apiRequest<AuthResponse>('/auth/register', {
     method: 'POST',
     body: data,
     includeAuth: false,
   });
-  setAuthSession(result.token, result.user);
+  setAuthSession(result.token, result.user, result.refreshToken);
   return result.user;
 }
 
@@ -86,8 +145,25 @@ export async function loginAccount(data: { username: string; password: string })
     body: data,
     includeAuth: false,
   });
-  setAuthSession(result.token, result.user);
+  setAuthSession(result.token, result.user, result.refreshToken);
   return result.user;
+}
+
+export async function logoutAccount(): Promise<void> {
+  const refreshToken = getRefreshToken();
+  if (refreshToken) {
+    try {
+      await apiRequest<void>('/auth/logout', {
+        method: 'POST',
+        includeAuth: false,
+        body: { refreshToken },
+      });
+    } catch {
+      // ignore network/server logout failures and clear local session regardless
+    }
+  }
+
+  clearAuthSession();
 }
 
 export async function getCurrentUser(): Promise<AuthUser> {
