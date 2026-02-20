@@ -49,8 +49,12 @@ jobs:
           package: backend.zip
 
       - name: Post-deploy backend health check
-        if: ${{ secrets.BACKEND_HEALTH_URL != '' }}
         run: |
+          if [ -z "${BACKEND_HEALTH_URL}" ]; then
+            echo "BACKEND_HEALTH_URL not set; skipping health check"
+            exit 0
+          fi
+
           echo "Checking ${BACKEND_HEALTH_URL}"
           for i in 1 2 3 4 5; do
             code=$(curl -s -o /dev/null -w "%{http_code}" "${BACKEND_HEALTH_URL}" || true)
