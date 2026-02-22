@@ -1,0 +1,15 @@
+{
+    "resourceGroup":  "chinatracker-rg-02192214374",
+    "location":  "centralus",
+    "storageAccount":  "ctweb02192214374",
+    "webEndpoint":  "https://ctweb02192214374.z19.web.core.windows.net/",
+    "appServicePlan":  "chinatracker-plan-02192214374",
+    "webAppName":  "chinatracker-api-02192214374",
+    "pgServer":  "chinatrackerpg02192214374",
+    "pgRegion":  "centralus",
+    "pgAdmin":  "ctadmin",
+    "pgPassword":  "Aa1YjF2Fa2U9BmIVIVa7s",
+    "databaseUrl":  "postgresql://ctadmin:Aa1YjF2Fa2U9BmIVIVa7s@chinatrackerpg02192214374.postgres.database.azure.com:5432/chinatracker?sslmode=require",
+    "jwtSecret":  "e1d5561e49c34e45bb7ff2c6e4def186dfeee53833eb4a9c80937a21142ec35f",
+    "jwtRefreshSecret":  "61cacd338fec45fa970b43fcf3cf16d1d1ec217b6b5345ae87ccc26f52ee81a4"
+}

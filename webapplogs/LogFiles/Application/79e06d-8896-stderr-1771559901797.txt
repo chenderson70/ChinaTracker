@@ -1,0 +1,18 @@
+(node:8896) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Failed to start server PrismaClientKnownRequestError: 
+Invalid `prisma.rankCpdRate.count()` invocation:
+
+
+The table `main.rank_cpd_rates` does not exist in the current database.
+    at Vg.handleRequestError (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\binary.js:182:7317)
+    at Vg.handleAndLogRequestError (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\binary.js:182:6624)
+    at Vg.request (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\binary.js:182:6308)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async a (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\binary.js:191:9642)
+    at async ensureBaselineData (C:\home\site\wwwroot\dist\db.js:71:22)
+    at async startServer (C:\home\site\wwwroot\dist\index.js:55:5) {
+  code: 'P2021',
+  clientVersion: '5.22.0',
+  meta: { modelName: 'RankCpdRate', table: 'main.rank_cpd_rates' }
+}

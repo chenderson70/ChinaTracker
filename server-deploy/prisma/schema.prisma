@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// UnitCode: SG | AE | CAB | A7
+// PersonnelRole: PLAYER | WHITE_CELL | PLANNING | SUPPORT
+// FundingType: RPA | OM
+// Location: GULFPORT | CAMP_SHELBY
+// OmCategory: CONTRACT | TRANSPORTATION | BILLETING | PORT_A_POTTY | RENTALS_VSCOS | CONSUMABLES | WRM | OTHER
+
+model Exercise {
+  id              String         @id @default(uuid())
+  ownerUserId     String         @map("owner_user_id")
+  name            String
+  totalBudget     Float          @default(0) @map("total_budget")
+  startDate       DateTime       @map("start_date")
+  endDate         DateTime       @map("end_date")
+  defaultDutyDays Int            @map("default_duty_days")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  unitBudgets     UnitBudget[]
+  travelConfig    TravelConfig?
+  omCostLines     OmCostLine[]
+
+  @@index([ownerUserId, updatedAt])
+  @@map("exercises")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  email        String?
+  name         String
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  sessions     AuthSession[]
+
+  @@map("users")
+}
+
+model AuthSession {
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  refreshTokenHash String   @unique @map("refresh_token_hash")
+  userAgent        String?  @map("user_agent")
+  ipAddress        String?  @map("ip_address")
+  expiresAt        DateTime @map("expires_at")
+  revokedAt        DateTime? @map("revoked_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("auth_sessions")
+}
+
+model UnitBudget {
+  id                 String              @id @default(uuid())
+  exerciseId         String              @map("exercise_id")
+  unitCode           String              @map("unit_code")
+  exercise           Exercise            @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  personnelGroups    PersonnelGroup[]
+  executionCostLines ExecutionCostLine[]
+
+  @@map("unit_budgets")
+}
+
+model PersonnelGroup {
+  id               String           @id @default(uuid())
+  unitBudgetId     String           @map("unit_budget_id")
+  role             String
+  fundingType      String           @map("funding_type")
+  paxCount         Int              @default(0) @map("pax_count")
+  dutyDays         Int?             @map("duty_days")
+  location         String?
+  isLongTour       Boolean          @default(false) @map("is_long_tour")
+  isLocal          Boolean          @default(false) @map("is_local")
+  airfarePerPerson Float?           @map("airfare_per_person")
+  rentalCarCount   Int              @default(0) @map("rental_car_count")
+  rentalCarDaily   Float?           @map("rental_car_daily")
+  rentalCarDays    Int              @default(0) @map("rental_car_days")
+  avgCpdOverride   Float?           @map("avg_cpd_override")
+  unitBudget       UnitBudget       @relation(fields: [unitBudgetId], references: [id], onDelete: Cascade)
+  personnelEntries PersonnelEntry[]
+
+  @@map("personnel_groups")
+}
+
+model PersonnelEntry {
+  id               String         @id @default(uuid())
+  personnelGroupId String         @map("personnel_group_id")
+  rankCode         String         @map("rank_code")
+  count            Int
+  dutyDays         Int?           @map("duty_days")
+  location         String?
+  isLocal          Boolean        @default(false) @map("is_local")
+  personnelGroup   PersonnelGroup @relation(fields: [personnelGroupId], references: [id], onDelete: Cascade)
+
+  @@map("personnel_entries")
+}
+
+model RankCpdRate {
+  id            String   @id @default(uuid())
+  rankCode      String   @unique @map("rank_code")
+  costPerDay    Float    @map("cost_per_day")
+  effectiveDate DateTime @map("effective_date")
+
+  @@map("rank_cpd_rates")
+}
+
+model PerDiemRate {
+  id            String   @id @default(uuid())
+  location      String   @unique
+  lodgingRate   Float    @map("lodging_rate")
+  mieRate       Float    @map("mie_rate")
+  effectiveDate DateTime @map("effective_date")
+
+  @@map("per_diem_rates")
+}
+
+model TravelConfig {
+  id                 String   @id @default(uuid())
+  exerciseId         String   @unique @map("exercise_id")
+  airfarePerPerson   Float    @default(400) @map("airfare_per_person")
+  rentalCarDailyRate Float    @default(50) @map("rental_car_daily_rate")
+  rentalCarCount     Int      @default(0) @map("rental_car_count")
+  rentalCarDays      Int      @default(0) @map("rental_car_days")
+  exercise           Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@map("travel_config")
+}
+
+model ExecutionCostLine {
+  id           String      @id @default(uuid())
+  unitBudgetId String      @map("unit_budget_id")
+  fundingType  String      @map("funding_type")
+  category     String
+  amount       Float
+  notes        String?
+  unitBudget   UnitBudget  @relation(fields: [unitBudgetId], references: [id], onDelete: Cascade)
+
+  @@map("execution_cost_lines")
+}
+
+model OmCostLine {
+  id         String     @id @default(uuid())
+  exerciseId String     @map("exercise_id")
+  category   String
+  label      String
+  amount     Float
+  notes      String?
+  exercise   Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@map("om_cost_lines")
+}
+
+model AppConfig {
+  key   String @id
+  value String
+
+  @@map("app_config")
+}

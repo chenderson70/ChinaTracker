@@ -1,0 +1,15 @@
+(node:8168) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Failed to start server Error: The default query engine type (Node-API, "library") is currently not supported for 32bit Node. Please set `engineType = "binary"` in the "generator" block of your "schema.prisma" file (or use the environment variables "PRISMA_CLIENT_ENGINE_TYPE=binary" and/or "PRISMA_CLI_QUERY_ENGINE_TYPE=binary".)
+    at Qn (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\library.js:4:218)
+    at _r.instantiateLibrary (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\library.js:111:12540)
+    at new _r (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\library.js:111:11737)
+    at hl (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\library.js:114:71)
+    at new t (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\library.js:130:3736)
+    at Object.<anonymous> (C:\home\site\wwwroot\dist\db.js:6:18)
+    at Module._compile (node:internal/modules/cjs/loader:1521:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+    at Module.load (node:internal/modules/cjs/loader:1266:32)
+    at Module._load (node:internal/modules/cjs/loader:1091:12) {
+  clientVersion: '5.22.0'
+}

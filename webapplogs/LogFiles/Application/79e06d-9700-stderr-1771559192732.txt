@@ -1,0 +1,17 @@
+(node:9700) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Failed to start server PrismaClientInitializationError: 
+Invalid `prisma.rankCpdRate.count()` invocation:
+
+
+Error querying the database: Error code 14: Unable to open the database file
+    at Vg.handleRequestError (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\binary.js:182:7620)
+    at Vg.handleAndLogRequestError (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\binary.js:182:6624)
+    at Vg.request (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\binary.js:182:6308)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async a (C:\home\site\wwwroot\node_modules\@prisma\client\runtime\binary.js:191:9642)
+    at async ensureBaselineData (C:\home\site\wwwroot\dist\db.js:41:22)
+    at async startServer (C:\home\site\wwwroot\dist\index.js:55:5) {
+  clientVersion: '5.22.0',
+  errorCode: undefined
+}

@@ -1,0 +1,8 @@
+<step title="Incoming Request" date="2026-02-20T03:40:42.093" instance="79e06d" url="/logstream" method="GET" type="request" pid="8956,4,7" Accept-Encoding="identity" Authorization="Bea..." Host="chinatracker-api-02192214374.scm.azurewebsites.net" User-Agent="AZURECLI/2.80.0 (MSI)" x-ms-client-request-id="e8cddbf4-0e0d-11f1-8554-b81ea46e5afc" X-ARR-LOG-ID="e8cddbf4-0e0d-11f1-8554-b81ea46e5afc" CLIENT-IP="69.236.114.46:62414" X-SITE-DEPLOYMENT-ID="chinatracker-api-02192214374" WAS-DEFAULT-HOSTNAME="chinatracker-api-02192214374.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/logstream" >
+  <step title="LogStreamHandler.BeginProcessRequest" date="2026-02-20T03:40:42.124" >
+    <step title="LockFile &apos;C:\home\site\locks\hooks.lock&apos; acquired" date="2026-02-20T03:40:42.202" /><!-- duration: 16ms -->
+    <step title="LockFile &apos;C:\home\site\locks\hooks.lock&apos; released" date="2026-02-20T03:40:42.281" /><!-- duration: 0ms -->
+  </step><!-- duration: 156ms -->
+  <step title="LogStreamHandler.EndProcessRequest" date="2026-02-20T03:42:42.179" /><!-- duration: 0ms -->
+  <step title="Outgoing response" date="2026-02-20T03:42:42.195" type="response" statusCode="200" statusText="OK" Server="Microsoft-IIS/10.0" Cache-Control="private" X-AspNet-Version="4.0.30319" Content-Type="text/plain; charset=utf-8" /><!-- duration: 0ms -->
+</step><!-- duration: 120102ms -->

@@ -1,0 +1,120 @@
+<step title="BackgroundTrace" date="2026-02-20T03:32:58.629" instance="79e06d" url="/api/zipdeploy" method="POST" >
+  <step title="Updating shutdown sentinel last write time" date="2026-02-20T03:32:58.629" SemaphoreCount="7" /><!-- duration: 16ms -->
+  <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; acquired" date="2026-02-20T03:32:58.645" /><!-- duration: 0ms -->
+  <step title="Creating temporary deployment" date="2026-02-20T03:32:58.645" /><!-- duration: 31ms -->
+  <step title="Performing fetch based deployment" date="2026-02-20T03:32:58.692" >
+    <step title="Fetching changes." date="2026-02-20T03:32:58.723" /><!-- duration: 16ms -->
+    <step title="Starting LocalZipHandler" date="2026-02-20T03:32:58.739" /><!-- duration: 0ms -->
+    <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file C:\local\Temp\zipdeploy\im1um51o.zip (0.05 MB) to C:\local\Temp\zipdeploy\extracted" date="2026-02-20T03:32:58.770" /><!-- duration: 16ms -->
+    <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file C:\local\Temp\zipdeploy\im1um51o.zip (0.05 MB) to C:\local\Temp\zipdeploy\extracted" date="2026-02-20T03:32:58.785" >
+      <step title="Renaming extractTargetDirectory(C:\local\Temp\zipdeploy\extracted) to tempDirectory(C:\local\Temp\zipdeploy\nihz23bp.kbj)" date="2026-02-20T03:32:58.785" /><!-- duration: 0ms -->
+      <step title="Extracting 24 entries to C:\local\Temp\zipdeploy\extracted directory" date="2026-02-20T03:32:58.801" >
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\prisma\dev.db ..." date="2026-02-20T03:32:58.801" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\prisma\schema.prisma ..." date="2026-02-20T03:32:58.832" /><!-- duration: 0ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\prisma\seed.ts ..." date="2026-02-20T03:32:58.832" /><!-- duration: 0ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\prisma\migrations\migration_lock.toml ..." date="2026-02-20T03:32:58.832" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\prisma\migrations\20260220002823_add_exercise_owner\migration.sql ..." date="2026-02-20T03:32:58.848" /><!-- duration: 0ms -->
+        <step title="Omitting extracting file traces ..." date="2026-02-20T03:32:58.848" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\src\services\calculationEngine.ts ..." date="2026-02-20T03:32:58.864" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\.env ..." date="2026-02-20T03:32:58.879" /><!-- duration: 0ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\package-lock.json ..." date="2026-02-20T03:32:58.879" /><!-- duration: 0ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\package.json ..." date="2026-02-20T03:32:58.895" /><!-- duration: 0ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\tsconfig.json ..." date="2026-02-20T03:32:58.895" /><!-- duration: 0ms -->
+      </step><!-- duration: 94ms -->
+    </step><!-- duration: 125ms -->
+    <step title="Before sending BuildRequestReceived status to /api/updatedeploystatus" date="2026-02-20T03:32:58.910" /><!-- duration: 0ms -->
+    <step title="DeploymentManager.Deploy(id:1d0895b55b4e45758c80ead000511479)" date="2026-02-20T03:32:58.926" >
+      <step title="Collecting changeset information" date="2026-02-20T03:32:58.942" /><!-- duration: 31ms -->
+      <step title="Updating submodules" date="2026-02-20T03:32:58.973" >
+        <step title="Updating submodules." date="2026-02-20T03:32:59.004" /><!-- duration: 0ms -->
+      </step><!-- duration: 31ms -->
+      <step title="Preparing deployment for commit id &apos;1d0895b55b&apos;." date="2026-02-20T03:32:59.035" /><!-- duration: 0ms -->
+      <step title="Determining deployment builder" date="2026-02-20T03:32:59.051" >
+        <step title="UseMSBuild16: True" date="2026-02-20T03:32:59.067" /><!-- duration: 0ms -->
+        <step title="Builder is NodeSiteBuilder" date="2026-02-20T03:32:59.098" /><!-- duration: 0ms -->
+      </step><!-- duration: 47ms -->
+      <step title="Copying SSH keys" date="2026-02-20T03:32:59.114" /><!-- duration: 0ms -->
+      <step title="Building" date="2026-02-20T03:32:59.114" >
+        <step title="Generating deployment script." date="2026-02-20T03:32:59.145" /><!-- duration: 0ms -->
+        <step title="Generating deployment script" date="2026-02-20T03:32:59.145" >
+          <step title="Using cached version of the deployment script for command: -y --no-dot-deployment -r &quot;C:\local\Temp\zipdeploy\extracted&quot; -o &quot;C:\home\site\deployments\tools&quot; --node --sitePath &quot;C:\local\Temp\zipdeploy\extracted&quot;" date="2026-02-20T03:32:59.192" /><!-- duration: 0ms -->
+          <step title="Using cached version of deployment script (command: &apos;azure -y --no-dot-deployment -r &quot;C:\local\Temp\zipdeploy\extracted&quot; -o &quot;C:\home\site\deployments\tools&quot; --node --sitePath &quot;C:\local\Temp\zipdeploy\extracted&quot;&apos;)." date="2026-02-20T03:32:59.207" /><!-- duration: 0ms -->
+        </step><!-- duration: 63ms -->
+        <step title="Running deployment command..." date="2026-02-20T03:32:59.239" /><!-- duration: 0ms -->
+        <step title="Command: &quot;C:\home\site\deployments\tools\deploy.cmd&quot;" date="2026-02-20T03:32:59.254" /><!-- duration: 0ms -->
+        <step title="Executing external process" date="2026-02-20T03:32:59.270" type="process" path="starter.cmd" arguments="&quot;C:\home\site\deployments\tools\deploy.cmd&quot;" >
+          <step title="Handling node.js deployment." date="2026-02-20T03:32:59.426" /><!-- duration: 0ms -->
+          <step title="Creating app_offline.htm" date="2026-02-20T03:32:59.598" /><!-- duration: 0ms -->
+          <step title="KuduSync.NET from: &apos;C:\local\Temp\zipdeploy\extracted&apos; to: &apos;C:\home\site\wwwroot&apos;" date="2026-02-20T03:32:59.598" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;package-lock.json&apos;" date="2026-02-20T03:32:59.598" /><!-- duration: 16ms -->
+          <step title="Deleting app_offline.htm" date="2026-02-20T03:32:59.614" /><!-- duration: 0ms -->
+          <step title="Invalid start-up command &quot;prisma migrate deploy &amp;&amp; node dist/index.js&quot; in package.json. Please use the format &quot;node &lt;script relative path&gt;&quot;." date="2026-02-20T03:32:59.676" /><!-- duration: 0ms -->
+Looking for app.js/server.js under site root." date="2026-02-20T03:32:59.676" /><!-- duration: 0ms -->
+          <step title="Missing server.js/app.js files, web.config is not generated" date="2026-02-20T03:32:59.676" /><!-- duration: 16ms -->
+he package.json file does not specify node.js engine version constraints." date="2026-02-20T03:32:59.692" /><!-- duration: 0ms -->
+          <step title="The node.js application will run with the default node.js version 20.20.0." date="2026-02-20T03:32:59.692" /><!-- duration: 0ms -->
+          <step title="Selected npm version 10.8.2" date="2026-02-20T03:32:59.707" /><!-- duration: 0ms -->
+          <step title="npm warn config production Use `--omit=dev` instead." date="2026-02-20T03:32:59.879" /><!-- duration: 0ms -->
+          <step title="&gt; china-tracker-server@1.0.0 postinstall" date="2026-02-20T03:33:00.973" /><!-- duration: 16ms -->
+          <step title="&gt; prisma generate" date="2026-02-20T03:33:00.989" /><!-- duration: 0ms -->
+          <step title="Error: The default query engine type (Node-API, &quot;library&quot;) is currently not supported for 32bit Node. Please set `engineType = &quot;binary&quot;` in the &quot;generator&quot; block of your &quot;schema.prisma&quot; file (or use the environment variables &quot;PRISMA_CLIENT_ENGINE_TYPE=binary&quot; and/or &quot;PRISMA_CLI_QUERY_ENGINE_TYPE=binary&quot;.)" date="2026-02-20T03:33:01.660" /><!-- duration: 0ms -->
+          <step title="npm error code 1" date="2026-02-20T03:33:01.676" /><!-- duration: 16ms -->
+          <step title="npm error path C:\home\site\wwwroot" date="2026-02-20T03:33:01.692" /><!-- duration: 0ms -->
+          <step title="Failed exitCode=1, command=&quot;C:\Program Files (x86)\nodejs\20.20.0\node.exe&quot; &quot;C:\Program Files (x86)\npm\10.8.2\node_modules\npm\bin\npm-cli.js&quot; install --production" date="2026-02-20T03:33:01.692" /><!-- duration: 16ms -->
+error command failed" date="2026-02-20T03:33:01.707" /><!-- duration: 0ms -->
+          <step title="An error has occurred during web site deployment." date="2026-02-20T03:33:01.707" /><!-- duration: 0ms -->
+          <step title="npm error command C:\Windows\system32\cmd.exe /d /s /c prisma generate" date="2026-02-20T03:33:01.707" /><!-- duration: 0ms -->
+          <step title="npm error A complete log of this run can be found in: C:\local\LocalAppData\npm-cache\_logs\2026-02-20T03_32_59_832Z-debug-0.log" date="2026-02-20T03:33:01.723" /><!-- duration: 0ms -->
+          <step title="Process dump" date="2026-02-20T03:33:01.723" exitCode="255" type="processOutput" /><!-- duration: 0ms -->
+        </step><!-- duration: 2453ms -->
+        <step title="Invalid start-up command &quot;prisma migrate deploy &amp;&amp; node dist/index.js&quot; in package.json. Please use the format &quot;node &lt;script relative path&gt;&quot;.
+Missing server.js/app.js files, web.config is not generated
+npm warn config production Use `--omit=dev` instead.
+Error: The default query engine type (Node-API, &quot;library&quot;) is currently not supported for 32bit Node. Please set `engineType = &quot;binary&quot;` in the &quot;generator&quot; block of your &quot;schema.prisma&quot; file (or use the environment variables &quot;PRISMA_CLIENT_ENGINE_TYPE=binary&quot; and/or &quot;PRISMA_CLI_QUERY_ENGINE_TYPE=binary&quot;.)
+npm error code 1
+npm error path C:\home\site\wwwroot
+npm error command failed
+npm error command C:\Windows\system32\cmd.exe /d /s /c prisma generate
+npm error A complete log of this run can be found in: C:\local\LocalAppData\npm-cache\_logs\2026-02-20T03_32_59_832Z-debug-0.log
+C:\Program Files (x86)\SiteExtensions\Kudu\2025.11.1.1\bin\Scripts\starter.cmd &quot;C:\home\site\deployments\tools\deploy.cmd&quot; DEPLOYMENTINFO: deploymentPath = ZipDeploy. Extract zip. Remote build. , deployer = ZipDeploy, os = windows, sku = Free, siteName = chinatracker-api-02192214374, siteHostName = chinatracker-api-02192214374.azurewebsites.net, deploymentStatus = Error" date="2026-02-20T03:33:01.739" /><!-- duration: 16ms -->
+        <step title="Error occurred" date="2026-02-20T03:33:01.754" type="error" text="Invalid start-up command &quot;prisma migrate deploy &amp;&amp; node dist/index.js&quot; in package.json. Please use the format &quot;node &lt;script relative path&gt;&quot;.
+Missing server.js/app.js files, web.config is not generated
+npm warn config production Use `--omit=dev` instead.
+Error: The default query engine type (Node-API, &quot;library&quot;) is currently not supported for 32bit Node. Please set `engineType = &quot;binary&quot;` in the &quot;generator&quot; block of your &quot;schema.prisma&quot; file (or use the environment variables &quot;PRISMA_CLIENT_ENGINE_TYPE=binary&quot; and/or &quot;PRISMA_CLI_QUERY_ENGINE_TYPE=binary&quot;.)
+npm error code 1
+npm error path C:\home\site\wwwroot
+npm error command failed
+npm error command C:\Windows\system32\cmd.exe /d /s /c prisma generate
+npm error A complete log of this run can be found in: C:\local\LocalAppData\npm-cache\_logs\2026-02-20T03_32_59_832Z-debug-0.log
+C:\Program Files (x86)\SiteExtensions\Kudu\2025.11.1.1\bin\Scripts\starter.cmd &quot;C:\home\site\deployments\tools\deploy.cmd&quot;" stackTrace="   at Kudu.Core.Infrastructure.Executable.ExecuteInternal(ITracer tracer, Func`2 onWriteOutput, Func`2 onWriteError, Encoding encoding, String arguments, Object[] args)
+   at Kudu.Core.Infrastructure.Executable.ExecuteWithProgressWriter(ILogger logger, ITracer tracer, String arguments, Object[] args)
+   at Kudu.Core.Deployment.Generator.ExternalCommandBuilder.RunCommand(DeploymentContext context, String command, Boolean ignoreManifest, String message)" /><!-- duration: 0ms -->
+        <step title="Purge deployment items" date="2026-02-20T03:33:01.801" >
+          <step title="Remove 077717319, Failed, received at 2/20/2026 3:31:18 AM" date="2026-02-20T03:33:01.848" /><!-- duration: 0ms -->
+        </step><!-- duration: 47ms -->
+      </step><!-- duration: 2734ms -->
+      <step title="Error occurred" date="2026-02-20T03:33:01.848" type="error" text="Invalid start-up command &quot;prisma migrate deploy &amp;&amp; node dist/index.js&quot; in package.json. Please use the format &quot;node &lt;script relative path&gt;&quot;.
+Missing server.js/app.js files, web.config is not generated
+npm warn config production Use `--omit=dev` instead.
+Error: The default query engine type (Node-API, &quot;library&quot;) is currently not supported for 32bit Node. Please set `engineType = &quot;binary&quot;` in the &quot;generator&quot; block of your &quot;schema.prisma&quot; file (or use the environment variables &quot;PRISMA_CLIENT_ENGINE_TYPE=binary&quot; and/or &quot;PRISMA_CLI_QUERY_ENGINE_TYPE=binary&quot;.)
+npm error code 1
+npm error path C:\home\site\wwwroot
+npm error command failed
+npm error command C:\Windows\system32\cmd.exe /d /s /c prisma generate
+npm error A complete log of this run can be found in: C:\local\LocalAppData\npm-cache\_logs\2026-02-20T03_32_59_832Z-debug-0.log
+C:\Program Files (x86)\SiteExtensions\Kudu\2025.11.1.1\bin\Scripts\starter.cmd &quot;C:\home\site\deployments\tools\deploy.cmd&quot;" stackTrace="   at Kudu.Core.Infrastructure.Executable.ExecuteInternal(ITracer tracer, Func`2 onWriteOutput, Func`2 onWriteError, Encoding encoding, String arguments, Object[] args)
+   at Kudu.Core.Infrastructure.Executable.ExecuteWithProgressWriter(ILogger logger, ITracer tracer, String arguments, Object[] args)
+   at Kudu.Core.Deployment.Generator.ExternalCommandBuilder.RunCommand(DeploymentContext context, String command, Boolean ignoreManifest, String message)
+   at Kudu.Core.Deployment.Generator.GeneratorSiteBuilder.Build(DeploymentContext context)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.ValidateEnd(Task task)
+   at Kudu.Core.Deployment.DeploymentManager.&lt;Build&gt;d__38.MoveNext()" /><!-- duration: 16ms -->
+      <step title="Deployment Failed. DEPLOYMENTINFO: deploymentPath = ZipDeploy. Extract zip. Remote build. , deployer = ZipDeploy, os = windows, sku = Free, siteName = chinatracker-api-02192214374, siteHostName = chinatracker-api-02192214374.azurewebsites.net, deploymentStatus = Failed" date="2026-02-20T03:33:01.864" /><!-- duration: 0ms -->
+    </step><!-- duration: 2937ms -->
+    <step title="Cleaning up temp files" date="2026-02-20T03:33:01.864" /><!-- duration: 16ms -->
+  </step><!-- duration: 3219ms -->
+  <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; released" date="2026-02-20T03:33:01.910" /><!-- duration: 0ms -->
+  <step title="Deleting shutdown sentinel file" date="2026-02-20T03:33:01.926" SemaphoreCount="8" /><!-- duration: 0ms -->
+</step><!-- duration: 3297ms -->

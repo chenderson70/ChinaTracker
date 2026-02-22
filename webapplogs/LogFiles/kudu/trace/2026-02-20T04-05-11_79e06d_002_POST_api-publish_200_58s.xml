@@ -1,0 +1,130 @@
+<step title="Incoming Request" date="2026-02-20T04:05:11.615" instance="79e06d" url="/api/publish?type=zip" method="POST" type="request" pid="4056,2,7" Cache-Control="no-cache" Connection="Keep-Alive" Content-Length="101735630" Content-Type="application/octet-stream" Accept="*/*" Accept-Encoding="gzip, deflate" Authorization="Bea..." Host="chinatracker-api-02192214374.scm.azurewebsites.net" User-Agent="AZURECLI/2.80.0 (MSI)" x-ms-client-request-id="53a47322-0e11-11f1-93d4-b81ea46e5afc" X-ARR-LOG-ID="53a47322-0e11-11f1-93d4-b81ea46e5afc" CLIENT-IP="69.236.114.46:63173" X-SITE-DEPLOYMENT-ID="chinatracker-api-02192214374" WAS-DEFAULT-HOSTNAME="chinatracker-api-02192214374.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/publish?type=zip" X-MS-COLDSTART="1" >
+  <step title="OneDeploy" date="2026-02-20T04:05:12.209" >
+    <step title="Starting PushDeployAsync" date="2026-02-20T04:05:12.240" /><!-- duration: 0ms -->
+    <step title="Updating shutdown sentinel last write time" date="2026-02-20T04:05:12.287" SemaphoreCount="7" /><!-- duration: 0ms -->
+    <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; acquired" date="2026-02-20T04:05:12.287" /><!-- duration: 16ms -->
+    <step title="Saving request content to C:\local\Temp\zipdeploy\45zakffp.zip" date="2026-02-20T04:05:12.303" >
+      <step title="Writing 62,976,000 bytes to C:\local\Temp\zipdeploy\45zakffp.zip" date="2026-02-20T04:05:42.310" /><!-- duration: 16ms -->
+      <step title="Total 101,735,630 bytes written to C:\local\Temp\zipdeploy\45zakffp.zip" date="2026-02-20T04:06:02.825" /><!-- duration: 0ms -->
+    </step><!-- duration: 50538ms -->
+    <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; released" date="2026-02-20T04:06:02.841" /><!-- duration: 0ms -->
+    <step title="Deleting shutdown sentinel file" date="2026-02-20T04:06:02.841" SemaphoreCount="8" /><!-- duration: 16ms -->
+    <step title="Starting FetchDeploy" date="2026-02-20T04:06:02.857" /><!-- duration: 0ms -->
+    <step title="Attempting to fetch target branch HEAD" date="2026-02-20T04:06:02.857" /><!-- duration: 16ms -->
+    <step title="Updating shutdown sentinel last write time" date="2026-02-20T04:06:02.872" SemaphoreCount="7" /><!-- duration: 16ms -->
+    <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; acquired" date="2026-02-20T04:06:02.888" /><!-- duration: 0ms -->
+    <step title="Performing fetch based deployment" date="2026-02-20T04:06:02.903" >
+      <step title="Creating temporary deployment" date="2026-02-20T04:06:02.903" /><!-- duration: 47ms -->
+      <step title="Fetching changes." date="2026-02-20T04:06:02.997" /><!-- duration: 0ms -->
+      <step title="Starting LocalZipHandler" date="2026-02-20T04:06:03.107" /><!-- duration: 16ms -->
+      <step title="Starting LocalZipFetch" date="2026-02-20T04:06:03.138" /><!-- duration: 0ms -->
+      <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file C:\local\Temp\zipdeploy\45zakffp.zip (97.02 MB) to C:\local\Temp\zipdeploy\extracted" date="2026-02-20T04:06:03.138" /><!-- duration: 0ms -->
+      <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file C:\local\Temp\zipdeploy\45zakffp.zip (97.02 MB) to C:\local\Temp\zipdeploy\extracted" date="2026-02-20T04:06:03.153" >
+        <step title="Extracting 1383 entries to C:\local\Temp\zipdeploy\extracted directory" date="2026-02-20T04:06:03.169" >
+          <step title="Extracting to C:\local\Temp\zipdeploy\extracted\dist\db.d.ts ..." date="2026-02-20T04:06:03.185" /><!-- duration: 16ms -->
+          <step title="Extracting to C:\local\Temp\zipdeploy\extracted\dist\db.d.ts.map ..." date="2026-02-20T04:06:03.200" /><!-- duration: 0ms -->
+          <step title="Extracting to C:\local\Temp\zipdeploy\extracted\dist\db.js ..." date="2026-02-20T04:06:03.216" /><!-- duration: 0ms -->
+          <step title="Extracting to C:\local\Temp\zipdeploy\extracted\dist\db.js.map ..." date="2026-02-20T04:06:03.216" /><!-- duration: 0ms -->
+          <step title="Extracting to C:\local\Temp\zipdeploy\extracted\dist\index.d.ts ..." date="2026-02-20T04:06:03.216" /><!-- duration: 16ms -->
+          <step title="Omitting extracting file traces ..." date="2026-02-20T04:06:03.232" /><!-- duration: 0ms -->
+        </step><!-- duration: 4281ms -->
+      </step><!-- duration: 4313ms -->
+      <step title="None repository commit" date="2026-02-20T04:06:07.482" >
+        <step title="Commit id: 0052f0586e24419cac80ee30c2118a7c" date="2026-02-20T04:06:07.482" Message="OneDeploy" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 0ms -->
+      </step><!-- duration: 0ms -->
+      <step title="Before sending BuildRequestReceived status to /api/updatedeploystatus" date="2026-02-20T04:06:07.497" /><!-- duration: 0ms -->
+      <step title="DeploymentManager.Deploy(id:0052f0586e24419cac80ee30c2118a7c)" date="2026-02-20T04:06:07.497" >
+        <step title="Collecting changeset information" date="2026-02-20T04:06:07.513" /><!-- duration: 16ms -->
+        <step title="Updating submodules" date="2026-02-20T04:06:07.528" >
+          <step title="Updating submodules." date="2026-02-20T04:06:07.560" /><!-- duration: 0ms -->
+        </step><!-- duration: 31ms -->
+        <step title="Preparing deployment for commit id &apos;0052f0586e&apos;." date="2026-02-20T04:06:07.607" /><!-- duration: 0ms -->
+        <step title="Determining deployment builder" date="2026-02-20T04:06:07.638" >
+          <step title="Builder is OneDeployBuilder" date="2026-02-20T04:06:07.638" /><!-- duration: 0ms -->
+        </step><!-- duration: 16ms -->
+        <step title="Copying SSH keys" date="2026-02-20T04:06:07.653" /><!-- duration: 16ms -->
+        <step title="Building" date="2026-02-20T04:06:07.669" >
+          <step title="Running build. Project type: OneDeploy" date="2026-02-20T04:06:07.685" /><!-- duration: 16ms -->
+          <step title="Copying the manifest" date="2026-02-20T04:06:07.732" /><!-- duration: 0ms -->
+          <step title="Clean deploying to C:\home\site\wwwroot" date="2026-02-20T04:06:07.763" /><!-- duration: 0ms -->
+          <step title="Generating deployment script." date="2026-02-20T04:06:07.794" /><!-- duration: 0ms -->
+          <step title="Generating deployment script" date="2026-02-20T04:06:07.794" >
+            <step title="Using cached version of the deployment script for command: -y --no-dot-deployment -r &quot;C:\local\Temp\zipdeploy\extracted&quot; -o &quot;C:\home\site\deployments\tools&quot; --basic --sitePath &quot;C:\local\Temp\zipdeploy\extracted&quot;" date="2026-02-20T04:06:07.841" /><!-- duration: 0ms -->
+            <step title="Using cached version of deployment script (command: &apos;azure -y --no-dot-deployment -r &quot;C:\local\Temp\zipdeploy\extracted&quot; -o &quot;C:\home\site\deployments\tools&quot; --basic --sitePath &quot;C:\local\Temp\zipdeploy\extracted&quot;&apos;)." date="2026-02-20T04:06:07.857" /><!-- duration: 0ms -->
+          </step><!-- duration: 109ms -->
+          <step title="Running deployment command..." date="2026-02-20T04:06:07.935" /><!-- duration: 0ms -->
+          <step title="Command: &quot;C:\home\site\deployments\tools\deploy.cmd&quot;" date="2026-02-20T04:06:07.935" /><!-- duration: 0ms -->
+          <step title="Executing external process" date="2026-02-20T04:06:07.950" type="process" path="starter.cmd" arguments="&quot;C:\home\site\deployments\tools\deploy.cmd&quot;" >
+            <step title="Handling Basic Web Site deployment." date="2026-02-20T04:06:08.107" /><!-- duration: 0ms -->
+            <step title="Creating app_offline.htm" date="2026-02-20T04:06:08.310" /><!-- duration: 0ms -->
+            <step title="KuduSync.NET from: &apos;C:\local\Temp\zipdeploy\extracted&apos; to: &apos;C:\home\site\wwwroot&apos;" date="2026-02-20T04:06:08.325" /><!-- duration: 0ms -->
+            <step title="Deleting file: &apos;data\chinatracker.db&apos;" date="2026-02-20T04:06:08.325" /><!-- duration: 0ms -->
+            <step title="Deleting directory: &apos;data&apos;" date="2026-02-20T04:06:08.325" /><!-- duration: 16ms -->
+            <step title="Copying file: &apos;package-lock.json&apos;" date="2026-02-20T04:06:08.341" /><!-- duration: 16ms -->
+            <step title="Copying file: &apos;dist\db.d.ts&apos;" date="2026-02-20T04:06:08.372" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\db.d.ts.map&apos;" date="2026-02-20T04:06:08.388" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\db.js&apos;" date="2026-02-20T04:06:08.388" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\db.js.map&apos;" date="2026-02-20T04:06:08.403" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\index.d.ts&apos;" date="2026-02-20T04:06:08.403" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\index.d.ts.map&apos;" date="2026-02-20T04:06:08.419" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\index.js&apos;" date="2026-02-20T04:06:08.419" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\index.js.map&apos;" date="2026-02-20T04:06:08.435" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\auth.d.ts&apos;" date="2026-02-20T04:06:08.435" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\auth.d.ts.map&apos;" date="2026-02-20T04:06:08.450" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\auth.js&apos;" date="2026-02-20T04:06:08.450" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\auth.js.map&apos;" date="2026-02-20T04:06:08.466" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\costLines.d.ts&apos;" date="2026-02-20T04:06:08.466" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\costLines.d.ts.map&apos;" date="2026-02-20T04:06:08.482" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\costLines.js&apos;" date="2026-02-20T04:06:08.482" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\costLines.js.map&apos;" date="2026-02-20T04:06:08.497" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\exercises.d.ts&apos;" date="2026-02-20T04:06:08.497" /><!-- duration: 16ms -->
+            <step title="Copying file: &apos;dist\routes\exercises.d.ts.map&apos;" date="2026-02-20T04:06:08.513" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\exercises.js&apos;" date="2026-02-20T04:06:08.513" /><!-- duration: 16ms -->
+            <step title="Copying file: &apos;dist\routes\exercises.js.map&apos;" date="2026-02-20T04:06:08.528" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\personnelGroups.d.ts&apos;" date="2026-02-20T04:06:08.575" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\personnelGroups.d.ts.map&apos;" date="2026-02-20T04:06:08.575" /><!-- duration: 16ms -->
+            <step title="Copying file: &apos;dist\routes\personnelGroups.js&apos;" date="2026-02-20T04:06:08.591" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\personnelGroups.js.map&apos;" date="2026-02-20T04:06:08.607" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\rates.d.ts&apos;" date="2026-02-20T04:06:08.622" /><!-- duration: 16ms -->
+            <step title="Copying file: &apos;dist\routes\rates.d.ts.map&apos;" date="2026-02-20T04:06:08.669" /><!-- duration: 16ms -->
+            <step title="Copying file: &apos;dist\routes\rates.js&apos;" date="2026-02-20T04:06:08.685" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\routes\rates.js.map&apos;" date="2026-02-20T04:06:08.700" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\services\auth.d.ts&apos;" date="2026-02-20T04:06:08.700" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\services\auth.d.ts.map&apos;" date="2026-02-20T04:06:08.716" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\services\auth.js&apos;" date="2026-02-20T04:06:08.732" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\services\auth.js.map&apos;" date="2026-02-20T04:06:08.732" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\services\calculationEngine.d.ts&apos;" date="2026-02-20T04:06:08.747" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\services\calculationEngine.d.ts.map&apos;" date="2026-02-20T04:06:08.747" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\services\calculationEngine.js&apos;" date="2026-02-20T04:06:08.763" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;dist\services\calculationEngine.js.map&apos;" date="2026-02-20T04:06:08.763" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;node_modules\.package-lock.json&apos;" date="2026-02-20T04:06:08.778" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;node_modules\.prisma\client\default.d.ts&apos;" date="2026-02-20T04:06:08.778" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;node_modules\.prisma\client\default.js&apos;" date="2026-02-20T04:06:08.794" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;node_modules\.prisma\client\edge.d.ts&apos;" date="2026-02-20T04:06:08.794" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;node_modules\.prisma\client\edge.js&apos;" date="2026-02-20T04:06:08.810" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;node_modules\.prisma\client\index-browser.js&apos;" date="2026-02-20T04:06:08.810" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;node_modules\.prisma\client\index.d.ts&apos;" date="2026-02-20T04:06:08.825" /><!-- duration: 31ms -->
+            <step title="Copying file: &apos;node_modules\.prisma\client\index.js&apos;" date="2026-02-20T04:06:08.857" /><!-- duration: 0ms -->
+            <step title="Copying file: &apos;node_modules\.prisma\client\package.json&apos;" date="2026-02-20T04:06:08.872" /><!-- duration: 0ms -->
+            <step title="Omitting next output lines..." date="2026-02-20T04:06:08.872" /><!-- duration: 0ms -->
+            <step title="Finished successfully." date="2026-02-20T04:06:08.888" /><!-- duration: 0ms -->
+          </step><!-- duration: 953ms -->
+          <step title="Build completed succesfully." date="2026-02-20T04:06:08.919" /><!-- duration: 0ms -->
+          <step title="Running post deployment command(s)..." date="2026-02-20T04:06:08.950" /><!-- duration: 0ms -->
+          <step title="Requesting site restart" date="2026-02-20T04:06:08.997" /><!-- duration: 0ms -->
+          <step title="Requesting site restart" date="2026-02-20T04:06:08.997" /><!-- duration: 0ms -->
+          <step title="Requesting site restart. Attempt #1" date="2026-02-20T04:06:09.028" /><!-- duration: 0ms -->
+          <step title="Requesting site restart. Attempt #1" date="2026-02-20T04:06:09.044" /><!-- duration: 0ms -->
+          <step title="Successfully requested a restart. Attempt #1" date="2026-02-20T04:06:09.388" /><!-- duration: 0ms -->
+          <step title="Successfully requested a restart. Attempt #1" date="2026-02-20T04:06:09.403" /><!-- duration: 0ms -->
+          <step title="Deployment successful. DEPLOYMENTINFO: deploymentPath = OneDeploy, deployer = OneDeploy, os = windows, sku = Free, siteName = chinatracker-api-02192214374, siteHostName = chinatracker-api-02192214374.azurewebsites.net, deploymentStatus = Success" date="2026-02-20T04:06:09.419" /><!-- duration: 0ms -->
+        </step><!-- duration: 1859ms -->
+      </step><!-- duration: 2031ms -->
+      <step title="Cleaning up temp files" date="2026-02-20T04:06:09.528" /><!-- duration: 0ms -->
+      <step title="Skip function trigger and logicapp sync because function is not enabled." date="2026-02-20T04:06:09.544" /><!-- duration: 0ms -->
+    </step><!-- duration: 6656ms -->
+    <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; released" date="2026-02-20T04:06:09.575" /><!-- duration: 0ms -->
+    <step title="Deleting shutdown sentinel file" date="2026-02-20T04:06:09.575" SemaphoreCount="8" /><!-- duration: 0ms -->
+  </step><!-- duration: 57366ms -->
+  <step title="Outgoing response" date="2026-02-20T04:06:09.607" type="response" statusCode="200" statusText="OK" Server="Microsoft-IIS/10.0" x-ms-request-id="53a47322-0e11-11f1-93d4-b81ea46e5afc" Cache-Control="private" X-AspNet-Version="4.0.30319" /><!-- duration: 16ms -->
+</step><!-- duration: 58007ms -->
