@@ -2,19 +2,21 @@ import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 
+const SERVER_ROOT = path.resolve(__dirname, '..');
+
 function resolveSqlitePath(databaseUrl: string | undefined): string | null {
 	if (!databaseUrl || !databaseUrl.startsWith('file:')) return null;
 	const rawPath = databaseUrl.slice(5);
 	if (!rawPath) return null;
 	if (path.isAbsolute(rawPath)) return rawPath;
-	return path.resolve(process.cwd(), rawPath);
+	return path.resolve(SERVER_ROOT, rawPath);
 }
 
 function bootstrapSqliteFileIfMissing(): void {
 	const targetDbPath = resolveSqlitePath(process.env.DATABASE_URL);
 	if (!targetDbPath) return;
 
-	const seededDbPath = path.resolve(process.cwd(), 'prisma', 'prod.db');
+	const seededDbPath = path.resolve(SERVER_ROOT, 'prisma', 'prod.db');
 	const targetDir = path.dirname(targetDbPath);
 	fs.mkdirSync(targetDir, { recursive: true });
 
@@ -39,15 +41,53 @@ bootstrapSqliteFileIfMissing();
 
 export const prisma = new PrismaClient();
 
-async function ensureSqliteSchema(): Promise<void> {
+async function hasSqliteTable(tableName: string): Promise<boolean> {
 	const tableCheck = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
-		"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rank_cpd_rates'",
+		"SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+		tableName,
 	);
-	if (Array.isArray(tableCheck) && tableCheck.length > 0) {
+	return Array.isArray(tableCheck) && tableCheck.length > 0;
+}
+
+async function ensureAuthSessionsTable(): Promise<void> {
+	await prisma.$executeRawUnsafe(`
+		CREATE TABLE IF NOT EXISTS "auth_sessions" (
+			"id" TEXT NOT NULL PRIMARY KEY,
+			"user_id" TEXT NOT NULL,
+			"refresh_token_hash" TEXT NOT NULL,
+			"user_agent" TEXT,
+			"ip_address" TEXT,
+			"expires_at" DATETIME NOT NULL,
+			"revoked_at" DATETIME,
+			"created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			"updated_at" DATETIME NOT NULL,
+			CONSTRAINT "auth_sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+		)
+	`);
+
+	await prisma.$executeRawUnsafe(
+		'CREATE INDEX IF NOT EXISTS "auth_sessions_user_id_expires_at_idx" ON "auth_sessions"("user_id", "expires_at")',
+	);
+
+	await prisma.$executeRawUnsafe(
+		'CREATE UNIQUE INDEX IF NOT EXISTS "auth_sessions_refresh_token_hash_key" ON "auth_sessions"("refresh_token_hash")',
+	);
+}
+
+async function ensureSqliteSchema(): Promise<void> {
+	const hasRankCpdRates = await hasSqliteTable('rank_cpd_rates');
+	const hasAuthSessions = await hasSqliteTable('auth_sessions');
+
+	if (hasRankCpdRates && hasAuthSessions) {
 		return;
 	}
 
-	const migrationsRoot = path.resolve(process.cwd(), 'prisma', 'migrations');
+	if (hasRankCpdRates && !hasAuthSessions) {
+		await ensureAuthSessionsTable();
+		return;
+	}
+
+	const migrationsRoot = path.resolve(SERVER_ROOT, 'prisma', 'migrations');
 	if (!fs.existsSync(migrationsRoot)) return;
 
 	const migrationDirs = fs
@@ -81,13 +121,17 @@ async function ensureSqliteSchema(): Promise<void> {
 				}
 			}
 
-			const verifyTable = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
-				"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rank_cpd_rates'",
-			);
-			if (!Array.isArray(verifyTable) || verifyTable.length === 0) {
-				throw new Error('Unable to initialize SQLite schema');
-			}
 		}
+	}
+
+	const verifyHasRankCpdRates = await hasSqliteTable('rank_cpd_rates');
+	if (!verifyHasRankCpdRates) {
+		throw new Error('Unable to initialize SQLite schema');
+	}
+
+	const verifyHasAuthSessions = await hasSqliteTable('auth_sessions');
+	if (!verifyHasAuthSessions) {
+		await ensureAuthSessionsTable();
 	}
 }
 
@@ -109,6 +153,7 @@ const BASE_CPD_RATES = [
 	{ rankCode: 'COL', costPerDay: 744 },
 	{ rankCode: 'BG', costPerDay: 861 },
 	{ rankCode: 'MG', costPerDay: 960 },
+	{ rankCode: 'CIV', costPerDay: 0 },
 ];
 
 const BASE_PER_DIEM = [
@@ -121,6 +166,8 @@ const BASE_CONFIG: Array<{ key: string; value: string }> = [
 	{ key: 'LUNCH_MRE_COST', value: '15.91' },
 	{ key: 'DINNER_COST', value: '14.00' },
 	{ key: 'PLAYER_BILLETING_NIGHT', value: '27.00' },
+	{ key: 'PLAYER_PER_DIEM_PER_DAY', value: '5.00' },
+	{ key: 'FIELD_CONDITIONS_PER_DIEM', value: '5.00' },
 	{ key: 'DEFAULT_AIRFARE', value: '400.00' },
 	{ key: 'DEFAULT_RENTAL_CAR_DAILY', value: '50.00' },
 	{ key: 'BUDGET_TARGET_RPA', value: '0.00' },
@@ -130,17 +177,16 @@ const BASE_CONFIG: Array<{ key: string; value: string }> = [
 export async function ensureBaselineData(): Promise<void> {
 	await ensureSqliteSchema();
 
-	const cpdCount = await prisma.rankCpdRate.count();
-	if (cpdCount === 0) {
-		for (const rate of BASE_CPD_RATES) {
-			await prisma.rankCpdRate.create({
-				data: {
-					rankCode: rate.rankCode,
-					costPerDay: rate.costPerDay,
-					effectiveDate: new Date('2025-10-01'),
-				},
-			});
-		}
+	for (const rate of BASE_CPD_RATES) {
+		await prisma.rankCpdRate.upsert({
+			where: { rankCode: rate.rankCode },
+			update: {},
+			create: {
+				rankCode: rate.rankCode,
+				costPerDay: rate.costPerDay,
+				effectiveDate: new Date('2025-10-01'),
+			},
+		});
 	}
 
 	const perDiemCount = await prisma.perDiemRate.count();

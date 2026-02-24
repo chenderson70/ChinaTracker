@@ -144,6 +144,59 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
+router.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const username = sanitizeUsername(req.body?.username);
+    const currentPassword = String(req.body?.currentPassword || '');
+    const newPassword = String(req.body?.newPassword || '');
+
+    if (!username || !currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Username, current password, and new password are required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+
+    if (newPassword === currentPassword) {
+      return res.status(400).json({ error: 'New password must be different from current password' });
+    }
+
+    const user = await userClient.findUnique({ where: { username } });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    const validPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await userClient.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    await (prisma as any).authSession.updateMany({
+      where: {
+        userId: user.id,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+
+    const authUser = { id: user.id, username: user.username, name: user.name };
+    const session = await issueSession(req, authUser);
+
+    res.json(session);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/refresh', async (req: Request, res: Response) => {
   try {
     const refreshToken = String(req.body?.refreshToken || '');

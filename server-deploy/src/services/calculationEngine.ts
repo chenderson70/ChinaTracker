@@ -51,6 +51,15 @@ function emptyGroup(pax = 0, days = 0): GroupCalc {
   return { paxCount: pax, dutyDays: days, milPay: 0, perDiem: 0, meals: 0, travel: 0, billeting: 0, subtotal: 0 };
 }
 
+function isLocalFlag(value: any): boolean {
+  if (value === true || value === 1 || value === '1') return true;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === 'local';
+  }
+  return false;
+}
+
 function calcMilPay(
   group: any,
   entry: any,
@@ -147,17 +156,17 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
         const entryCount = entry.count || 0;
         const entryDays = entry.dutyDays || pg.dutyDays || defaultDays;
         const entryLoc = entry.location || pg.location || 'GULFPORT';
-        const entryIsLocal = !!(entry.isLocal ?? pg.isLocal);
+        const entryIsLocal = isLocalFlag(entry.isLocal) || isLocalFlag(pg.isLocal);
         const pdRates = rates.perDiemRates[entryLoc] || { lodging: 0, mie: 0 };
 
         dutyDaysAccumulator += entryDays * entryCount;
 
         if (isWhiteCell && pg.fundingType === 'RPA') {
           groupMilPay += calcMilPay(pg, entry, rates, entryDays);
-          groupPerDiem += entryCount * (pdRates.lodging + pdRates.mie) * entryDays;
+          groupPerDiem += entryIsLocal ? 0 : (entryCount * (pdRates.lodging + pdRates.mie) * entryDays);
           groupTravel += entryIsLocal ? 0 : (entryCount * airfarePerPerson);
         } else if (isWhiteCell && pg.fundingType === 'OM') {
-          groupPerDiem += entryCount * (pdRates.lodging + pdRates.mie) * entryDays;
+          groupPerDiem += entryIsLocal ? 0 : (entryCount * (pdRates.lodging + pdRates.mie) * entryDays);
           groupTravel += entryIsLocal ? 0 : (entryCount * airfarePerPerson);
         } else if (isPlayer && pg.fundingType === 'RPA') {
           groupMilPay += calcMilPay(pg, entry, rates, entryDays);
@@ -170,7 +179,7 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
         }
       }
 
-      if (isWhiteCell && groupTravel > 0 && !calcEntries.every((entry: any) => !!(entry.isLocal ?? pg.isLocal))) {
+      if (isWhiteCell && groupTravel > 0 && !calcEntries.every((entry: any) => isLocalFlag(entry.isLocal) || isLocalFlag(pg.isLocal))) {
         groupTravel += appliedRentalCost;
       }
 

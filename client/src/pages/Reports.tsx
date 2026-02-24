@@ -55,12 +55,12 @@ export default function Reports() {
 
   const columns = [
     { title: 'Unit', dataIndex: 'unit', width: 60 },
-    { title: 'WC RPA', dataIndex: 'wcRpa', render: fmt },
-    { title: 'WC O&M', dataIndex: 'wcOm', render: fmt },
+    { title: 'White Cell RPA', dataIndex: 'wcRpa', render: fmt },
+    { title: 'White Cell O&M', dataIndex: 'wcOm', render: fmt },
     { title: 'Player RPA', dataIndex: 'playerRpa', render: fmt },
     { title: 'Player O&M', dataIndex: 'playerOm', render: fmt },
-    { title: 'Exec RPA', dataIndex: 'execRpa', render: fmt },
-    { title: 'Exec O&M', dataIndex: 'execOm', render: fmt },
+    { title: 'Execution RPA', dataIndex: 'execRpa', render: fmt },
+    { title: 'Execution O&M', dataIndex: 'execOm', render: fmt },
     { title: 'Total RPA', dataIndex: 'totalRpa', render: fmt },
     { title: 'Total O&M', dataIndex: 'totalOm', render: fmt },
     { title: 'Total', dataIndex: 'total', render: (v: number) => <strong>{fmt(v)}</strong> },

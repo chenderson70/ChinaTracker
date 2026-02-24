@@ -10,7 +10,7 @@ import authRouter from './routes/auth';
 import { requireAuth } from './services/auth';
 import { ensureBaselineData, prisma } from './db';
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 const app = express();
 

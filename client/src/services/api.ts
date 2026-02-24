@@ -149,6 +149,16 @@ export async function loginAccount(data: { username: string; password: string })
   return result.user;
 }
 
+export async function resetPasswordAccount(data: { username: string; currentPassword: string; newPassword: string }): Promise<AuthUser> {
+  const result = await apiRequest<AuthResponse>('/auth/reset-password', {
+    method: 'POST',
+    body: data,
+    includeAuth: false,
+  });
+  setAuthSession(result.token, result.user, result.refreshToken);
+  return result.user;
+}
+
 export async function logoutAccount(): Promise<void> {
   const refreshToken = getRefreshToken();
   if (refreshToken) {
@@ -256,6 +266,13 @@ export async function addExecutionCost(
   return apiRequest<ExecutionCostLine>(`/units/${unitId}/execution-costs`, { method: 'POST', body: data });
 }
 
+export async function updateExecutionCost(
+  lineId: string,
+  data: Partial<Pick<ExecutionCostLine, 'fundingType' | 'category' | 'amount' | 'notes'>>,
+): Promise<ExecutionCostLine> {
+  return apiRequest<ExecutionCostLine>(`/execution-costs/${lineId}`, { method: 'PUT', body: data });
+}
+
 export async function deleteExecutionCost(lineId: string): Promise<void> {
   await apiRequest<{ success: boolean }>(`/execution-costs/${lineId}`, { method: 'DELETE' });
 }
@@ -273,7 +290,7 @@ export async function deleteOmCost(lineId: string): Promise<void> {
 }
 
 // ── Rates ──
-const RANK_ORDER = ['AB','AMN','A1C','SRA','SSGT','TSGT','MSGT','SMSGT','CMSGT','2LT','1LT','CAPT','MAJ','LTCOL','COL','BG','MG'];
+const RANK_ORDER = ['CIV','AB','AMN','A1C','SRA','SSGT','TSGT','MSGT','SMSGT','CMSGT','2LT','1LT','CAPT','MAJ','LTCOL','COL','BG','MG'];
 
 export async function getCpdRates(): Promise<RankCpdRate[]> {
   const rates = await apiRequest<RankCpdRate[]>('/rates/cpd');

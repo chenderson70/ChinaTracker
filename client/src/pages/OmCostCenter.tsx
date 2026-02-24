@@ -11,7 +11,7 @@ const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigi
 const OM_CATEGORIES: { value: OmCategory; label: string }[] = [
   { value: 'CONTRACT', label: 'Contract' },
   { value: 'TRANSPORTATION', label: 'Transportation' },
-  { value: 'BILLETING', label: 'Billeting' },
+  { value: 'BILLETING', label: 'Lodging' },
   { value: 'PORT_A_POTTY', label: 'Port-A-Potty' },
   { value: 'RENTALS_VSCOS', label: 'Rentals / VSCOs' },
   { value: 'CONSUMABLES', label: 'Consumables' },

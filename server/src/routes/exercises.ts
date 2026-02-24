@@ -22,6 +22,7 @@ async function loadRates(): Promise<RateInputs> {
       dinner: cfg['DINNER_COST'] || 14,
     },
     playerBilletingPerNight: cfg['PLAYER_BILLETING_NIGHT'] || 27,
+    playerPerDiemPerDay: cfg['PLAYER_PER_DIEM_PER_DAY'] || cfg['FIELD_CONDITIONS_PER_DIEM'] || 5,
   };
 }
 
@@ -43,10 +44,45 @@ async function loadFullExercise(id: string) {
 }
 
 async function loadOwnedExercise(id: string, ownerUserId: string) {
+  await ensurePlanningGroups(id);
   const exercise = await loadFullExercise(id);
   if (!exercise) return null;
   if (exercise.ownerUserId !== ownerUserId) return null;
   return exercise;
+}
+
+async function ensurePlanningGroups(exerciseId: string): Promise<void> {
+  const unitBudgets = await prisma.unitBudget.findMany({
+    where: { exerciseId },
+    include: { personnelGroups: true },
+  });
+
+  for (const unitBudget of unitBudgets) {
+    const hasPlanningRpa = unitBudget.personnelGroups.some((group) => group.role === 'PLANNING' && group.fundingType === 'RPA');
+    const hasPlanningOm = unitBudget.personnelGroups.some((group) => group.role === 'PLANNING' && group.fundingType === 'OM');
+
+    if (!hasPlanningRpa) {
+      await prisma.personnelGroup.create({
+        data: {
+          unitBudgetId: unitBudget.id,
+          role: 'PLANNING',
+          fundingType: 'RPA',
+          location: 'GULFPORT',
+        },
+      });
+    }
+
+    if (!hasPlanningOm) {
+      await prisma.personnelGroup.create({
+        data: {
+          unitBudgetId: unitBudget.id,
+          role: 'PLANNING',
+          fundingType: 'OM',
+          location: 'GULFPORT',
+        },
+      });
+    }
+  }
 }
 
 // Helper: seed default unit budgets and personnel groups for a new exercise
@@ -78,6 +114,8 @@ async function seedExerciseDefaults(exerciseId: string) {
       }
     } else {
       const groups = [
+        { role: 'PLANNING' as const, fundingType: 'RPA' as const },
+        { role: 'PLANNING' as const, fundingType: 'OM' as const },
         { role: 'PLAYER' as const, fundingType: 'RPA' as const },
         { role: 'PLAYER' as const, fundingType: 'OM' as const },
         { role: 'WHITE_CELL' as const, fundingType: 'RPA' as const },
@@ -327,7 +365,7 @@ router.post('/:id/units', async (req: Request, res: Response) => {
 
     const ub = await prisma.unitBudget.create({ data: { exerciseId: req.params.id, unitCode: unitCodeRaw } });
     const template = String(req.body?.template || 'STANDARD').toUpperCase();
-    const roles = template === 'A7' ? ['PLANNING', 'SUPPORT'] : ['PLAYER', 'WHITE_CELL'];
+    const roles = template === 'A7' ? ['PLANNING', 'SUPPORT'] : ['PLANNING', 'PLAYER', 'WHITE_CELL'];
     const fundingTypes = ['RPA', 'OM'];
 
     for (const role of roles) {

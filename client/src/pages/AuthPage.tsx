@@ -5,12 +5,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import * as api from '../services/api';
 
-type AuthMode = 'login' | 'signup';
+type AuthMode = 'login' | 'signup' | 'reset';
 
 export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [loginForm] = Form.useForm();
   const [signupForm] = Form.useForm();
+  const [resetForm] = Form.useForm();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -38,6 +39,18 @@ export default function AuthPage() {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: (values: { username: string; currentPassword: string; newPassword: string }) => api.resetPasswordAccount(values),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['authMe'] });
+      message.success('Password updated');
+      navigate('/');
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Unable to reset password');
+    },
+  });
+
   return (
     <div
       style={{
@@ -54,7 +67,7 @@ export default function AuthPage() {
           <div style={{ textAlign: 'center' }}>
             <ThunderboltOutlined style={{ fontSize: 28, color: '#1677ff' }} />
             <Typography.Title level={3} style={{ marginBottom: 0, marginTop: 8 }}>
-              China Tracker
+              PATRIOT MEDIC
             </Typography.Title>
             <Typography.Text type="secondary">Sign in or create an account to access saved exercises</Typography.Text>
           </div>
@@ -66,6 +79,7 @@ export default function AuthPage() {
             options={[
               { label: 'Login', value: 'login' },
               { label: 'Create Account', value: 'signup' },
+              { label: 'Reset Password', value: 'reset' },
             ]}
           />
 
@@ -99,7 +113,7 @@ export default function AuthPage() {
                 Login
               </Button>
             </Form>
-          ) : (
+          ) : mode === 'signup' ? (
             <Form
               form={signupForm}
               layout="vertical"
@@ -150,6 +164,45 @@ export default function AuthPage() {
                 loading={signupMutation.isPending}
               >
                 Create Account
+              </Button>
+            </Form>
+          ) : (
+            <Form
+              form={resetForm}
+              layout="vertical"
+              onFinish={(values) => resetPasswordMutation.mutate(values)}
+            >
+              <Form.Item name="username" label="Username" rules={[{ required: true }]}>
+                <Input
+                  placeholder="username"
+                  size="large"
+                  autoComplete="username"
+                  onChange={(event) => {
+                    resetForm.setFieldValue('username', String(event.target.value || '').toLowerCase());
+                  }}
+                />
+              </Form.Item>
+              <Form.Item name="currentPassword" label="Current Password" rules={[{ required: true }]}>
+                <Input.Password placeholder="Current password" size="large" autoComplete="current-password" />
+              </Form.Item>
+              <Form.Item
+                name="newPassword"
+                label="New Password"
+                rules={[
+                  { required: true },
+                  { min: 8, message: 'Use at least 8 characters' },
+                ]}
+              >
+                <Input.Password placeholder="New password" size="large" autoComplete="new-password" />
+              </Form.Item>
+              <Button
+                htmlType="submit"
+                type="primary"
+                size="large"
+                block
+                loading={resetPasswordMutation.isPending}
+              >
+                Reset Password
               </Button>
             </Form>
           )}

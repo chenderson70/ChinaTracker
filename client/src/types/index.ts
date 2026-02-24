@@ -144,6 +144,8 @@ export interface GroupCalc {
 export interface UnitCalc {
   unitCode: string;
   totalPax: number;
+  planningRpa: GroupCalc;
+  planningOm: GroupCalc;
   whiteCellRpa: GroupCalc;
   whiteCellOm: GroupCalc;
   playerRpa: GroupCalc;

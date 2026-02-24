@@ -251,7 +251,7 @@ export default function AppLayout() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ChinaTracker_Backup_${dayjs().format('YYYY-MM-DD')}.json`;
+    a.download = `PATRIOT_MEDIC_Backup_${dayjs().format('YYYY-MM-DD')}.json`;
     a.click();
     URL.revokeObjectURL(url);
     message.success('Backup downloaded');
@@ -322,7 +322,7 @@ export default function AppLayout() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <ThunderboltOutlined style={{ fontSize: 22, color: '#4096ff' }} />
               <Typography.Title level={4} className="ct-logo-title">
-                China Tracker
+                PATRIOT MEDIC
               </Typography.Title>
             </div>
             <span className="ct-logo-sub">Budget Management</span>

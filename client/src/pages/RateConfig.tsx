@@ -313,16 +313,16 @@ export default function RateConfig() {
         onCancel={() => setAddLocOpen(false)}
       >
         <Space direction="vertical" style={{ width: '100%' }}>
-          <div>
-            <Typography.Text type="secondary">Location Name</Typography.Text>
+          <div className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">Location Name</Typography.Text>
             <Input placeholder="e.g., Fort Hood" value={newLoc.name} onChange={(e) => setNewLoc({ ...newLoc, name: e.target.value })} />
           </div>
-          <div>
-            <Typography.Text type="secondary">Lodging Rate ($/night)</Typography.Text>
+          <div className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">Lodging Rate ($/night)</Typography.Text>
             <InputNumber min={0} step={0.01} value={newLoc.lodging} onChange={(v) => setNewLoc({ ...newLoc, lodging: v || 0 })} style={{ width: '100%' }} />
           </div>
-          <div>
-            <Typography.Text type="secondary">M&IE Rate ($/day)</Typography.Text>
+          <div className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">M&IE Rate ($/day)</Typography.Text>
             <InputNumber min={0} step={0.01} value={newLoc.mie} onChange={(v) => setNewLoc({ ...newLoc, mie: v || 0 })} style={{ width: '100%' }} />
           </div>
         </Space>
@@ -330,13 +330,13 @@ export default function RateConfig() {
 
       {/* App Config: Meals & billeting */}
       <Card
-        title="Meal Rates & Billeting"
+        title="Meal Rates & Billeting - Players ONLY"
         className="ct-config-card"
         extra={<Button icon={<SaveOutlined />} type="primary" onClick={() => saveCfgMut.mutate()} loading={saveCfgMut.isPending}>Save</Button>}
       >
         <Row gutter={24}>
-          <Col span={6}>
-            <Typography.Text type="secondary">Breakfast ($/day)</Typography.Text>
+          <Col span={6} className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">Breakfast ($/day)</Typography.Text>
             <InputNumber
               min={0}
               step={0.01}
@@ -345,8 +345,8 @@ export default function RateConfig() {
               style={{ width: '100%' }}
             />
           </Col>
-          <Col span={6}>
-            <Typography.Text type="secondary">Lunch/MRE ($/day)</Typography.Text>
+          <Col span={6} className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">Lunch/MRE ($/day)</Typography.Text>
             <InputNumber
               min={0}
               step={0.01}
@@ -355,8 +355,8 @@ export default function RateConfig() {
               style={{ width: '100%' }}
             />
           </Col>
-          <Col span={6}>
-            <Typography.Text type="secondary">Dinner ($/day)</Typography.Text>
+          <Col span={6} className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">Dinner ($/day)</Typography.Text>
             <InputNumber
               min={0}
               step={0.01}
@@ -365,8 +365,8 @@ export default function RateConfig() {
               style={{ width: '100%' }}
             />
           </Col>
-          <Col span={6}>
-            <Typography.Text type="secondary">Player Billeting ($/night)</Typography.Text>
+          <Col span={6} className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">Player Billeting ($/night)</Typography.Text>
             <InputNumber
               min={0}
               step={0.01}
@@ -376,10 +376,22 @@ export default function RateConfig() {
             />
           </Col>
         </Row>
+        <Row gutter={24} style={{ marginTop: 12 }}>
+          <Col span={6} className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">Player Per Diem (M&amp;IE) ($/day)</Typography.Text>
+            <InputNumber
+              min={0}
+              step={0.01}
+              value={cfgVal('PLAYER_PER_DIEM_PER_DAY') || cfgVal('FIELD_CONDITIONS_PER_DIEM')}
+              onChange={(v) => setCfgEdits({ ...cfgEdits, PLAYER_PER_DIEM_PER_DAY: String(v || 0) })}
+              style={{ width: '100%' }}
+            />
+          </Col>
+        </Row>
         <Divider />
         <Row gutter={24}>
-          <Col span={6}>
-            <Typography.Text type="secondary">Default Airfare ($)</Typography.Text>
+          <Col span={6} className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">Default Airfare ($)</Typography.Text>
             <InputNumber
               min={0}
               step={1}
@@ -388,8 +400,8 @@ export default function RateConfig() {
               style={{ width: '100%' }}
             />
           </Col>
-          <Col span={6}>
-            <Typography.Text type="secondary">Rental Car Rate ($/day)</Typography.Text>
+          <Col span={6} className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">Rental Car Rate ($/day)</Typography.Text>
             <InputNumber
               min={0}
               step={1}
@@ -398,8 +410,8 @@ export default function RateConfig() {
               style={{ width: '100%' }}
             />
           </Col>
-          <Col span={6}>
-            <Typography.Text type="secondary">RPA Budget Target ($)</Typography.Text>
+          <Col span={6} className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">RPA Budget Target ($)</Typography.Text>
             <InputNumber
               min={0}
               step={1000}
@@ -408,8 +420,8 @@ export default function RateConfig() {
               style={{ width: '100%' }}
             />
           </Col>
-          <Col span={6}>
-            <Typography.Text type="secondary">O&amp;M Budget Target ($)</Typography.Text>
+          <Col span={6} className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">O&amp;M Budget Target ($)</Typography.Text>
             <InputNumber
               min={0}
               step={1000}

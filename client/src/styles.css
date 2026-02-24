@@ -641,6 +641,19 @@ body {
   color: #52c41a;
 }
 
+/* --- Form field alignment --- */
+.ct-field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ct-field-label {
+  display: block;
+  min-height: 38px;
+  line-height: 1.35;
+}
+
 /* --- Print styles --- */
 @media print {
   .ct-sider,
@@ -655,6 +668,10 @@ body {
 
 /* --- Responsive tweaks --- */
 @media (max-width: 768px) {
+  .ct-field-label {
+    min-height: 0;
+  }
+
   .ct-header-stats {
     display: none;
   }
