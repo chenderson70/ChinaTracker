@@ -619,11 +619,20 @@ export default function UnitView() {
               <div className="ct-stat-label">Unit O&M</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: '#52c41a', lineHeight: 1.1 }}>{fmt(unitCalc.unitTotalOm)}</div>
               <div style={{ marginTop: 6, fontSize: 11, color: '#6b7280', lineHeight: 1.4 }}>
-                <div>WRM: {fmt(omWrmTotal)}</div>
-                <div>Contracts: {fmt(omContractsTotal)}</div>
-                <div>GPC Purchases: {fmt(omGpcPurchasesTotal)}</div>
-                <div>Planning Travel: {fmt(omPlanningTravelTotal)}</div>
-                <div>Support - Execution Travel: {fmt(omSupportExecutionTravelTotal)}</div>
+                {isSgAeCabUnit ? (
+                  <>
+                    <div>Planning Travel (AGRs and Civ): {fmt(omPlanningTravelTotal)}</div>
+                    <div>Support - Execution Travel (AGRs and Civ): {fmt(omSupportExecutionTravelTotal)}</div>
+                  </>
+                ) : (
+                  <>
+                    <div>WRM: {fmt(omWrmTotal)}</div>
+                    <div>Contracts: {fmt(omContractsTotal)}</div>
+                    <div>GPC Purchases: {fmt(omGpcPurchasesTotal)}</div>
+                    <div>Planning Travel: {fmt(omPlanningTravelTotal)}</div>
+                    <div>Support - Execution Travel: {fmt(omSupportExecutionTravelTotal)}</div>
+                  </>
+                )}
               </div>
             </div>
           </Card>

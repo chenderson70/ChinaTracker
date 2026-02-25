@@ -1,6 +1,6 @@
 import { Card, Typography, Button, Row, Col, Table, Descriptions, Divider, Space, Spin, InputNumber, Form, message } from 'antd';
 import { FileExcelOutlined, PrinterOutlined, EditOutlined, SaveOutlined } from '@ant-design/icons';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useApp } from '../components/AppLayout';
 import * as api from '../services/api';
@@ -13,6 +13,7 @@ export default function Reports() {
   const queryClient = useQueryClient();
   const [editTravel, setEditTravel] = useState(false);
   const [travelForm] = Form.useForm();
+  const { data: appConfig = {} } = useQuery({ queryKey: ['appConfig'], queryFn: api.getAppConfig });
 
   const travelMut = useMutation({
     mutationFn: (data: any) => api.updateTravelConfig(exerciseId!, data),
@@ -31,6 +32,24 @@ export default function Reports() {
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
       queryClient.invalidateQueries({ queryKey: ['budget', exerciseId] });
       message.success('Exercise updated');
+    },
+  });
+
+  const totalBudgetMut = useMutation({
+    mutationFn: (totalBudget: number) => api.updateExercise(exerciseId!, { totalBudget }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      queryClient.invalidateQueries({ queryKey: ['budget', exerciseId] });
+    },
+  });
+
+  const appConfigMut = useMutation({
+    mutationFn: (config: Record<string, string>) => api.updateAppConfig(config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appConfig'] });
+      queryClient.invalidateQueries({ queryKey: ['budget', exerciseId] });
+      message.success('Budget targets updated');
     },
   });
 
@@ -68,6 +87,19 @@ export default function Reports() {
 
   const travel = exercise.travelConfig;
   const totalBudgetLeft = (exercise.totalBudget || 0) - budget.grandTotal;
+  const cfgNum = (key: string) => Number(appConfig[key] || 0);
+  const rpaBudgetTarget = cfgNum('BUDGET_TARGET_RPA');
+  const omBudgetTarget = cfgNum('BUDGET_TARGET_OM');
+  const aggregatedTotalBudget = rpaBudgetTarget + omBudgetTarget;
+
+  const updateBudgetTarget = (key: 'BUDGET_TARGET_RPA' | 'BUDGET_TARGET_OM', value: number | null) => {
+    if (value === null) return;
+    const nextRpa = key === 'BUDGET_TARGET_RPA' ? value : rpaBudgetTarget;
+    const nextOm = key === 'BUDGET_TARGET_OM' ? value : omBudgetTarget;
+    const nextTotal = nextRpa + nextOm;
+    appConfigMut.mutate({ ...appConfig, [key]: String(value) });
+    totalBudgetMut.mutate(nextTotal);
+  };
 
   return (
     <div>
@@ -90,13 +122,31 @@ export default function Reports() {
           <Descriptions.Item label="Start">{dayjs(exercise.startDate).format('DD MMM YYYY')}</Descriptions.Item>
           <Descriptions.Item label="End">{dayjs(exercise.endDate).format('DD MMM YYYY')}</Descriptions.Item>
           <Descriptions.Item label="Total Budget ($)">
-            <InputNumber
-              size="small"
-              min={0}
-              value={exercise.totalBudget}
-              onChange={(v) => v !== null && exerciseMut.mutate({ totalBudget: v })}
-              style={{ width: 130 }}
-            />
+            <Space direction="vertical" size={10} style={{ width: '100%', maxWidth: 320 }}>
+              <InputNumber
+                size="small"
+                min={0}
+                value={aggregatedTotalBudget}
+                readOnly
+                style={{ width: '100%' }}
+              />
+              <InputNumber
+                size="small"
+                min={0}
+                value={rpaBudgetTarget}
+                onChange={(v) => updateBudgetTarget('BUDGET_TARGET_RPA', v)}
+                addonBefore="RPA Budget"
+                style={{ width: '100%' }}
+              />
+              <InputNumber
+                size="small"
+                min={0}
+                value={omBudgetTarget}
+                onChange={(v) => updateBudgetTarget('BUDGET_TARGET_OM', v)}
+                addonBefore="O&M Budget"
+                style={{ width: '100%' }}
+              />
+            </Space>
           </Descriptions.Item>
           <Descriptions.Item label="Duty Days">
             <InputNumber

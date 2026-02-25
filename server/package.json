@@ -6,6 +6,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "prisma migrate deploy && node dist/index.js",
+    "reset-password": "node scripts/reset-password.js",
     "postinstall": "prisma generate"
   },
   "prisma": {

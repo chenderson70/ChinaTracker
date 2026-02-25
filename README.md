@@ -46,6 +46,22 @@ npm run dev
 - Frontend: `http://localhost:5173`
 - API: `http://localhost:3001/api/v1`
 
+## Account Password Reset (Local)
+
+From the `server/` folder, run:
+
+```bash
+npm run reset-password -- <username> "<newPassword>"
+```
+
+Example:
+
+```bash
+npm run reset-password -- admin "Password1111!!!!"
+```
+
+This updates the user's password hash and revokes active sessions so they must sign in again.
+
 ## Environment Variables
 
 - Server (`server/.env`)
