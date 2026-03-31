@@ -8,4 +8,4 @@ If member is SG/AE players or CAB players and on O&M, then only calculate their 
 
 For SG, AE and CAB, there needs to be separate areas to account for planning & execution
 
-If we are calculating RPA, then there needs to be separate total calculations collected for Enlisted and Officers
+If we are calculating RPA, then there needs to be separate total calculations collected for Enlisted and OfficersMorning 
