@@ -4,6 +4,7 @@ import { ThunderboltOutlined, LoginOutlined, UserAddOutlined } from '@ant-design
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import * as api from '../services/api';
+import { clearAuthSession } from '../services/auth';
 
 type AuthMode = 'login' | 'signup' | 'reset';
 
@@ -14,6 +15,10 @@ export default function AuthPage() {
   const [resetForm] = Form.useForm();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    clearAuthSession();
+  }, []);
 
   useEffect(() => {
     loginForm.setFieldValue('password', '');

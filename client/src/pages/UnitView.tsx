@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
+  AutoComplete,
   Card,
   Row,
   Col,
@@ -26,6 +27,21 @@ import type { PersonnelGroup, UnitBudget, FundingType, UnitCalc, GroupCalc, PerD
 import { getUnitDisplayLabel } from '../utils/unitLabels';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+const formatNumberInput = (value: string | number | null | undefined) => {
+  if (value === null || value === undefined || value === '') return '';
+  const stringValue = String(value).replace(/,/g, '');
+  const [integerPart, decimalPart] = stringValue.split('.');
+  const sign = integerPart.startsWith('-') ? '-' : '';
+  const digits = integerPart.replace('-', '');
+  const formattedInteger = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return decimalPart !== undefined
+    ? `${sign}${formattedInteger}.${decimalPart}`
+    : `${sign}${formattedInteger}`;
+};
+const parseNumberInput = (value: string | undefined) => {
+  const cleanedValue = (value || '').replace(/,/g, '').trim();
+  return cleanedValue ? Number(cleanedValue) : 0;
+};
 
 const parseA7OverallEquipmentCost = (notes: string | null | undefined): number | null => {
   if (!notes) return null;
@@ -39,6 +55,11 @@ const RANKS = [
   'CIV','AB','AMN','A1C','SRA','SSGT','TSGT','MSGT','SMSGT','CMSGT',
   '2LT','1LT','CAPT','MAJ','LTCOL','COL','BG','MG',
 ];
+const PLANNING_NOTE_OPTIONS = [
+  { value: 'Planning' },
+  { value: 'Site Visit' },
+  { value: 'Planning Conference' },
+];
 const DAYS_PER_MONTH = 30;
 
 function monthsToDutyDays(months: number): number {
@@ -47,6 +68,51 @@ function monthsToDutyDays(months: number): number {
 
 function dutyDaysToMonths(dutyDays: number): number {
   return Number((dutyDays / DAYS_PER_MONTH).toFixed(2));
+}
+
+function PlanningNoteInput({
+  value,
+  onSave,
+}: {
+  value: string | null | undefined;
+  onSave: (value: string | null) => void;
+}) {
+  const [draft, setDraft] = useState(String(value || ''));
+
+  useEffect(() => {
+    setDraft(String(value || ''));
+  }, [value]);
+
+  const commit = () => {
+    const nextValue = draft.trim();
+    const currentValue = String(value || '').trim();
+    if (nextValue === currentValue) return;
+    onSave(nextValue || null);
+  };
+
+  return (
+    <AutoComplete
+      size="small"
+      value={draft}
+      options={PLANNING_NOTE_OPTIONS}
+      style={{ width: '100%' }}
+      placeholder="Select or type a note"
+      filterOption={(inputValue, option) =>
+        String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
+      }
+      onChange={setDraft}
+      onSelect={(nextValue) => {
+        setDraft(nextValue);
+        onSave(nextValue.trim() || null);
+      }}
+    >
+      <Input
+        size="small"
+        onBlur={commit}
+        onPressEnter={commit}
+      />
+    </AutoComplete>
+  );
 }
 
 export default function UnitView() {
@@ -73,6 +139,8 @@ export default function UnitView() {
     }, {});
   }, [perDiemRates]);
   const [entryModal, setEntryModal] = useState<{ groupId: string } | null>(null);
+  const [entryModalNoteDraft, setEntryModalNoteDraft] = useState('');
+  const [entryModalTravelOnlyDraft, setEntryModalTravelOnlyDraft] = useState(false);
   const [contractModalOpen, setContractModalOpen] = useState(false);
   const [execModal, setExecModal] = useState(false);
   const [wrmCost, setWrmCost] = useState(0);
@@ -105,6 +173,8 @@ export default function UnitView() {
     onSuccess: async () => {
       await refreshExerciseAndBudget();
       setEntryModal(null);
+      setEntryModalNoteDraft('');
+      setEntryModalTravelOnlyDraft(false);
       entryForm.resetFields();
     },
   });
@@ -157,6 +227,8 @@ export default function UnitView() {
   const executionCostLines = ub?.executionCostLines || [];
   const entryModalGroup = entryModal ? personnelGroups.find((group) => group.id === entryModal.groupId) : null;
   const entryModalIsPlanning = entryModalGroup?.role === 'PLANNING';
+  const entryModalAllowsTravelOnly = entryModalGroup?.fundingType === 'RPA'
+    && (entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'SUPPORT');
 
   const findGroup = (role: string, ft: FundingType) =>
     personnelGroups.find((g: PersonnelGroup) => g.role === role && g.fundingType === ft);
@@ -213,6 +285,8 @@ export default function UnitView() {
       location: entryModalGroup?.location || perDiemLocations[0] || 'GULFPORT',
       isLocal: entryModalGroup?.isLocal ?? false,
     });
+    setEntryModalNoteDraft('');
+    setEntryModalTravelOnlyDraft(false);
   }, [entryModal, entryForm, entryModalGroup?.isLocal, entryModalGroup?.location, exercise?.defaultDutyDays, perDiemLocations]);
 
   const roleSections = ['PLANNING', 'PLAYER', 'WHITE_CELL', 'SUPPORT'].filter((role) => hasRole(role));
@@ -253,6 +327,7 @@ export default function UnitView() {
     const isPlanning = role === 'PLANNING';
     const isPlayerRpa = isPlayer && ft === 'RPA';
     const isPlayerOm = isPlayer && ft === 'OM';
+    const showTravelOnly = ft === 'RPA' && (role === 'PLANNING' || role === 'SUPPORT');
     const fundingNote = role === 'PLANNING'
       ? (ft === 'RPA'
           ? '(Exercise planning, planning meetings, site visits)'
@@ -261,7 +336,7 @@ export default function UnitView() {
         ? '(ADVON, REARVON, exercise execution)'
         : '';
     const totalEntryPax = group.personnelEntries.reduce((sum, entry) => sum + entry.count, 0);
-    const planningPerDiemBreakout = isPlanning
+    const nonPlayerTravelEntries = !isPlayer
       ? (group.personnelEntries.length > 0
         ? group.personnelEntries
         : [{
@@ -269,24 +344,50 @@ export default function UnitView() {
             dutyDays: group.dutyDays ?? exercise?.defaultDutyDays ?? 1,
             location: group.location || 'GULFPORT',
             isLocal: group.isLocal,
-          }]
-      ).reduce(
-        (acc, entry) => {
-          const entryCount = entry.count || 0;
-          const entryDays = entry.dutyDays || group.dutyDays || exercise?.defaultDutyDays || 1;
-          const entryLoc = entry.location || group.location || 'GULFPORT';
-          const entryIsLocal = !!(entry.isLocal ?? group.isLocal);
-          if (entryIsLocal) {
-            return acc;
-          }
-          const rates = perDiemByLocation[entryLoc] || { lodging: 0, mie: 0 };
-          acc.mie += entryCount * rates.mie * entryDays;
-          acc.lodging += entryCount * rates.lodging * entryDays;
+          }])
+      : [];
+    const unitCount = exercise?.unitBudgets?.length || 1;
+    const defaultTravel = exercise?.travelConfig || {
+      airfarePerPerson: 400,
+      rentalCarDailyRate: 50,
+      rentalCarCount: 0,
+      rentalCarDays: 0,
+    };
+    const airfarePerPerson = group.airfarePerPerson ?? defaultTravel.airfarePerPerson;
+    const rentalDaily = group.rentalCarDaily ?? defaultTravel.rentalCarDailyRate;
+    const hasGroupRental = (group.rentalCarCount || 0) > 0 || (group.rentalCarDays || 0) > 0 || group.rentalCarDaily != null;
+    const sharedRentalCost = ((defaultTravel.rentalCarCount || 0) * (defaultTravel.rentalCarDailyRate || 0) * (defaultTravel.rentalCarDays || 0)) / unitCount;
+    const configuredRentalCost = (group.rentalCarCount || 0) * rentalDaily * (group.rentalCarDays || 0);
+    const nonPlayerTravelBreakout = nonPlayerTravelEntries.reduce(
+      (acc, entry) => {
+        const entryCount = entry.count || 0;
+        const entryDays = entry.dutyDays || group.dutyDays || exercise?.defaultDutyDays || 1;
+        const entryLoc = entry.location || group.location || 'GULFPORT';
+        const entryIsLocal = !!(entry.isLocal ?? group.isLocal);
+        if (entryIsLocal) {
           return acc;
-        },
-        { mie: 0, lodging: 0 },
-      )
-      : { mie: 0, lodging: 0 };
+        }
+        const rates = perDiemByLocation[entryLoc] || { lodging: 0, mie: 0 };
+        acc.perDiem += entryCount * rates.mie * entryDays;
+        acc.lodging += entryCount * rates.lodging * entryDays;
+        acc.airfare += entryCount * airfarePerPerson;
+        acc.hasNonLocal = true;
+        return acc;
+      },
+      { perDiem: 0, lodging: 0, airfare: 0, rental: 0, hasNonLocal: false },
+    );
+    if ((role === 'WHITE_CELL' || role === 'SUPPORT') && ft === 'RPA' && nonPlayerTravelBreakout.hasNonLocal && nonPlayerTravelBreakout.airfare > 0) {
+      nonPlayerTravelBreakout.rental = hasGroupRental ? configuredRentalCost : sharedRentalCost;
+    }
+    const nonPlayerTravelTotal =
+      nonPlayerTravelBreakout.perDiem +
+      nonPlayerTravelBreakout.lodging +
+      nonPlayerTravelBreakout.airfare +
+      nonPlayerTravelBreakout.rental;
+    const nonPlayerSummary =
+      ft === 'OM'
+        ? `Travel Pay Total: ${fmt(nonPlayerTravelTotal)} (Per diem: ${fmt(nonPlayerTravelBreakout.perDiem)}, Lodging: ${fmt(nonPlayerTravelBreakout.lodging)}, Airfare: ${fmt(nonPlayerTravelBreakout.airfare)}, Rental: ${fmt(nonPlayerTravelBreakout.rental)}) \u2022 Total: ${fmt(nonPlayerTravelTotal)}`
+        : `Mil Pay: ${fmt(calc.milPay)} \u2022 Travel Pay Total: ${fmt(nonPlayerTravelTotal)} (Per diem: ${fmt(nonPlayerTravelBreakout.perDiem)}, Lodging: ${fmt(nonPlayerTravelBreakout.lodging)}, Airfare: ${fmt(nonPlayerTravelBreakout.airfare)}, Rental: ${fmt(nonPlayerTravelBreakout.rental)}) \u2022 Total: ${fmt(calc.milPay + nonPlayerTravelTotal)}`;
 
     return (
       <Card
@@ -361,9 +462,7 @@ export default function UnitView() {
                   <span style={{ color: 'var(--ct-success)' }}>{`Billeting: ${fmt(calc.billeting)}`}</span>
                   {` • Total: ${fmt(calc.subtotal)}`}
                 </>
-                : isPlanning
-                ? `Mil Pay: ${fmt(calc.milPay)} • Travel Pay: ${fmt(calc.travel)} • Per Diem (M&IE): ${fmt(planningPerDiemBreakout.mie)} • Lodging: ${fmt(planningPerDiemBreakout.lodging)} • Total: ${fmt(calc.subtotal)}`
-                : `Mil Pay: ${fmt(calc.milPay)} • Travel Pay: ${fmt(calc.travel)} • Lodging/Per Diem: ${fmt(calc.perDiem)} • Meals: ${fmt(calc.meals)} • Total: ${fmt(calc.subtotal)}`}
+                : nonPlayerSummary}
         </Typography.Text>
 
         {/* Rank-level detail */}
@@ -448,12 +547,41 @@ export default function UnitView() {
                   />
                 ),
               },
+              ...(isPlanning ? [{
+                title: 'Note',
+                dataIndex: 'note',
+                width: 180,
+                render: (value: string | null, row: { id: string }) => (
+                  <PlanningNoteInput
+                    value={value}
+                    onSave={(nextValue) => {
+                      updateEntryMut.mutate({ id: row.id, data: { note: nextValue } });
+                    }}
+                  />
+                ),
+              }] : []),
+              ...(showTravelOnly ? [{
+                title: 'Travel Only',
+                dataIndex: 'travelOnly',
+                width: 120,
+                render: (value: boolean, row: { id: string }) => (
+                  <Switch
+                    className="ct-travel-only-switch"
+                    size="small"
+                    checked={!!value}
+                    checkedChildren="travel only"
+                    unCheckedChildren=""
+                    onChange={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { travelOnly: nextValue } })}
+                  />
+                ),
+              }] : []),
               {
                 title: 'Local / Not local',
                 dataIndex: 'isLocal',
                 width: 100,
                 render: (value, row) => (
                   <Switch
+                    className="ct-locality-switch"
                     size="small"
                     checked={!!value}
                     checkedChildren="Local"
@@ -714,6 +842,8 @@ export default function UnitView() {
                   onChange={(value) => setWrmCost(value || 0)}
                   style={{ width: '100%' }}
                   prefix="$"
+                  formatter={formatNumberInput}
+                  parser={parseNumberInput}
                 />
               </Col>
               <Col xs={24} md={12} className="ct-field-stack">
@@ -725,6 +855,7 @@ export default function UnitView() {
                   value={ufrCost}
                   style={{ width: '100%' }}
                   prefix="$"
+                  formatter={formatNumberInput}
                   readOnly
                 />
               </Col>
@@ -804,6 +935,8 @@ export default function UnitView() {
                   onChange={(value) => setGpcPurchasesCost(value || 0)}
                   style={{ width: '100%' }}
                   prefix="$"
+                  formatter={formatNumberInput}
+                  parser={parseNumberInput}
                 />
               </Col>
             </Row>
@@ -857,12 +990,16 @@ export default function UnitView() {
             count: values.count,
             dutyDays: calculatedDutyDays,
             location: values.location,
+            note: entryModalIsPlanning ? (entryModalNoteDraft.trim() || null) : null,
+            travelOnly: entryModalAllowsTravelOnly ? entryModalTravelOnlyDraft : false,
             isLocal: !!values.isLocal,
           };
           addEntryMut.mutate({ groupId: entryModal!.groupId, data: payload });
         }}
         onCancel={() => {
           setEntryModal(null);
+          setEntryModalNoteDraft('');
+          setEntryModalTravelOnlyDraft(false);
           entryForm.resetFields();
         }}
       >
@@ -893,8 +1030,36 @@ export default function UnitView() {
           <Form.Item name="location" label="Location" initialValue={perDiemLocations[0] || 'GULFPORT'} rules={[{ required: true }]}>
             <Select options={perDiemLocations.map((loc) => ({ value: loc, label: loc }))} />
           </Form.Item>
+          {entryModalIsPlanning && (
+            <Form.Item label="Note">
+              <AutoComplete
+                value={entryModalNoteDraft}
+                options={PLANNING_NOTE_OPTIONS}
+                style={{ width: '100%' }}
+                placeholder="Select or type a note"
+                filterOption={(inputValue, option) =>
+                  String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
+                }
+                onChange={setEntryModalNoteDraft}
+                onSelect={setEntryModalNoteDraft}
+              >
+                <Input />
+              </AutoComplete>
+            </Form.Item>
+          )}
+          {entryModalAllowsTravelOnly && (
+            <Form.Item label="Travel Only">
+              <Switch
+                className="ct-travel-only-switch"
+                checked={entryModalTravelOnlyDraft}
+                checkedChildren="travel only"
+                unCheckedChildren=""
+                onChange={setEntryModalTravelOnlyDraft}
+              />
+            </Form.Item>
+          )}
           <Form.Item name="isLocal" label="Local / Not local" valuePropName="checked" initialValue={false}>
-            <Switch checkedChildren="Local" unCheckedChildren="Not local" />
+            <Switch className="ct-locality-switch" checkedChildren="Local" unCheckedChildren="Not local" />
           </Form.Item>
         </Form>
       </Modal>

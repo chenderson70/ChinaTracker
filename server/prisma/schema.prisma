@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  engineType = "binary"
+  engineType = "library"
 }
 
 datasource db {
@@ -101,6 +101,8 @@ model PersonnelEntry {
   dutyDays         Int?           @map("duty_days")
   location         String?
   isLocal          Boolean        @default(false) @map("is_local")
+  note             String?
+  travelOnly       Boolean        @default(false) @map("travel_only")
   personnelGroup   PersonnelGroup @relation(fields: [personnelGroupId], references: [id], onDelete: Cascade)
 
   @@map("personnel_entries")

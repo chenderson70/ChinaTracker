@@ -358,7 +358,7 @@ export default function RateConfig() {
 
       {/* Per Diem Rates */}
       <Card
-        title="Per Diem Rates"
+        title="Per Diem Rates (Planning & Support Only)"
         className="ct-config-card"
         extra={
           <Space>
@@ -369,6 +369,9 @@ export default function RateConfig() {
       >
         <Space direction="vertical" style={{ width: '100%', marginBottom: 12 }}>
           <Typography.Text type="secondary">Search FY2026 master per diem file and add a location/rate into system rates.</Typography.Text>
+          <Typography.Text type="secondary">
+            These location-based rates apply only to planning and support/white cell calculations. Player calculations use the player-specific per diem and billeting settings below.
+          </Typography.Text>
           <Space.Compact style={{ width: '100%' }}>
             <Select<MasterSearchField>
               value={pdSearchField}

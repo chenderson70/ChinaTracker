@@ -66,6 +66,8 @@ export interface PersonnelEntry {
   dutyDays: number | null;
   location: Location | null;
   isLocal: boolean;
+  note: string | null;
+  travelOnly: boolean;
 }
 
 export interface TravelConfig {

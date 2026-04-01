@@ -242,14 +242,22 @@ export async function updatePersonnelGroup(groupId: string, data: Partial<Person
 // ── Personnel Entries ──
 export async function addPersonnelEntry(
   groupId: string,
-  data: { rankCode: string; count: number; dutyDays?: number | null; location?: string | null; isLocal?: boolean },
+  data: {
+    rankCode: string;
+    count: number;
+    dutyDays?: number | null;
+    location?: string | null;
+    isLocal?: boolean;
+    note?: string | null;
+    travelOnly?: boolean;
+  },
 ): Promise<PersonnelEntry> {
   return apiRequest<PersonnelEntry>(`/personnel-groups/${groupId}/entries`, { method: 'POST', body: data });
 }
 
 export async function updatePersonnelEntry(
   entryId: string,
-  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'dutyDays' | 'location' | 'isLocal'>>,
+  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'dutyDays' | 'location' | 'isLocal' | 'note' | 'travelOnly'>>,
 ): Promise<PersonnelEntry> {
   return apiRequest<PersonnelEntry>(`/personnel-entries/${entryId}`, { method: 'PUT', body: data });
 }
@@ -442,6 +450,8 @@ export async function exportAllData(): Promise<string> {
           dutyDays: entry.dutyDays,
           location: entry.location,
           isLocal: entry.isLocal,
+          note: entry.note,
+          travelOnly: entry.travelOnly,
         })),
       ),
     ),
@@ -495,6 +505,8 @@ export async function importAllData(json: string): Promise<void> {
       dutyDays?: number | null;
       location?: string | null;
       isLocal?: boolean;
+      note?: string | null;
+      travelOnly?: boolean;
     }>;
     travelConfigs?: Array<{
       exerciseId: string;
@@ -623,6 +635,8 @@ export async function importAllData(json: string): Promise<void> {
           dutyDays: entry.dutyDays ?? null,
           location: entry.location ?? null,
           isLocal: !!entry.isLocal,
+          note: entry.note ?? null,
+          travelOnly: !!entry.travelOnly,
         });
       }
     }

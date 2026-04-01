@@ -116,6 +116,8 @@ export function ReportsPage({ title = 'Reports & Export', extraSections }: Repor
     .map((u) => ({
       key: u.unitCode,
       unit: getUnitDisplayLabel(u.unitCode),
+      planningRpa: u.planningRpa.subtotal,
+      planningOm: u.planningOm.subtotal,
       wcRpa: u.whiteCellRpa.subtotal,
       wcOm: u.whiteCellOm.subtotal,
       playerRpa: u.playerRpa.subtotal,
@@ -128,16 +130,18 @@ export function ReportsPage({ title = 'Reports & Export', extraSections }: Repor
     }));
 
   const columns = [
-    { title: 'Unit', dataIndex: 'unit', width: 60 },
-    { title: 'White Cell RPA', dataIndex: 'wcRpa', render: fmt },
-    { title: 'White Cell O&M', dataIndex: 'wcOm', render: fmt },
-    { title: 'Player RPA', dataIndex: 'playerRpa', render: fmt },
-    { title: 'Player O&M', dataIndex: 'playerOm', render: fmt },
-    { title: 'Execution RPA', dataIndex: 'execRpa', render: fmt },
-    { title: 'Execution O&M', dataIndex: 'execOm', render: fmt },
-    { title: 'Total RPA', dataIndex: 'totalRpa', render: fmt },
-    { title: 'Total O&M', dataIndex: 'totalOm', render: fmt },
-    { title: 'Total', dataIndex: 'total', render: (v: number) => <strong>{fmt(v)}</strong> },
+    { title: 'Unit', dataIndex: 'unit', width: 60, align: 'center' as const },
+    { title: 'Planning RPA', dataIndex: 'planningRpa', render: fmt, align: 'center' as const },
+    { title: 'Planning O&M', dataIndex: 'planningOm', render: fmt, align: 'center' as const },
+    { title: 'White Cell RPA', dataIndex: 'wcRpa', render: fmt, align: 'center' as const },
+    { title: 'White Cell O&M', dataIndex: 'wcOm', render: fmt, align: 'center' as const },
+    { title: 'Player RPA', dataIndex: 'playerRpa', render: fmt, align: 'center' as const },
+    { title: 'Player O&M', dataIndex: 'playerOm', render: fmt, align: 'center' as const },
+    { title: 'Execution RPA', dataIndex: 'execRpa', render: fmt, align: 'center' as const },
+    { title: 'Execution O&M', dataIndex: 'execOm', render: fmt, align: 'center' as const },
+    { title: 'Total RPA', dataIndex: 'totalRpa', render: fmt, align: 'center' as const },
+    { title: 'Total O&M', dataIndex: 'totalOm', render: fmt, align: 'center' as const },
+    { title: 'Total', dataIndex: 'total', render: (v: number) => <strong>{fmt(v)}</strong>, align: 'center' as const },
   ];
 
   const totalBudgetLeft = (exercise.totalBudget || 0) - budget.grandTotal;
@@ -288,7 +292,7 @@ export function ReportsPage({ title = 'Reports & Export', extraSections }: Repor
       {/* Full budget table */}
       <Card title="Full Budget Breakdown" className="ct-section-card" style={{ marginBottom: 24 }}>
         <div className="ct-table">
-          <Table size="small" pagination={false} dataSource={unitData} columns={columns} scroll={{ x: 1100 }} />
+            <Table size="small" pagination={false} dataSource={unitData} columns={columns} scroll={{ x: 1320 }} />
         </div>
       </Card>
 

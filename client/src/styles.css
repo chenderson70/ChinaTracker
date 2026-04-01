@@ -664,6 +664,30 @@ body {
   line-height: 1.35;
 }
 
+.ct-locality-switch.ant-switch:not(.ant-switch-checked) {
+  background: #ff4d4f !important;
+}
+
+.ct-locality-switch.ant-switch:not(.ant-switch-checked):hover {
+  background: #ff7875 !important;
+}
+
+.ct-travel-only-switch.ant-switch {
+  min-width: 86px;
+}
+
+.ct-travel-only-switch.ant-switch.ant-switch-checked {
+  background: var(--ct-success) !important;
+}
+
+.ct-travel-only-switch.ant-switch.ant-switch-checked:hover {
+  background: #73d13d !important;
+}
+
+.ct-travel-only-switch.ant-switch .ant-switch-inner {
+  font-size: 11px;
+}
+
 /* --- Print styles --- */
 @media print {
   .ct-sider,

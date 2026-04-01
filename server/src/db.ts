@@ -177,7 +177,11 @@ const BASE_CONFIG: Array<{ key: string; value: string }> = [
 ];
 
 export async function ensureBaselineData(): Promise<void> {
-	await ensureSqliteSchema();
+	try {
+		await prisma.rankCpdRate.count();
+	} catch {
+		await ensureSqliteSchema();
+	}
 
 	for (const rate of BASE_CPD_RATES) {
 		await prisma.rankCpdRate.upsert({

@@ -69,7 +69,9 @@ function buildPersonnelDetail(
   const duration = formatDuration(entry.dutyDays ?? group.dutyDays ?? defaultDutyDays);
   const location = formatLocation(entry.location ?? group.location);
   const locality = (entry.isLocal ?? group.isLocal) ? 'Local' : 'Not local';
-  const detail = `${count} ${rank} - ${duration} - ${location} - ${locality}`;
+  const note = String(entry.note || '').trim();
+  const travelOnly = entry.travelOnly ? ' - Travel only' : '';
+  const detail = `${count} ${rank} - ${duration} - ${location} - ${locality}${travelOnly}${note ? ` (${note})` : ''}`;
 
   return prefix ? `${prefix} - ${detail}` : detail;
 }

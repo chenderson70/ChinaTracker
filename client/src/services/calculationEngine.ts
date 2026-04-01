@@ -24,6 +24,15 @@ function isLocalFlag(value: any): boolean {
   return false;
 }
 
+function isTravelOnlyFlag(value: any): boolean {
+  if (value === true || value === 1 || value === '1') return true;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === 'travel only' || normalized === 'travel_only';
+  }
+  return false;
+}
+
 function calcMilPay(
   group: { isLongTour: boolean; avgCpdOverride: number | null; paxCount: number },
   entry: { rankCode: string | null; count: number },
@@ -98,12 +107,15 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
       const isWhiteCell = pg.role === 'WHITE_CELL' || isSupport;
       const isPlayer = pg.role === 'PLAYER';
       const isPlanningGroup = isPlanning;
+      const allowsTravelOnly = isPlanningGroup || isSupport;
       const isSgAeCabPlayer = isSgAeCab && pg.role === 'PLAYER';
+      const usesLocationPerDiemRates = isPlanningGroup || isWhiteCell;
+      const usesPlayerPerDiemRates = isPlayer;
       unitCalc.totalPax += pax;
 
       const calcEntries = entries.length > 0
         ? entries
-        : [{ count: pax, rankCode: null, dutyDays: pg.dutyDays, location: pg.location, isLocal: pg.isLocal }];
+        : [{ count: pax, rankCode: null, dutyDays: pg.dutyDays, location: pg.location, isLocal: pg.isLocal, travelOnly: false }];
 
       let groupMilPay = 0;
       let groupPerDiem = 0;
@@ -117,30 +129,35 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
         const entryDays = entry.dutyDays || pg.dutyDays || defaultDays;
         const entryLoc = entry.location || pg.location || 'GULFPORT';
         const entryIsLocal = isLocalFlag(entry.isLocal) || isLocalFlag(pg.isLocal);
+        const entryTravelOnly = allowsTravelOnly && isTravelOnlyFlag(entry.travelOnly);
         const pdRates = rates.perDiemRates[entryLoc] || { lodging: 0, mie: 0 };
 
         dutyDaysAccumulator += entryDays * entryCount;
 
         if (isWhiteCell && pg.fundingType === 'RPA') {
-          groupMilPay += calcMilPay(pg, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryDays);
-          if (!entryIsLocal) {
+          if (!entryTravelOnly) {
+            groupMilPay += calcMilPay(pg, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryDays);
+          }
+          if (usesLocationPerDiemRates && !entryIsLocal) {
             groupPerDiem += entryCount * (pdRates.lodging + pdRates.mie) * entryDays;
             groupTravel += entryCount * travel.airfarePerPerson;
           }
         } else if (isPlanningGroup && pg.fundingType === 'RPA') {
-          groupMilPay += calcMilPay(pg, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryDays);
-          if (!entryIsLocal) {
+          if (!entryTravelOnly) {
+            groupMilPay += calcMilPay(pg, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryDays);
+          }
+          if (usesLocationPerDiemRates && !entryIsLocal) {
             groupPerDiem += entryCount * (pdRates.lodging + pdRates.mie) * entryDays;
             groupTravel += entryCount * travel.airfarePerPerson;
           }
         } else if (isPlanningGroup && pg.fundingType === 'OM') {
-          if (!entryIsLocal) {
+          if (usesLocationPerDiemRates && !entryIsLocal) {
             groupPerDiem += entryCount * (pdRates.lodging + pdRates.mie) * entryDays;
             groupTravel += entryCount * travel.airfarePerPerson;
           }
         } else if (isPlayer && pg.fundingType === 'RPA') {
           groupMilPay += calcMilPay(pg, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryDays);
-          if (!entryIsLocal) {
+          if (usesPlayerPerDiemRates && !entryIsLocal) {
             groupPerDiem += entryCount * rates.playerPerDiemPerDay * entryDays;
           }
           if (isSgAeCabPlayer) {
@@ -156,7 +173,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
             groupBilleting += entryIsLocal ? 0 : (entryCount * rates.playerBilletingPerNight * nights);
           }
         } else if (isPlayer && pg.fundingType === 'OM') {
-          if (!entryIsLocal) {
+          if (usesPlayerPerDiemRates && !entryIsLocal) {
             groupPerDiem += entryCount * rates.playerPerDiemPerDay * entryDays;
           }
           groupTravel += entryIsLocal ? 0 : (entryCount * travel.airfarePerPerson);
