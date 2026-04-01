@@ -19,10 +19,21 @@ export type AuthUser = {
   name: string;
 };
 
-const JWT_SECRET = process.env.JWT_SECRET || 'china-tracker-dev-secret-change-me';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || `${JWT_SECRET}-refresh`;
-const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '30d';
+function normalizeEnvValue(value: string | undefined, fallback: string): string {
+  const resolved = String(value || fallback).trim();
+  if (
+    (resolved.startsWith('"') && resolved.endsWith('"')) ||
+    (resolved.startsWith("'") && resolved.endsWith("'"))
+  ) {
+    return resolved.slice(1, -1);
+  }
+  return resolved;
+}
+
+const JWT_SECRET = normalizeEnvValue(process.env.JWT_SECRET, 'china-tracker-dev-secret-change-me');
+const JWT_EXPIRES_IN = normalizeEnvValue(process.env.JWT_EXPIRES_IN, '15m');
+const JWT_REFRESH_SECRET = normalizeEnvValue(process.env.JWT_REFRESH_SECRET, `${JWT_SECRET}-refresh`);
+const JWT_REFRESH_EXPIRES_IN = normalizeEnvValue(process.env.JWT_REFRESH_EXPIRES_IN, '30d');
 
 declare global {
   namespace Express {

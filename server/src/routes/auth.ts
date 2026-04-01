@@ -50,10 +50,12 @@ async function issueSession(req: Request, user: { id: string; username: string; 
     },
   });
 
+  const pendingRefreshTokenHash = tokenHash(crypto.randomUUID());
+
   const session = await (prisma as any).authSession.create({
     data: {
       userId: user.id,
-      refreshTokenHash: '',
+      refreshTokenHash: pendingRefreshTokenHash,
       userAgent: String(req.headers['user-agent'] || ''),
       ipAddress: getRequestIp(req),
       expiresAt: getRefreshExpiryDate(),
