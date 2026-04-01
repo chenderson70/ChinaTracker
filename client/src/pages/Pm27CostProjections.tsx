@@ -49,6 +49,14 @@ function formatLocation(location: string | null | undefined): string {
   return LOCATION_LABELS[normalized] || toTitleCase(normalized.replace(/_/g, ' '));
 }
 
+function formatExecutionCategory(category: string | null | undefined): string {
+  const normalized = String(category || '').trim().toUpperCase();
+  if (normalized === 'UFR' || normalized === 'WRM') return 'WRM (10%)';
+  if (normalized === 'GPC_PURCHASES') return 'GPC Purchases';
+  if (!normalized) return 'Execution Cost';
+  return toTitleCase(normalized.replace(/_/g, ' '));
+}
+
 function formatDuration(dutyDays: number | null | undefined): string {
   const days = Number(dutyDays || 0);
   if (!days) return '0 days';
@@ -85,7 +93,7 @@ function getPersonnelDetails(groups: PersonnelGroup[], defaultDutyDays: number, 
       isLocal: group.isLocal,
     };
     const entries = group.personnelEntries.length > 0 ? group.personnelEntries : [fallbackEntry];
-    const prefix = includeRolePrefix ? (group.role === 'SUPPORT' ? 'Support' : 'White Cell') : undefined;
+    const prefix = includeRolePrefix ? (group.role === 'SUPPORT' ? 'Support' : 'Support Personnel - Execution') : undefined;
 
     return entries
       .map((entry) => buildPersonnelDetail(entry, group, defaultDutyDays, prefix))
@@ -95,9 +103,15 @@ function getPersonnelDetails(groups: PersonnelGroup[], defaultDutyDays: number, 
 
 function getExecutionLineDetails(lines: ExecutionCostLine[]): string[] {
   return lines.map((line) => {
-    const category = String(line.category || 'Execution Cost').trim();
+    const category = formatExecutionCategory(line.category);
     const notes = String(line.notes || '').trim();
-    return notes ? `${category} - ${notes} - ${fmt(line.amount || 0)}` : `${category} - ${fmt(line.amount || 0)}`;
+    const normalizedNotes = notes.toLowerCase();
+    const shouldShowNotes = notes
+      && !normalizedNotes.startsWith('a7_wrm_overall:')
+      && normalizedNotes !== 'gpc purchases o&m cost'
+      && normalizedNotes !== category.toLowerCase();
+
+    return shouldShowNotes ? `${category} - ${notes} - ${fmt(line.amount || 0)}` : `${category} - ${fmt(line.amount || 0)}`;
   });
 }
 

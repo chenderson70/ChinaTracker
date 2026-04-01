@@ -75,13 +75,14 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
       return res.status(404).json({ error: 'Personnel group not found' });
     }
 
-    const { rankCode, count, dutyDays, location, isLocal, note, travelOnly } = req.body;
+    const { rankCode, count, dutyDays, rentalCarCount, location, isLocal, note, travelOnly } = req.body;
     const entry = await prisma.personnelEntry.create({
       data: {
         personnelGroupId: req.params.groupId,
         rankCode,
         count,
         dutyDays,
+        rentalCarCount: rentalCarCount ?? 0,
         location,
         isLocal,
         note: note ?? null,
@@ -126,11 +127,12 @@ router.put('/personnel-entries/:entryId', async (req: Request, res: Response) =>
       return res.status(404).json({ error: 'Personnel entry not found' });
     }
 
-    const { rankCode, count, dutyDays, location, isLocal, note, travelOnly } = req.body;
+    const { rankCode, count, dutyDays, rentalCarCount, location, isLocal, note, travelOnly } = req.body;
     const data: Record<string, unknown> = {};
     if (rankCode !== undefined) data.rankCode = rankCode;
     if (count !== undefined) data.count = count;
     if (dutyDays !== undefined) data.dutyDays = dutyDays;
+    if (rentalCarCount !== undefined) data.rentalCarCount = rentalCarCount;
     if (location !== undefined) data.location = location;
     if (isLocal !== undefined) data.isLocal = isLocal;
     if (note !== undefined) data.note = note ?? null;

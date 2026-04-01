@@ -64,6 +64,7 @@ export interface PersonnelEntry {
   rankCode: string;
   count: number;
   dutyDays: number | null;
+  rentalCarCount: number;
   location: Location | null;
   isLocal: boolean;
   note: string | null;

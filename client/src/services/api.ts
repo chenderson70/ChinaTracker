@@ -16,10 +16,16 @@ import type {
 } from '../types';
 import { clearAuthSession, getAuthToken, getRefreshToken, setAuthSession } from './auth';
 
-const API_BASE =
+const configuredApiBase =
   import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_API_BASE_URL ||
   '/api/v1';
+
+const isLocalBrowser =
+  typeof window !== 'undefined' &&
+  ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+const API_BASE = isLocalBrowser ? '/api/v1' : configuredApiBase;
 
 let perDiemMasterCache: PerDiemMasterRecord[] | null = null;
 
@@ -246,6 +252,7 @@ export async function addPersonnelEntry(
     rankCode: string;
     count: number;
     dutyDays?: number | null;
+    rentalCarCount?: number;
     location?: string | null;
     isLocal?: boolean;
     note?: string | null;
@@ -257,7 +264,7 @@ export async function addPersonnelEntry(
 
 export async function updatePersonnelEntry(
   entryId: string,
-  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'dutyDays' | 'location' | 'isLocal' | 'note' | 'travelOnly'>>,
+  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'dutyDays' | 'rentalCarCount' | 'location' | 'isLocal' | 'note' | 'travelOnly'>>,
 ): Promise<PersonnelEntry> {
   return apiRequest<PersonnelEntry>(`/personnel-entries/${entryId}`, { method: 'PUT', body: data });
 }
@@ -448,6 +455,7 @@ export async function exportAllData(): Promise<string> {
           rankCode: entry.rankCode,
           count: entry.count,
           dutyDays: entry.dutyDays,
+          rentalCarCount: entry.rentalCarCount,
           location: entry.location,
           isLocal: entry.isLocal,
           note: entry.note,
@@ -503,6 +511,7 @@ export async function importAllData(json: string): Promise<void> {
       rankCode: string;
       count: number;
       dutyDays?: number | null;
+      rentalCarCount?: number;
       location?: string | null;
       isLocal?: boolean;
       note?: string | null;
@@ -633,6 +642,7 @@ export async function importAllData(json: string): Promise<void> {
           rankCode: entry.rankCode,
           count: entry.count,
           dutyDays: entry.dutyDays ?? null,
+          rentalCarCount: entry.rentalCarCount ?? 0,
           location: entry.location ?? null,
           isLocal: !!entry.isLocal,
           note: entry.note ?? null,

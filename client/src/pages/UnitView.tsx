@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   AutoComplete,
@@ -60,6 +60,11 @@ const PLANNING_NOTE_OPTIONS = [
   { value: 'Site Visit' },
   { value: 'Planning Conference' },
 ];
+const WHITE_CELL_TYPE_OPTIONS = [
+  { value: 'White Cell' },
+  { value: 'DTT (OC/T)' },
+  { value: 'ECG' },
+];
 const DAYS_PER_MONTH = 30;
 
 function monthsToDutyDays(months: number): number {
@@ -70,11 +75,15 @@ function dutyDaysToMonths(dutyDays: number): number {
   return Number((dutyDays / DAYS_PER_MONTH).toFixed(2));
 }
 
-function PlanningNoteInput({
+function EntryAutoCompleteInput({
   value,
+  options,
+  placeholder,
   onSave,
 }: {
   value: string | null | undefined;
+  options: Array<{ value: string }>;
+  placeholder: string;
   onSave: (value: string | null) => void;
 }) {
   const [draft, setDraft] = useState(String(value || ''));
@@ -94,9 +103,9 @@ function PlanningNoteInput({
     <AutoComplete
       size="small"
       value={draft}
-      options={PLANNING_NOTE_OPTIONS}
+      options={options}
       style={{ width: '100%' }}
-      placeholder="Select or type a note"
+      placeholder={placeholder}
       filterOption={(inputValue, option) =>
         String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
       }
@@ -112,6 +121,61 @@ function PlanningNoteInput({
         onPressEnter={commit}
       />
     </AutoComplete>
+  );
+}
+
+function DraftNumberInput({
+  value,
+  onSave,
+  size = 'small',
+  style,
+  min,
+  step,
+  precision,
+}: {
+  value: number | null | undefined;
+  onSave: (value: number) => void;
+  size?: 'small' | 'middle' | 'large';
+  style?: CSSProperties;
+  min?: number;
+  step?: number;
+  precision?: number;
+}) {
+  const normalizedValue = value ?? 0;
+  const [draft, setDraft] = useState<number | null>(normalizedValue);
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setDraft(normalizedValue);
+    }
+  }, [normalizedValue, isEditing]);
+
+  const commit = () => {
+    const nextValue = draft ?? normalizedValue;
+    setIsEditing(false);
+    setDraft(nextValue);
+    if (Math.abs(nextValue - normalizedValue) > 0.0001) {
+      onSave(nextValue);
+    }
+  };
+
+  return (
+    <InputNumber
+      size={size}
+      min={min}
+      step={step}
+      precision={precision}
+      value={draft}
+      style={style}
+      onFocus={() => setIsEditing(true)}
+      onChange={(nextValue) => {
+        setIsEditing(true);
+        setDraft(typeof nextValue === 'number' ? nextValue : nextValue === null ? null : Number(nextValue));
+      }}
+      onBlur={commit}
+      onPressEnter={commit}
+    />
   );
 }
 
@@ -142,11 +206,12 @@ export default function UnitView() {
   const [entryModalNoteDraft, setEntryModalNoteDraft] = useState('');
   const [entryModalTravelOnlyDraft, setEntryModalTravelOnlyDraft] = useState(false);
   const [contractModalOpen, setContractModalOpen] = useState(false);
+  const [gpcModalOpen, setGpcModalOpen] = useState(false);
   const [execModal, setExecModal] = useState(false);
   const [wrmCost, setWrmCost] = useState(0);
-  const [gpcPurchasesCost, setGpcPurchasesCost] = useState(0);
   const [entryForm] = Form.useForm();
   const [contractForm] = Form.useForm();
+  const [gpcForm] = Form.useForm();
   const [execForm] = Form.useForm();
   const wrmAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isWrmAutoSaving = useRef(false);
@@ -227,6 +292,7 @@ export default function UnitView() {
   const executionCostLines = ub?.executionCostLines || [];
   const entryModalGroup = entryModal ? personnelGroups.find((group) => group.id === entryModal.groupId) : null;
   const entryModalIsPlanning = entryModalGroup?.role === 'PLANNING';
+  const entryModalIsWhiteCell = entryModalGroup?.role === 'WHITE_CELL';
   const entryModalAllowsTravelOnly = entryModalGroup?.fundingType === 'RPA'
     && (entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'SUPPORT');
 
@@ -249,10 +315,8 @@ export default function UnitView() {
     (line) => line.fundingType === 'OM' && String(line.category || '').toUpperCase() === 'GPC_PURCHASES',
   );
   const wrmLine = wrmLines[0];
-  const gpcPurchaseLine = gpcPurchaseLines[0];
   const persistedOverallEquipmentCost = parseA7OverallEquipmentCost(wrmLine?.notes)
     ?? (String(wrmLine?.category || '').toUpperCase() === 'UFR' ? (wrmLine?.amount || 0) * 10 : (wrmLine?.amount || 0));
-  const persistedGpcPurchasesCost = gpcPurchaseLine?.amount || 0;
 
   useEffect(() => {
     const overallFromNotes = parseA7OverallEquipmentCost(wrmLine?.notes);
@@ -271,16 +335,13 @@ export default function UnitView() {
   }, [wrmLine?.id, wrmLine?.amount, wrmLine?.category, wrmLine?.notes]);
 
   useEffect(() => {
-    setGpcPurchasesCost(gpcPurchaseLine?.amount || 0);
-  }, [gpcPurchaseLine?.id, gpcPurchaseLine?.amount]);
-
-  useEffect(() => {
     if (!entryModal) return;
 
     entryForm.setFieldsValue({
       rankCode: undefined,
       count: 1,
       dutyDays: exercise?.defaultDutyDays ?? 1,
+      rentalCarCount: 0,
       months: undefined,
       location: entryModalGroup?.location || perDiemLocations[0] || 'GULFPORT',
       isLocal: entryModalGroup?.isLocal ?? false,
@@ -293,14 +354,14 @@ export default function UnitView() {
 
   const roleLabels: Record<string, string> = {
     PLAYER: 'Player',
-    WHITE_CELL: 'White Cell',
+    WHITE_CELL: 'Support Personnel - Execution',
     PLANNING: 'Planning',
     SUPPORT: 'Support-Execution',
   };
 
   const getRoleLabel = (role: string) => {
     if (isSgAeCabUnit && role === 'PLAYER') return 'Player - Execution';
-    if (isSgAeCabUnit && role === 'WHITE_CELL') return 'White Cell - Execution';
+    if (isSgAeCabUnit && role === 'WHITE_CELL') return 'Support Personnel - Execution';
     return roleLabels[role] || role;
   };
 
@@ -325,6 +386,8 @@ export default function UnitView() {
     if (!group) return null;
     const isPlayer = role === 'PLAYER';
     const isPlanning = role === 'PLANNING';
+    const isWhiteCell = role === 'WHITE_CELL';
+    const usesEntryLevelRental = isWhiteCell;
     const isPlayerRpa = isPlayer && ft === 'RPA';
     const isPlayerOm = isPlayer && ft === 'OM';
     const showTravelOnly = ft === 'RPA' && (role === 'PLANNING' || role === 'SUPPORT');
@@ -365,18 +428,24 @@ export default function UnitView() {
         const entryLoc = entry.location || group.location || 'GULFPORT';
         const entryIsLocal = !!(entry.isLocal ?? group.isLocal);
         if (entryIsLocal) {
+          if (usesEntryLevelRental) {
+            acc.rental += (Number((entry as any).rentalCarCount || 0) || 0) * rentalDaily * entryDays;
+          }
           return acc;
         }
         const rates = perDiemByLocation[entryLoc] || { lodging: 0, mie: 0 };
         acc.perDiem += entryCount * rates.mie * entryDays;
         acc.lodging += entryCount * rates.lodging * entryDays;
         acc.airfare += entryCount * airfarePerPerson;
+        if (usesEntryLevelRental) {
+          acc.rental += (Number((entry as any).rentalCarCount || 0) || 0) * rentalDaily * entryDays;
+        }
         acc.hasNonLocal = true;
         return acc;
       },
       { perDiem: 0, lodging: 0, airfare: 0, rental: 0, hasNonLocal: false },
     );
-    if ((role === 'WHITE_CELL' || role === 'SUPPORT') && ft === 'RPA' && nonPlayerTravelBreakout.hasNonLocal && nonPlayerTravelBreakout.airfare > 0) {
+    if (!usesEntryLevelRental && role === 'SUPPORT' && ft === 'RPA' && nonPlayerTravelBreakout.hasNonLocal && nonPlayerTravelBreakout.airfare > 0) {
       nonPlayerTravelBreakout.rental = hasGroupRental ? configuredRentalCost : sharedRentalCost;
     }
     const nonPlayerTravelTotal =
@@ -386,8 +455,25 @@ export default function UnitView() {
       nonPlayerTravelBreakout.rental;
     const nonPlayerSummary =
       ft === 'OM'
-        ? `Travel Pay Total: ${fmt(nonPlayerTravelTotal)} (Per diem: ${fmt(nonPlayerTravelBreakout.perDiem)}, Lodging: ${fmt(nonPlayerTravelBreakout.lodging)}, Airfare: ${fmt(nonPlayerTravelBreakout.airfare)}, Rental: ${fmt(nonPlayerTravelBreakout.rental)}) \u2022 Total: ${fmt(nonPlayerTravelTotal)}`
+        ? `Airfare: ${fmt(nonPlayerTravelBreakout.airfare)} \u2022 Per Diem: ${fmt(nonPlayerTravelBreakout.perDiem)} \u2022 Billeting: ${fmt(nonPlayerTravelBreakout.lodging)} \u2022 Total: ${fmt(nonPlayerTravelTotal)}`
         : `Mil Pay: ${fmt(calc.milPay)} \u2022 Travel Pay Total: ${fmt(nonPlayerTravelTotal)} (Per diem: ${fmt(nonPlayerTravelBreakout.perDiem)}, Lodging: ${fmt(nonPlayerTravelBreakout.lodging)}, Airfare: ${fmt(nonPlayerTravelBreakout.airfare)}, Rental: ${fmt(nonPlayerTravelBreakout.rental)}) \u2022 Total: ${fmt(calc.milPay + nonPlayerTravelTotal)}`;
+    const playerTravelBreakout = {
+      perDiem: calc.perDiem || 0,
+      lodging: calc.billeting || 0,
+      airfare: calc.travel || 0,
+      rental: 0,
+    };
+    const playerTravelTotal =
+      playerTravelBreakout.perDiem +
+      playerTravelBreakout.lodging +
+      playerTravelBreakout.airfare +
+      playerTravelBreakout.rental;
+    const playerRpaSummary =
+      `Mil Pay: ${fmt(calc.milPay)} \u2022 Travel Pay Total: ${fmt(playerTravelTotal)} ` +
+      `(Per diem: ${fmt(playerTravelBreakout.perDiem)}, Lodging: ${fmt(playerTravelBreakout.lodging)}, Airfare: ${fmt(playerTravelBreakout.airfare)}, Rental: ${fmt(playerTravelBreakout.rental)}) ` +
+      `\u2022 Meals: ${fmt(calc.meals)} \u2022 Total: ${fmt(calc.subtotal)}`;
+    const playerOmSummary =
+      `Airfare: ${fmt(playerTravelBreakout.airfare)} \u2022 Per Diem: ${fmt(playerTravelBreakout.perDiem)} \u2022 Billeting: ${fmt(playerTravelBreakout.lodging)} \u2022 Total: ${fmt(calc.subtotal)}`;
 
     return (
       <Card
@@ -407,61 +493,35 @@ export default function UnitView() {
           {!isPlayerRpa && (
             <Col span={6} className="ct-field-stack">
               <Typography.Text type="secondary" className="ct-field-label">Airfare/POV ($/person)</Typography.Text>
-              <InputNumber
+              <DraftNumberInput
+                size="middle"
                 min={0}
                 value={group.airfarePerPerson ?? 400}
                 style={{ width: '100%' }}
-                onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { airfarePerPerson: v || 0 } })}
+                onSave={(nextValue) => updateGroupMut.mutate({ id: group.id, data: { airfarePerPerson: nextValue } })}
               />
             </Col>
           )}
           {(role === 'WHITE_CELL' || role === 'SUPPORT') && (
-            <>
-              <Col span={4} className="ct-field-stack">
-                <Typography.Text type="secondary" className="ct-field-label">Rental Cars (#)</Typography.Text>
-                <InputNumber
-                  min={0}
-                  value={group.rentalCarCount || 0}
-                  style={{ width: '100%' }}
-                  onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { rentalCarCount: v || 0 } })}
-                />
-              </Col>
-              <Col span={4} className="ct-field-stack">
-                <Typography.Text type="secondary" className="ct-field-label">Rental Rate ($/day)</Typography.Text>
-                <InputNumber
-                  min={0}
-                  value={group.rentalCarDaily ?? 50}
-                  style={{ width: '100%' }}
-                  onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { rentalCarDaily: v || 0 } })}
-                />
-              </Col>
-              <Col span={4} className="ct-field-stack">
-                <Typography.Text type="secondary" className="ct-field-label">Rental Days</Typography.Text>
-                <InputNumber
-                  min={0}
-                  value={group.rentalCarDays || 0}
-                  style={{ width: '100%' }}
-                  onChange={(v) => updateGroupMut.mutate({ id: group.id, data: { rentalCarDays: v || 0 } })}
-                />
-              </Col>
-            </>
+            <Col span={6} className="ct-field-stack">
+              <Typography.Text type="secondary" className="ct-field-label">Rental Rate ($/day)</Typography.Text>
+              <DraftNumberInput
+                size="middle"
+                min={0}
+                value={group.rentalCarDaily ?? 50}
+                style={{ width: '100%' }}
+                onSave={(nextValue) => updateGroupMut.mutate({ id: group.id, data: { rentalCarDaily: nextValue } })}
+              />
+            </Col>
           )}
         </Row>
 
         {/* Cost breakdown */}
         <Typography.Text style={{ color: '#1677ff', fontWeight: 600, display: 'block', marginBottom: 10 }}>
           {isPlayerRpa
-            ? <>
-                {`Mil Pay: ${fmt(calc.milPay)} • Travel Pay: ${fmt(calc.travel)} • Per Diem (M&IE): ${fmt(calc.perDiem)} • `}
-                <span style={{ color: 'var(--ct-success)' }}>{`Billeting: ${fmt(calc.billeting)}`}</span>
-                {` • Meals: ${fmt(calc.meals)} • Total: ${fmt(calc.subtotal)}`}
-              </>
+            ? playerRpaSummary
               : isPlayerOm
-              ? <>
-                  {`Travel Pay: ${fmt(calc.travel)} • Per Diem (M&IE): ${fmt(calc.perDiem)} • `}
-                  <span style={{ color: 'var(--ct-success)' }}>{`Billeting: ${fmt(calc.billeting)}`}</span>
-                  {` • Total: ${fmt(calc.subtotal)}`}
-                </>
+              ? playerOmSummary
                 : nonPlayerSummary}
         </Typography.Text>
 
@@ -487,16 +547,15 @@ export default function UnitView() {
                 ),
               },
               {
-                title: 'Count',
+                title: 'PAX',
                 dataIndex: 'count',
                 width: 90,
                 render: (value, row) => (
-                  <InputNumber
-                    size="small"
+                  <DraftNumberInput
                     min={1}
                     value={value}
                     style={{ width: '100%' }}
-                    onChange={(v) => updateEntryMut.mutate({ id: row.id, data: { count: v || 1 } })}
+                    onSave={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { count: nextValue || 1 } })}
                   />
                 ),
               },
@@ -505,16 +564,14 @@ export default function UnitView() {
                 dataIndex: 'dutyDays',
                 width: 100,
                 render: (value: number | null, row: { id: string }) => (
-                  <InputNumber
-                    size="small"
+                  <DraftNumberInput
                     min={0}
                     step={0.25}
                     precision={2}
                     value={dutyDaysToMonths(value ?? exercise!.defaultDutyDays)}
                     style={{ width: '100%' }}
-                    onChange={(v) => {
-                      if (v === null) return;
-                      updateEntryMut.mutate({ id: row.id, data: { dutyDays: monthsToDutyDays(v) } });
+                    onSave={(nextValue) => {
+                      updateEntryMut.mutate({ id: row.id, data: { dutyDays: monthsToDutyDays(nextValue) } });
                     }}
                   />
                 ),
@@ -524,15 +581,28 @@ export default function UnitView() {
                 dataIndex: 'dutyDays',
                 width: 110,
                 render: (value, row) => (
-                  <InputNumber
-                    size="small"
+                  <DraftNumberInput
                     min={1}
                     value={value ?? exercise!.defaultDutyDays}
                     style={{ width: '100%' }}
-                    onChange={(v) => updateEntryMut.mutate({ id: row.id, data: { dutyDays: v || 1 } })}
+                    onSave={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { dutyDays: nextValue || 1 } })}
                   />
                 ),
               },
+              ...(isWhiteCell ? [{
+                title: 'Rental Car',
+                dataIndex: 'rentalCarCount',
+                width: 110,
+                render: (value: number, row: { id: string }) => (
+                  <DraftNumberInput
+                    min={0}
+                    precision={0}
+                    value={value || 0}
+                    style={{ width: '100%' }}
+                    onSave={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { rentalCarCount: nextValue || 0 } })}
+                  />
+                ),
+              }] : []),
               {
                 title: 'Location',
                 dataIndex: 'location',
@@ -552,8 +622,25 @@ export default function UnitView() {
                 dataIndex: 'note',
                 width: 180,
                 render: (value: string | null, row: { id: string }) => (
-                  <PlanningNoteInput
+                  <EntryAutoCompleteInput
                     value={value}
+                    options={PLANNING_NOTE_OPTIONS}
+                    placeholder="Select or type a note"
+                    onSave={(nextValue) => {
+                      updateEntryMut.mutate({ id: row.id, data: { note: nextValue } });
+                    }}
+                  />
+                ),
+              }] : []),
+              ...(isWhiteCell ? [{
+                title: 'Type',
+                dataIndex: 'note',
+                width: 180,
+                render: (value: string | null, row: { id: string }) => (
+                  <EntryAutoCompleteInput
+                    value={value}
+                    options={WHITE_CELL_TYPE_OPTIONS}
+                    placeholder="Select or type a type"
                     onSave={(nextValue) => {
                       updateEntryMut.mutate({ id: row.id, data: { note: nextValue } });
                     }}
@@ -569,7 +656,7 @@ export default function UnitView() {
                     className="ct-travel-only-switch"
                     size="small"
                     checked={!!value}
-                    checkedChildren="travel only"
+                    checkedChildren="Travel Only"
                     unCheckedChildren=""
                     onChange={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { travelOnly: nextValue } })}
                   />
@@ -660,9 +747,25 @@ export default function UnitView() {
     },
     ...userContractLines.map((line) => ({ ...line, key: line.id, isDerived: false })),
   ];
+  const gpcLinesForDisplay = gpcPurchaseLines
+    .slice()
+    .sort((a, b) => {
+      const left = String(a.notes || '').toLowerCase();
+      const right = String(b.notes || '').toLowerCase();
+      if (left < right) return -1;
+      if (left > right) return 1;
+      return String(a.id).localeCompare(String(b.id));
+    })
+    .map((line) => ({
+      ...line,
+      key: line.id,
+      isDerived: false,
+      notes: String(line.notes || '').trim() || 'General GPC Purchase',
+    }));
   const contractsDisplayTotal = sgAeCabPlayerBilletingTotal + userContractLines.reduce((sum, line) => sum + (line.amount || 0), 0);
   const omPlanningTravelTotal = (planningOm.travel || 0) + (planningOm.perDiem || 0);
   const omSupportExecutionTravelTotal = (whiteCellOm.travel || 0) + (whiteCellOm.perDiem || 0);
+  const omTravelTotal = omPlanningTravelTotal + omSupportExecutionTravelTotal;
   const ufrCost = Math.round(((Number(wrmCost) || 0) * 0.1) * 100) / 100;
 
   const saveWrmCost = useCallback(async () => {
@@ -687,33 +790,6 @@ export default function UnitView() {
       await Promise.all(wrmLines.slice(1).map((line) => api.deleteExecutionCost(line.id)));
       invalidate();
     }
-
-    if (gpcPurchaseLine) {
-      await updateExecMut.mutateAsync({
-        id: gpcPurchaseLine.id,
-        data: {
-          fundingType: 'OM',
-          category: 'GPC_PURCHASES',
-          amount: Number(gpcPurchasesCost) || 0,
-          notes: 'GPC Purchases O&M Cost',
-        },
-      });
-    } else {
-      await addExecMut.mutateAsync({
-        unitId: ub.id,
-        data: {
-          fundingType: 'OM',
-          category: 'GPC_PURCHASES',
-          amount: Number(gpcPurchasesCost) || 0,
-          notes: 'GPC Purchases O&M Cost',
-        },
-      });
-    }
-
-    if (gpcPurchaseLines.length > 1) {
-      await Promise.all(gpcPurchaseLines.slice(1).map((line) => api.deleteExecutionCost(line.id)));
-      invalidate();
-    }
   }, [
     wrmCost,
     wrmLine,
@@ -721,9 +797,6 @@ export default function UnitView() {
     updateExecMut,
     ub?.id,
     wrmLines,
-    gpcPurchaseLine,
-    gpcPurchasesCost,
-    gpcPurchaseLines,
     invalidate,
   ]);
 
@@ -731,11 +804,7 @@ export default function UnitView() {
     if (!isA7Unit) return;
 
     const currentWrm = Number(wrmCost) || 0;
-    const currentGpc = Number(gpcPurchasesCost) || 0;
-
-    const hasChanges =
-      Math.abs(currentWrm - persistedOverallEquipmentCost) > 0.001 ||
-      Math.abs(currentGpc - persistedGpcPurchasesCost) > 0.001;
+    const hasChanges = Math.abs(currentWrm - persistedOverallEquipmentCost) > 0.001;
 
     if (!hasChanges || isWrmAutoSaving.current) return;
 
@@ -762,9 +831,7 @@ export default function UnitView() {
   }, [
     isA7Unit,
     wrmCost,
-    gpcPurchasesCost,
     persistedOverallEquipmentCost,
-    persistedGpcPurchasesCost,
     saveWrmCost,
   ]);
 
@@ -793,16 +860,14 @@ export default function UnitView() {
               <div style={{ marginTop: 6, fontSize: 11, color: '#6b7280', lineHeight: 1.4 }}>
                 {isSgAeCabUnit ? (
                   <>
-                    <div>Planning Travel (AGRs and Civ): {fmt(omPlanningTravelTotal)}</div>
-                    <div>Support - Execution Travel (AGRs and Civ): {fmt(omSupportExecutionTravelTotal)}</div>
+                    <div>Travel: {fmt(omTravelTotal)}</div>
                   </>
                 ) : (
                   <>
-                    <div>WRM: {fmt(omWrmTotal)}</div>
+                    <div>WRM (10%): {fmt(omWrmTotal)}</div>
                     <div>Contracts: {fmt(omContractsTotal)}</div>
                     <div>GPC Purchases: {fmt(omGpcPurchasesTotal)}</div>
-                    <div>Planning Travel: {fmt(omPlanningTravelTotal)}</div>
-                    <div>Support - Execution Travel: {fmt(omSupportExecutionTravelTotal)}</div>
+                    <div>Travel: {fmt(omTravelTotal)}</div>
                   </>
                 )}
               </div>
@@ -820,18 +885,19 @@ export default function UnitView() {
       </Row>
 
       {isA7Unit && (
-        <>
+        <div className="ct-a7-om-section">
           <Card
+            size="small"
             title={
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <span>WRM (War Reserve Material)</span>
                 <span className="ct-badge-om">O&M</span>
               </span>
             }
-            className="ct-section-card"
-            style={{ marginBottom: 12 }}
+            className="ct-section-card ct-a7-compact-card"
+            style={{ marginBottom: 10 }}
           >
-            <Row gutter={16}>
+            <Row gutter={[12, 8]}>
               <Col xs={24} md={12} className="ct-field-stack">
                 <Typography.Text type="secondary" className="ct-field-label">
                   Overall Equipment Cost
@@ -848,7 +914,7 @@ export default function UnitView() {
               </Col>
               <Col xs={24} md={12} className="ct-field-stack">
                 <Typography.Text type="secondary" className="ct-field-label">
-                  UFR Cost (10% to O&amp;M)
+                  WRM Cost to O&amp;M (10%)
                 </Typography.Text>
                 <InputNumber
                   min={0}
@@ -862,86 +928,111 @@ export default function UnitView() {
             </Row>
           </Card>
 
-          <Card
-            title={
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <span>Contracts</span>
-                <span className="ct-badge-om">O&M</span>
-                <span style={{ fontSize: 12, color: '#52c41a', fontWeight: 700 }}>Total: {fmt(contractsDisplayTotal)}</span>
-              </span>
-            }
-            className="ct-section-card"
-            style={{ marginBottom: 16 }}
-            extra={
-              <Button type="dashed" icon={<PlusOutlined />} onClick={() => setContractModalOpen(true)}>
-                Add Contract Details
-              </Button>
-            }
-          >
-            <div className="ct-table">
-              <Table
+          <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+            <Col xs={24} xl={12}>
+              <Card
                 size="small"
-                pagination={false}
-                dataSource={contractLinesForDisplay}
-                locale={{ emptyText: 'No contract details yet' }}
-                columns={[
-                  {
-                    title: 'Type',
-                    dataIndex: 'notes',
-                    render: (value: string | null) => value || '—',
-                  },
-                  {
-                    title: 'Cost',
-                    dataIndex: 'amount',
-                    width: 140,
-                    render: (value: number) => fmt(value || 0),
-                  },
-                  {
-                    title: '',
-                    width: 56,
-                    render: (_: any, row: any) => (
-                      row.isDerived
-                        ? null
-                        : (
+                title={
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <span>Contracts</span>
+                    <span className="ct-badge-om">O&M</span>
+                    <span style={{ fontSize: 12, color: '#52c41a', fontWeight: 700 }}>Total: {fmt(contractsDisplayTotal)}</span>
+                  </span>
+                }
+                className="ct-section-card ct-a7-compact-card"
+                extra={
+                  <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => setContractModalOpen(true)}>
+                    Add Contract Details
+                  </Button>
+                }
+              >
+                <div className="ct-table">
+                  <Table
+                    size="small"
+                    pagination={false}
+                    dataSource={contractLinesForDisplay}
+                    locale={{ emptyText: 'No contract details yet' }}
+                    columns={[
+                      {
+                        title: 'Type',
+                        dataIndex: 'notes',
+                        render: (value: string | null) => value || '—',
+                      },
+                      {
+                        title: 'Cost',
+                        dataIndex: 'amount',
+                        width: 140,
+                        render: (value: number) => fmt(value || 0),
+                      },
+                      {
+                        title: '',
+                        width: 56,
+                        render: (_: any, row: any) => (
+                          row.isDerived
+                            ? null
+                            : (
+                              <Popconfirm title="Remove?" onConfirm={() => deleteExecMut.mutate(row.id)}>
+                                <Button size="small" danger icon={<DeleteOutlined />} />
+                              </Popconfirm>
+                            )
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+              </Card>
+            </Col>
+            <Col xs={24} xl={12}>
+              <Card
+                size="small"
+                title={
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <span>GPC Purchases</span>
+                    <span className="ct-badge-om">O&M</span>
+                    <span style={{ fontSize: 12, color: '#52c41a', fontWeight: 700 }}>Total: {fmt(omGpcPurchasesTotal)}</span>
+                  </span>
+                }
+                className="ct-section-card ct-a7-compact-card"
+                extra={
+                  <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => setGpcModalOpen(true)}>
+                    Add Details
+                  </Button>
+                }
+              >
+                <div className="ct-table">
+                  <Table
+                    size="small"
+                    pagination={false}
+                    dataSource={gpcLinesForDisplay}
+                    locale={{ emptyText: 'No GPC purchase details yet' }}
+                    columns={[
+                      {
+                        title: 'Type',
+                        dataIndex: 'notes',
+                        render: (value: string | null) => value || '—',
+                      },
+                      {
+                        title: 'Cost',
+                        dataIndex: 'amount',
+                        width: 140,
+                        render: (value: number) => fmt(value || 0),
+                      },
+                      {
+                        title: '',
+                        width: 56,
+                        render: (_: any, row: any) => (
                           <Popconfirm title="Remove?" onConfirm={() => deleteExecMut.mutate(row.id)}>
                             <Button size="small" danger icon={<DeleteOutlined />} />
                           </Popconfirm>
-                        )
-                    ),
-                  },
-                ]}
-              />
-            </div>
-          </Card>
-
-          <Card
-            title={
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <span>GPC Purchases</span>
-                <span className="ct-badge-om">O&M</span>
-              </span>
-            }
-            className="ct-section-card"
-            style={{ marginBottom: 16 }}
-          >
-            <Row gutter={16}>
-              <Col xs={24} md={24} className="ct-field-stack">
-                <Typography.Text type="secondary" className="ct-field-label">
-                  GPC Purchases (O&amp;M)
-                </Typography.Text>
-                <InputNumber
-                  min={0}
-                  value={gpcPurchasesCost}
-                  onChange={(value) => setGpcPurchasesCost(value || 0)}
-                  style={{ width: '100%' }}
-                  prefix="$"
-                  formatter={formatNumberInput}
-                  parser={parseNumberInput}
-                />
-              </Col>
-            </Row>
-          </Card>
-        </>
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+              </Card>
+            </Col>
+          </Row>
+        </div>
       )}
 
       <Divider />
@@ -989,8 +1080,9 @@ export default function UnitView() {
             rankCode: values.rankCode,
             count: values.count,
             dutyDays: calculatedDutyDays,
+            rentalCarCount: entryModalIsWhiteCell ? (values.rentalCarCount || 0) : 0,
             location: values.location,
-            note: entryModalIsPlanning ? (entryModalNoteDraft.trim() || null) : null,
+            note: (entryModalIsPlanning || entryModalIsWhiteCell) ? (entryModalNoteDraft.trim() || null) : null,
             travelOnly: entryModalAllowsTravelOnly ? entryModalTravelOnlyDraft : false,
             isLocal: !!values.isLocal,
           };
@@ -1007,7 +1099,7 @@ export default function UnitView() {
           <Form.Item name="rankCode" label="Rank" rules={[{ required: true }]}>
             <Select options={RANKS.map((r) => ({ value: r, label: r }))} />
           </Form.Item>
-          <Form.Item name="count" label="Count" initialValue={1} rules={[{ required: true }]}>
+          <Form.Item name="count" label="PAX" initialValue={1} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
           {entryModalIsPlanning && (
@@ -1027,16 +1119,21 @@ export default function UnitView() {
           <Form.Item name="dutyDays" label="Duty Days" initialValue={exercise.defaultDutyDays} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
+          {entryModalIsWhiteCell && (
+            <Form.Item name="rentalCarCount" label="Rental Car" initialValue={0}>
+              <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
+          )}
           <Form.Item name="location" label="Location" initialValue={perDiemLocations[0] || 'GULFPORT'} rules={[{ required: true }]}>
             <Select options={perDiemLocations.map((loc) => ({ value: loc, label: loc }))} />
           </Form.Item>
-          {entryModalIsPlanning && (
-            <Form.Item label="Note">
+          {(entryModalIsPlanning || entryModalIsWhiteCell) && (
+            <Form.Item label={entryModalIsWhiteCell ? 'Type' : 'Note'}>
               <AutoComplete
                 value={entryModalNoteDraft}
-                options={PLANNING_NOTE_OPTIONS}
+                options={entryModalIsWhiteCell ? WHITE_CELL_TYPE_OPTIONS : PLANNING_NOTE_OPTIONS}
                 style={{ width: '100%' }}
-                placeholder="Select or type a note"
+                placeholder={entryModalIsWhiteCell ? 'Select or type a type' : 'Select or type a note'}
                 filterOption={(inputValue, option) =>
                   String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
                 }
@@ -1052,7 +1149,7 @@ export default function UnitView() {
               <Switch
                 className="ct-travel-only-switch"
                 checked={entryModalTravelOnlyDraft}
-                checkedChildren="travel only"
+                checkedChildren="Travel Only"
                 unCheckedChildren=""
                 onChange={setEntryModalTravelOnlyDraft}
               />
@@ -1096,6 +1193,38 @@ export default function UnitView() {
         </Form>
       </Modal>
 
+      <Modal
+        title="Add GPC Purchase Details"
+        open={gpcModalOpen}
+        onOk={async () => {
+          const values = await gpcForm.validateFields();
+          await addExecMut.mutateAsync({
+            unitId: ub.id,
+            data: {
+              fundingType: 'OM',
+              category: 'GPC_PURCHASES',
+              amount: Number(values.cost) || 0,
+              notes: values.type?.trim() || null,
+            },
+          });
+          setGpcModalOpen(false);
+          gpcForm.resetFields();
+        }}
+        onCancel={() => {
+          setGpcModalOpen(false);
+          gpcForm.resetFields();
+        }}
+      >
+        <Form form={gpcForm} layout="vertical">
+          <Form.Item name="type" label="Type" rules={[{ required: true, message: 'Enter purchase type' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="cost" label="Cost" rules={[{ required: true, message: 'Enter purchase cost' }]}>
+            <InputNumber min={0} style={{ width: '100%' }} prefix="$" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
       {/* Add execution cost modal */}
       <Modal
         title="Add Execution Cost"
@@ -1125,3 +1254,4 @@ export default function UnitView() {
     </div>
   );
 }
+

@@ -99,6 +99,7 @@ model PersonnelEntry {
   rankCode         String         @map("rank_code")
   count            Int
   dutyDays         Int?           @map("duty_days")
+  rentalCarCount   Int            @default(0) @map("rental_car_count")
   location         String?
   isLocal          Boolean        @default(false) @map("is_local")
   note             String?

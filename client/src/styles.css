@@ -622,6 +622,40 @@ body {
   margin-bottom: 0;
 }
 
+.ct-a7-om-section {
+  margin-bottom: 8px;
+}
+
+.ct-a7-compact-card .ant-card-head {
+  min-height: 42px;
+  padding: 0 14px;
+}
+
+.ct-a7-compact-card .ant-card-head-title,
+.ct-a7-compact-card .ant-card-extra {
+  padding: 10px 0;
+}
+
+.ct-a7-compact-card .ant-card-body {
+  padding: 12px 14px;
+}
+
+.ct-a7-compact-card .ct-field-stack {
+  gap: 4px;
+}
+
+.ct-a7-compact-card .ct-field-label {
+  min-height: 20px;
+  line-height: 1.2;
+  margin-bottom: 0;
+}
+
+.ct-a7-compact-card .ant-table-thead > tr > th,
+.ct-a7-compact-card .ant-table-tbody > tr > td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
 /* --- Spin Override --- */
 .ct-loading {
   display: flex;

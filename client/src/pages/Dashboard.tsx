@@ -62,13 +62,13 @@ export default function Dashboard() {
 
   const omSupportExecutionTravelTotal = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.whiteCellOm.travel || 0) + (unit.whiteCellOm.perDiem || 0), 0);
+  const omTravelTotal = omPlanningTravelTotal + omSupportExecutionTravelTotal;
 
   const unitOmBreakdownTotal =
     omWrmTotal +
     omContractsTotal +
     omGpcPurchasesTotal +
-    omPlanningTravelTotal +
-    omSupportExecutionTravelTotal;
+    omTravelTotal;
 
   const rpaMilPayTotal = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.planningRpa.milPay || 0) + (unit.whiteCellRpa.milPay || 0) + (unit.playerRpa.milPay || 0), 0);
@@ -280,8 +280,7 @@ export default function Dashboard() {
                   <div>WRM: {fmt(omWrmTotal)}</div>
                   <div>Contracts: {fmt(omContractsTotal)}</div>
                   <div>GPC Purchases: {fmt(omGpcPurchasesTotal)}</div>
-                  <div>Planning Travel: {fmt(omPlanningTravelTotal)}</div>
-                  <div>Support - Execution Travel: {fmt(omSupportExecutionTravelTotal)}</div>
+                  <div>Travel: {fmt(omTravelTotal)}</div>
                 </div>
               </div>
 
