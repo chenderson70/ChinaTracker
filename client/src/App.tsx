@@ -7,6 +7,7 @@ import UnitView from './pages/UnitView';
 import RateConfig from './pages/RateConfig';
 import OmCostCenter from './pages/OmCostCenter';
 import Reports from './pages/Reports';
+import Pm27CostProjections from './pages/Pm27CostProjections';
 import AuthPage from './pages/AuthPage';
 import * as api from './services/api';
 import { clearAuthSession, getAuthChangedEventName, getAuthToken } from './services/auth';
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="/rates" element={<RateConfig />} />
         <Route path="/om-costs" element={<OmCostCenter />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/reports/pm-27-cost-projections" element={<Pm27CostProjections />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -159,6 +159,8 @@ const BASE_CPD_RATES = [
 const BASE_PER_DIEM = [
 	{ location: 'GULFPORT', lodgingRate: 98, mieRate: 64 },
 	{ location: 'CAMP_SHELBY', lodgingRate: 96, mieRate: 59 },
+	{ location: 'WARNER_ROBINS', lodgingRate: 110, mieRate: 68 },
+	{ location: 'MARIETTA', lodgingRate: 126, mieRate: 74 },
 ];
 
 const BASE_CONFIG: Array<{ key: string; value: string }> = [
@@ -189,18 +191,17 @@ export async function ensureBaselineData(): Promise<void> {
 		});
 	}
 
-	const perDiemCount = await prisma.perDiemRate.count();
-	if (perDiemCount === 0) {
-		for (const rate of BASE_PER_DIEM) {
-			await prisma.perDiemRate.create({
-				data: {
-					location: rate.location,
-					lodgingRate: rate.lodgingRate,
-					mieRate: rate.mieRate,
-					effectiveDate: new Date('2025-10-01'),
-				},
-			});
-		}
+	for (const rate of BASE_PER_DIEM) {
+		await prisma.perDiemRate.upsert({
+			where: { location: rate.location },
+			update: {},
+			create: {
+				location: rate.location,
+				lodgingRate: rate.lodgingRate,
+				mieRate: rate.mieRate,
+				effectiveDate: new Date('2025-10-01'),
+			},
+		});
 	}
 
 	for (const item of BASE_CONFIG) {

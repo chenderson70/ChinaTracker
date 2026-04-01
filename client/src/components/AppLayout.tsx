@@ -30,13 +30,14 @@ import {
   DatabaseOutlined,
   ArrowRightOutlined,
   LogoutOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import * as api from '../services/api';
 import type { Exercise, ExerciseDetail, BudgetResult } from '../types';
 import { getStoredUser } from '../services/auth';
-import { getUnitDisplayLabel } from '../utils/unitLabels';
+import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 
 const { Header, Sider, Content } = Layout;
 
@@ -68,9 +69,12 @@ export default function AppLayout() {
   const [createOpen, setCreateOpen] = useState(false);
   const [addUnitOpen, setAddUnitOpen] = useState(false);
   const [removeUnitOpen, setRemoveUnitOpen] = useState(false);
+  const [editBudgetOpen, setEditBudgetOpen] = useState(false);
   const [form] = Form.useForm();
   const [unitForm] = Form.useForm();
   const [removeUnitForm] = Form.useForm();
+  const [editBudgetForm] = Form.useForm();
+  const editBudgetDraft = Form.useWatch([], editBudgetForm);
 
   // Fetch exercise list
   const {
@@ -78,6 +82,7 @@ export default function AppLayout() {
     isFetched: exercisesFetched,
     isError: exercisesLoadError,
   } = useQuery({ queryKey: ['exercises'], queryFn: api.getExercises });
+  const { data: appConfig = {} } = useQuery({ queryKey: ['appConfig'], queryFn: api.getAppConfig });
 
   // Fetch current exercise detail
   const {
@@ -212,6 +217,41 @@ export default function AppLayout() {
     });
   };
 
+  const editBudgetMut = useMutation({
+    mutationFn: async ({ rpaBudgetTarget, omBudgetTarget }: { rpaBudgetTarget: number; omBudgetTarget: number }) => {
+      const nextRpaBudgetTarget = Number(rpaBudgetTarget || 0);
+      const nextOmBudgetTarget = Number(omBudgetTarget || 0);
+      const totalBudget = nextRpaBudgetTarget + nextOmBudgetTarget;
+
+      await api.updateAppConfig({
+        ...appConfig,
+        BUDGET_TARGET_RPA: String(nextRpaBudgetTarget),
+        BUDGET_TARGET_OM: String(nextOmBudgetTarget),
+      });
+      await api.updateExercise(exerciseId!, { totalBudget });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      queryClient.invalidateQueries({ queryKey: ['budget', exerciseId] });
+      queryClient.invalidateQueries({ queryKey: ['appConfig'] });
+      setEditBudgetOpen(false);
+      message.success('Exercise budget updated');
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to update exercise budget');
+    },
+  });
+
+  const handleEditBudget = () => {
+    editBudgetForm.validateFields().then((values) => {
+      editBudgetMut.mutate({
+        rpaBudgetTarget: values.rpaBudgetTarget,
+        omBudgetTarget: values.omBudgetTarget,
+      });
+    });
+  };
+
   // Delete current exercise
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.deleteExercise(id),
@@ -282,7 +322,7 @@ export default function AppLayout() {
 
   const unitChildren = (exercise?.unitBudgets || [])
     .map((unit) => unit.unitCode)
-    .sort((a, b) => a.localeCompare(b))
+    .sort(compareUnitCodes)
     .map((unitCode) => ({ key: `/units/${unitCode}`, label: getUnitDisplayLabel(unitCode) }));
 
   const baseMenuItems = [
@@ -295,7 +335,15 @@ export default function AppLayout() {
     },
     { key: '/rates', icon: <SettingOutlined />, label: 'Rate Config' },
     { key: '/om-costs', icon: <DollarOutlined />, label: 'O&M Costs' },
-    { key: '/reports', icon: <FileExcelOutlined />, label: 'Reports' },
+    {
+      key: 'reports',
+      icon: <FileExcelOutlined />,
+      label: 'Reports',
+      children: [
+        { key: '/reports', label: 'Reports & Export' },
+        { key: '/reports/pm-27-cost-projections', label: 'PM 27 Cost Projections' },
+      ],
+    },
   ];
 
   const menuItems = baseMenuItems.map((item) => ({
@@ -313,6 +361,18 @@ export default function AppLayout() {
     navigate('/auth');
     message.success('Signed out');
   };
+
+  useEffect(() => {
+    if (!editBudgetOpen) return;
+    editBudgetForm.setFieldsValue({
+      rpaBudgetTarget: Number(appConfig.BUDGET_TARGET_RPA || 0),
+      omBudgetTarget: Number(appConfig.BUDGET_TARGET_OM || 0),
+    });
+  }, [editBudgetOpen, appConfig.BUDGET_TARGET_RPA, appConfig.BUDGET_TARGET_OM, editBudgetForm]);
+
+  const editBudgetTotal =
+    Number(editBudgetDraft?.rpaBudgetTarget ?? Number(appConfig.BUDGET_TARGET_RPA || 0)) +
+    Number(editBudgetDraft?.omBudgetTarget ?? Number(appConfig.BUDGET_TARGET_OM || 0));
 
   return (
     <AppContext.Provider value={{ exercise, budget, exerciseId, setExerciseId, refetchBudget, refetchExercise }}>
@@ -333,7 +393,7 @@ export default function AppLayout() {
             theme="dark"
             mode="inline"
             selectedKeys={[selectedKey]}
-            defaultOpenKeys={['units']}
+            defaultOpenKeys={['units', 'reports']}
             items={menuItems}
             onClick={({ key }) => navigate(key)}
           />
@@ -359,6 +419,13 @@ export default function AppLayout() {
                   {hasAnyExercise ? 'New Exercise' : 'Start here to create your exercise'}
                 </Button>
               </Tooltip>
+              {exerciseId && (
+                <Tooltip title="Edit overall exercise budget">
+                  <Button icon={<EditOutlined />} onClick={() => setEditBudgetOpen(true)}>
+                    Edit Budget
+                  </Button>
+                </Tooltip>
+              )}
               {exerciseId && (
                 <Tooltip title="Add a new unit to this exercise">
                   <Button icon={<TeamOutlined />} onClick={() => setAddUnitOpen(true)}>
@@ -538,6 +605,38 @@ export default function AppLayout() {
           </Form.Item>
           <Typography.Text type="secondary">
             This removes the selected unit and all of its personnel and execution cost data.
+          </Typography.Text>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Edit Overall Exercise Budget"
+        open={editBudgetOpen}
+        onOk={handleEditBudget}
+        confirmLoading={editBudgetMut.isPending}
+        onCancel={() => setEditBudgetOpen(false)}
+        okText="Save Budget"
+      >
+        <Form form={editBudgetForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item
+            name="rpaBudgetTarget"
+            label="RPA Budget ($)"
+            rules={[{ required: true, message: 'Enter the RPA budget' }]}
+          >
+            <InputNumber min={0} style={{ width: '100%' }} size="large" />
+          </Form.Item>
+          <Form.Item
+            name="omBudgetTarget"
+            label="O&M Budget ($)"
+            rules={[{ required: true, message: 'Enter the O&M budget' }]}
+          >
+            <InputNumber min={0} style={{ width: '100%' }} size="large" />
+          </Form.Item>
+          <Form.Item label="Overall Exercise Budget ($)">
+            <InputNumber min={0} style={{ width: '100%' }} size="large" value={editBudgetTotal} readOnly />
+          </Form.Item>
+          <Typography.Text type="secondary">
+            The overall exercise budget is automatically set to RPA + O&amp;M.
           </Typography.Text>
         </Form>
       </Modal>

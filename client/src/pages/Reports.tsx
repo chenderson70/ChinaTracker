@@ -1,16 +1,21 @@
 import { Card, Typography, Button, Row, Col, Table, Descriptions, Space, Spin, InputNumber, Form, message } from 'antd';
 import { FileExcelOutlined, PrinterOutlined, EditOutlined, SaveOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useApp } from '../components/AppLayout';
 import * as api from '../services/api';
 import dayjs from 'dayjs';
 import { exportElementToPdf } from '../services/pdf';
-import { getUnitDisplayLabel } from '../utils/unitLabels';
+import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
-export default function Reports() {
+interface ReportsPageProps {
+  title?: string;
+  extraSections?: ReactNode;
+}
+
+export function ReportsPage({ title = 'Reports & Export', extraSections }: ReportsPageProps) {
   const { exercise, budget, exerciseId } = useApp();
   const queryClient = useQueryClient();
   const [editTravel, setEditTravel] = useState(false);
@@ -24,6 +29,9 @@ export default function Reports() {
   const [draftRpaBudgetTarget, setDraftRpaBudgetTarget] = useState(0);
   const [draftOmBudgetTarget, setDraftOmBudgetTarget] = useState(0);
   const [draftDutyDays, setDraftDutyDays] = useState(1);
+  const skipBudgetTargetsSaveRef = useRef(true);
+  const skipTotalBudgetSaveRef = useRef(true);
+  const skipDutyDaysSaveRef = useRef(true);
 
   const travelMut = useMutation({
     mutationFn: (data: any) => api.updateTravelConfig(exerciseId!, data),
@@ -68,7 +76,7 @@ export default function Reports() {
   const handleExportPdf = async () => {
     if (!exportRef.current) return;
     try {
-      await exportElementToPdf(`${exercise.name} Reports`, exportRef.current);
+      await exportElementToPdf(`${exercise.name} ${title}`, exportRef.current);
     } catch (error: any) {
       message.error(error?.message || 'Unable to export reports to PDF');
     }
@@ -103,19 +111,21 @@ export default function Reports() {
     };
   }, [editTravel, travelDraft, travel, travelMut.isPending]);
 
-  const unitData = Object.values(budget.units).map((u) => ({
-    key: u.unitCode,
-    unit: getUnitDisplayLabel(u.unitCode),
-    wcRpa: u.whiteCellRpa.subtotal,
-    wcOm: u.whiteCellOm.subtotal,
-    playerRpa: u.playerRpa.subtotal,
-    playerOm: u.playerOm.subtotal,
-    execRpa: u.executionRpa,
-    execOm: u.executionOm,
-    totalRpa: u.unitTotalRpa,
-    totalOm: u.unitTotalOm,
-    total: u.unitTotal,
-  }));
+  const unitData = Object.values(budget.units)
+    .sort((left, right) => compareUnitCodes(left.unitCode, right.unitCode))
+    .map((u) => ({
+      key: u.unitCode,
+      unit: getUnitDisplayLabel(u.unitCode),
+      wcRpa: u.whiteCellRpa.subtotal,
+      wcOm: u.whiteCellOm.subtotal,
+      playerRpa: u.playerRpa.subtotal,
+      playerOm: u.playerOm.subtotal,
+      execRpa: u.executionRpa,
+      execOm: u.executionOm,
+      totalRpa: u.unitTotalRpa,
+      totalOm: u.unitTotalOm,
+      total: u.unitTotal,
+    }));
 
   const columns = [
     { title: 'Unit', dataIndex: 'unit', width: 60 },
@@ -134,33 +144,35 @@ export default function Reports() {
   const cfgNum = (key: string) => Number(appConfig[key] || 0);
   const rpaBudgetTarget = cfgNum('BUDGET_TARGET_RPA');
   const omBudgetTarget = cfgNum('BUDGET_TARGET_OM');
-  const aggregatedTotalBudget = rpaBudgetTarget + omBudgetTarget;
+  const draftOverallBudget = draftRpaBudgetTarget + draftOmBudgetTarget;
 
   useEffect(() => {
+    skipBudgetTargetsSaveRef.current = true;
+    skipTotalBudgetSaveRef.current = true;
     setDraftRpaBudgetTarget(rpaBudgetTarget);
-  }, [rpaBudgetTarget]);
-
-  useEffect(() => {
     setDraftOmBudgetTarget(omBudgetTarget);
-  }, [omBudgetTarget]);
+  }, [rpaBudgetTarget, omBudgetTarget]);
 
   useEffect(() => {
+    skipDutyDaysSaveRef.current = true;
     setDraftDutyDays(exercise.defaultDutyDays);
   }, [exercise.defaultDutyDays]);
 
   useEffect(() => {
-    if (appConfigMut.isPending || totalBudgetMut.isPending) return;
+    if (skipBudgetTargetsSaveRef.current) {
+      skipBudgetTargetsSaveRef.current = false;
+      return;
+    }
+    if (appConfigMut.isPending) return;
     if (draftRpaBudgetTarget === rpaBudgetTarget && draftOmBudgetTarget === omBudgetTarget) return;
 
     if (budgetAutoSaveTimer.current) clearTimeout(budgetAutoSaveTimer.current);
     budgetAutoSaveTimer.current = setTimeout(() => {
-      const nextTotal = draftRpaBudgetTarget + draftOmBudgetTarget;
       appConfigMut.mutate({
         ...appConfig,
         BUDGET_TARGET_RPA: String(draftRpaBudgetTarget),
         BUDGET_TARGET_OM: String(draftOmBudgetTarget),
       });
-      totalBudgetMut.mutate(nextTotal);
     }, 700);
 
     return () => {
@@ -169,7 +181,6 @@ export default function Reports() {
   }, [
     appConfig,
     appConfigMut,
-    totalBudgetMut,
     draftRpaBudgetTarget,
     draftOmBudgetTarget,
     rpaBudgetTarget,
@@ -177,6 +188,20 @@ export default function Reports() {
   ]);
 
   useEffect(() => {
+    if (skipTotalBudgetSaveRef.current) {
+      skipTotalBudgetSaveRef.current = false;
+      return;
+    }
+    if (totalBudgetMut.isPending) return;
+    if (draftOverallBudget === exercise.totalBudget) return;
+    totalBudgetMut.mutate(draftOverallBudget);
+  }, [draftOverallBudget, exercise.totalBudget, totalBudgetMut]);
+
+  useEffect(() => {
+    if (skipDutyDaysSaveRef.current) {
+      skipDutyDaysSaveRef.current = false;
+      return;
+    }
     if (exerciseMut.isPending) return;
     if (draftDutyDays === exercise.defaultDutyDays) return;
 
@@ -194,7 +219,7 @@ export default function Reports() {
     <div ref={exportRef}>
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
-          <Typography.Title level={4} className="ct-page-title" style={{ marginBottom: 0 }}>Reports & Export</Typography.Title>
+          <Typography.Title level={4} className="ct-page-title" style={{ marginBottom: 0 }}>{title}</Typography.Title>
         </Col>
         <Col>
           <Space>
@@ -225,9 +250,10 @@ export default function Reports() {
               <InputNumber
                 size="small"
                 min={0}
-                value={aggregatedTotalBudget}
-                readOnly
+                value={draftOverallBudget}
+                addonBefore="Overall Budget"
                 style={{ width: '100%' }}
+                readOnly
               />
               <InputNumber
                 size="small"
@@ -247,7 +273,7 @@ export default function Reports() {
               />
             </Space>
           </Descriptions.Item>
-          <Descriptions.Item label="Duty Days">
+              <Descriptions.Item label="Exercise Duration">
             <InputNumber
               size="small"
               min={1}
@@ -258,6 +284,15 @@ export default function Reports() {
           </Descriptions.Item>
         </Descriptions>
       </Card>
+
+      {/* Full budget table */}
+      <Card title="Full Budget Breakdown" className="ct-section-card" style={{ marginBottom: 24 }}>
+        <div className="ct-table">
+          <Table size="small" pagination={false} dataSource={unitData} columns={columns} scroll={{ x: 1100 }} />
+        </div>
+      </Card>
+
+      {extraSections}
 
       {/* Travel Config */}
       <Card
@@ -304,13 +339,6 @@ export default function Reports() {
         )}
       </Card>
 
-      {/* Full budget table */}
-      <Card title="Full Budget Breakdown" className="ct-section-card" style={{ marginBottom: 24 }}>
-        <div className="ct-table">
-          <Table size="small" pagination={false} dataSource={unitData} columns={columns} scroll={{ x: 1100 }} />
-        </div>
-      </Card>
-
       {/* Grand totals */}
       <Card title="Grand Totals" className="ct-section-card">
         <Descriptions column={3}>
@@ -328,4 +356,8 @@ export default function Reports() {
       </Card>
     </div>
   );
+}
+
+export default function Reports() {
+  return <ReportsPage />;
 }

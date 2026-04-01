@@ -50,30 +50,29 @@ async function main() {
       },
     });
   }
-  console.log(`  ✓ ${cpdRates.length} rank CPD rates seeded`);
+  console.log(`  - ${cpdRates.length} rank CPD rates seeded`);
 
   // --- Per Diem Rates ---
-  await prisma.perDiemRate.upsert({
-    where: { location: 'GULFPORT' },
-    update: {},
-    create: {
-      location: 'GULFPORT',
-      lodgingRate: 98,
-      mieRate: 64,
-      effectiveDate: new Date('2025-10-01'),
-    },
-  });
-  await prisma.perDiemRate.upsert({
-    where: { location: 'CAMP_SHELBY' },
-    update: {},
-    create: {
-      location: 'CAMP_SHELBY',
-      lodgingRate: 96,
-      mieRate: 59,
-      effectiveDate: new Date('2025-10-01'),
-    },
-  });
-  console.log('  ✓ Per diem rates seeded (Gulfport & Camp Shelby)');
+  const perDiemRates = [
+    { location: 'GULFPORT', lodgingRate: 98, mieRate: 64 },
+    { location: 'CAMP_SHELBY', lodgingRate: 96, mieRate: 59 },
+    { location: 'WARNER_ROBINS', lodgingRate: 110, mieRate: 68 },
+    { location: 'MARIETTA', lodgingRate: 126, mieRate: 74 },
+  ];
+
+  for (const rate of perDiemRates) {
+    await prisma.perDiemRate.upsert({
+      where: { location: rate.location },
+      update: {},
+      create: {
+        location: rate.location,
+        lodgingRate: rate.lodgingRate,
+        mieRate: rate.mieRate,
+        effectiveDate: new Date('2025-10-01'),
+      },
+    });
+  }
+  console.log('  - Per diem rates seeded (Gulfport, Camp Shelby, Warner Robins, Marietta)');
 
   // --- App Config (meal rates, billeting) ---
   const configs = [
@@ -94,7 +93,7 @@ async function main() {
       create: cfg,
     });
   }
-  console.log('  ✓ App config seeded');
+  console.log('  - App config seeded');
 
   console.log('Seeding complete!');
 }

@@ -39,6 +39,15 @@ const RANKS = [
   'CIV','AB','AMN','A1C','SRA','SSGT','TSGT','MSGT','SMSGT','CMSGT',
   '2LT','1LT','CAPT','MAJ','LTCOL','COL','BG','MG',
 ];
+const DAYS_PER_MONTH = 30;
+
+function monthsToDutyDays(months: number): number {
+  return Math.max(1, Math.round(months * DAYS_PER_MONTH));
+}
+
+function dutyDaysToMonths(dutyDays: number): number {
+  return Number((dutyDays / DAYS_PER_MONTH).toFixed(2));
+}
 
 export default function UnitView() {
   const { unitCode } = useParams<{ unitCode: string }>();
@@ -146,6 +155,8 @@ export default function UnitView() {
 
   const personnelGroups = ub?.personnelGroups || [];
   const executionCostLines = ub?.executionCostLines || [];
+  const entryModalGroup = entryModal ? personnelGroups.find((group) => group.id === entryModal.groupId) : null;
+  const entryModalIsPlanning = entryModalGroup?.role === 'PLANNING';
 
   const findGroup = (role: string, ft: FundingType) =>
     personnelGroups.find((g: PersonnelGroup) => g.role === role && g.fundingType === ft);
@@ -190,6 +201,19 @@ export default function UnitView() {
   useEffect(() => {
     setGpcPurchasesCost(gpcPurchaseLine?.amount || 0);
   }, [gpcPurchaseLine?.id, gpcPurchaseLine?.amount]);
+
+  useEffect(() => {
+    if (!entryModal) return;
+
+    entryForm.setFieldsValue({
+      rankCode: undefined,
+      count: 1,
+      dutyDays: exercise?.defaultDutyDays ?? 1,
+      months: undefined,
+      location: entryModalGroup?.location || perDiemLocations[0] || 'GULFPORT',
+      isLocal: entryModalGroup?.isLocal ?? false,
+    });
+  }, [entryModal, entryForm, entryModalGroup?.isLocal, entryModalGroup?.location, exercise?.defaultDutyDays, perDiemLocations]);
 
   const roleSections = ['PLANNING', 'PLAYER', 'WHITE_CELL', 'SUPPORT'].filter((role) => hasRole(role));
 
@@ -377,6 +401,25 @@ export default function UnitView() {
                   />
                 ),
               },
+              ...(isPlanning ? [{
+                title: 'Months',
+                dataIndex: 'dutyDays',
+                width: 100,
+                render: (value: number | null, row: { id: string }) => (
+                  <InputNumber
+                    size="small"
+                    min={0}
+                    step={0.25}
+                    precision={2}
+                    value={dutyDaysToMonths(value ?? exercise!.defaultDutyDays)}
+                    style={{ width: '100%' }}
+                    onChange={(v) => {
+                      if (v === null) return;
+                      updateEntryMut.mutate({ id: row.id, data: { dutyDays: monthsToDutyDays(v) } });
+                    }}
+                  />
+                ),
+              }] : []),
               {
                 title: 'Duty Days',
                 dataIndex: 'dutyDays',
@@ -806,16 +849,22 @@ export default function UnitView() {
         open={!!entryModal}
         onOk={async () => {
           const values = await entryForm.validateFields();
+          const calculatedDutyDays = entryModalIsPlanning && values.months !== undefined && values.months !== null
+            ? monthsToDutyDays(values.months)
+            : values.dutyDays;
           const payload = {
             rankCode: values.rankCode,
             count: values.count,
-            dutyDays: values.dutyDays,
+            dutyDays: calculatedDutyDays,
             location: values.location,
             isLocal: !!values.isLocal,
           };
           addEntryMut.mutate({ groupId: entryModal!.groupId, data: payload });
         }}
-        onCancel={() => setEntryModal(null)}
+        onCancel={() => {
+          setEntryModal(null);
+          entryForm.resetFields();
+        }}
       >
         <Form form={entryForm} layout="vertical">
           <Form.Item name="rankCode" label="Rank" rules={[{ required: true }]}>
@@ -824,6 +873,20 @@ export default function UnitView() {
           <Form.Item name="count" label="Count" initialValue={1} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
+          {entryModalIsPlanning && (
+            <Form.Item name="months" label="Months (optional, 30 days/month)">
+              <InputNumber
+                min={0}
+                step={0.25}
+                precision={2}
+                style={{ width: '100%' }}
+                onChange={(value) => {
+                  if (value === null) return;
+                  entryForm.setFieldValue('dutyDays', monthsToDutyDays(value));
+                }}
+              />
+            </Form.Item>
+          )}
           <Form.Item name="dutyDays" label="Duty Days" initialValue={exercise.defaultDutyDays} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>

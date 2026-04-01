@@ -12,9 +12,11 @@ import {
 import { useApp } from '../components/AppLayout';
 import * as api from '../services/api';
 import { exportElementToPdf } from '../services/pdf';
-import { getUnitDisplayLabel } from '../utils/unitLabels';
+import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+const fmtDelta = (n: number) => (n < 0 ? `-${fmt(Math.abs(n))}` : fmt(n));
+const dangerColor = '#ff4d4f';
 
 export default function Dashboard() {
   const { exercise, budget } = useApp();
@@ -23,14 +25,16 @@ export default function Dashboard() {
 
   if (!exercise || !budget) return <div className="ct-loading"><Spin size="large" /></div>;
 
-  const unitData = Object.values(budget.units).map((u) => ({
-    key: u.unitCode,
-    unitCode: u.unitCode,
-    totalPax: u.totalPax,
-    rpa: u.unitTotalRpa,
-    om: u.unitTotalOm,
-    total: u.unitTotal,
-  }));
+  const unitData = Object.values(budget.units)
+    .sort((left, right) => compareUnitCodes(left.unitCode, right.unitCode))
+    .map((u) => ({
+      key: u.unitCode,
+      unitCode: u.unitCode,
+      totalPax: u.totalPax,
+      rpa: u.unitTotalRpa,
+      om: u.unitTotalOm,
+      total: u.unitTotal,
+    }));
 
   const barData = unitData.map((u) => ({ name: getUnitDisplayLabel(u.unitCode), RPA: u.rpa, 'O&M': u.om }));
 
@@ -90,6 +94,9 @@ export default function Dashboard() {
   const totalBudgetLeft = totalBudget - budget.grandTotal;
   const rpaRemainingBudget = targetRpa - budget.totalRpa;
   const omRemainingBudget = targetOm - budget.totalOm;
+  const totalBudgetLeftColor = totalBudgetLeft < 0 ? dangerColor : '#1a1a2e';
+  const rpaRemainingBudgetColor = rpaRemainingBudget < 0 ? dangerColor : '#1677ff';
+  const omRemainingBudgetColor = omRemainingBudget < 0 ? dangerColor : '#52c41a';
 
   const statCards = [
     { label: 'Grand Total', value: fmt(budget.grandTotal), color: '#1a1a2e', accent: 'ct-stat-purple', icon: <DollarOutlined /> },
@@ -136,7 +143,7 @@ export default function Dashboard() {
           <Card size="small" className="ct-stat-card" style={{ padding: '8px 0' }}>
             <div style={{ padding: '6px 12px', textAlign: 'center' }}>
               <div className="ct-stat-label">Total Budget Left</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#1a1a2e', lineHeight: 1.2 }}>{fmt(totalBudgetLeft)}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: totalBudgetLeftColor, lineHeight: 1.2 }}>{fmtDelta(totalBudgetLeft)}</div>
             </div>
           </Card>
         </Col>
@@ -151,8 +158,8 @@ export default function Dashboard() {
                 Target {fmt(targetRpa)}
               </div>
               <div style={{ marginTop: 4, fontSize: 14, fontWeight: 700, color: '#596577', textDecoration: 'underline', textUnderlineOffset: 3 }}>Remaining Budget</div>
-              <div style={{ marginTop: 2, fontSize: 20, fontWeight: 800, color: '#1677ff', lineHeight: 1.2 }}>
-                {rpaRemainingBudget < 0 ? `-${fmt(Math.abs(rpaRemainingBudget))}` : fmt(rpaRemainingBudget)}
+              <div style={{ marginTop: 2, fontSize: 20, fontWeight: 800, color: rpaRemainingBudgetColor, lineHeight: 1.2 }}>
+                {fmtDelta(rpaRemainingBudget)}
               </div>
             </div>
           </Card>
@@ -170,8 +177,8 @@ export default function Dashboard() {
               <div style={{ marginTop: 4, fontSize: 14, fontWeight: 700, color: '#596577', textDecoration: 'underline', textUnderlineOffset: 3 }}>
                 Remaining Budget
               </div>
-              <div style={{ marginTop: 2, fontSize: 20, fontWeight: 800, color: '#52c41a', lineHeight: 1.2 }}>
-                {omRemainingBudget < 0 ? `-${fmt(Math.abs(omRemainingBudget))}` : fmt(omRemainingBudget)}
+              <div style={{ marginTop: 2, fontSize: 20, fontWeight: 800, color: omRemainingBudgetColor, lineHeight: 1.2 }}>
+                {fmtDelta(omRemainingBudget)}
               </div>
             </div>
           </Card>

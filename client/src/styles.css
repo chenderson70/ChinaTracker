@@ -612,6 +612,16 @@ body {
   box-shadow: var(--ct-shadow-md) !important;
 }
 
+.ct-config-card-compact .ct-field-stack {
+  gap: 2px;
+}
+
+.ct-config-card-compact .ct-field-label {
+  min-height: 26px;
+  line-height: 1.15;
+  margin-bottom: 0;
+}
+
 /* --- Spin Override --- */
 .ct-loading {
   display: flex;

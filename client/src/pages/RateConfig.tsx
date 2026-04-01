@@ -449,12 +449,12 @@ export default function RateConfig() {
       {/* App Config: Meals & billeting */}
       <Card
         title="Meal Rates & Billeting - Players ONLY"
-        className="ct-config-card"
+        className="ct-config-card ct-config-card-compact"
         extra={<Typography.Text type="secondary">{saveCfgMut.isPending ? 'Autosaving...' : 'Changes auto-save'}</Typography.Text>}
       >
         <Row gutter={24}>
           <Col span={6} className="ct-field-stack">
-            <Typography.Text type="secondary" className="ct-field-label">Breakfast ($/day)</Typography.Text>
+            <Typography.Text type="secondary" className="ct-field-label">Breakfast ($/day, A rations)</Typography.Text>
             <InputNumber
               min={0}
               step={0.01}
@@ -474,7 +474,7 @@ export default function RateConfig() {
             />
           </Col>
           <Col span={6} className="ct-field-stack">
-            <Typography.Text type="secondary" className="ct-field-label">Dinner ($/day)</Typography.Text>
+            <Typography.Text type="secondary" className="ct-field-label">Dinner ($/day, A rations)</Typography.Text>
             <InputNumber
               min={0}
               step={0.01}
@@ -494,7 +494,7 @@ export default function RateConfig() {
             />
           </Col>
         </Row>
-        <Row gutter={24} style={{ marginTop: 12 }}>
+        <Row gutter={24} style={{ marginTop: 18 }}>
           <Col span={6} className="ct-field-stack">
             <Typography.Text type="secondary" className="ct-field-label">Player Per Diem (M&amp;IE) ($/day)</Typography.Text>
             <InputNumber
@@ -505,9 +505,6 @@ export default function RateConfig() {
               style={{ width: '100%' }}
             />
           </Col>
-        </Row>
-        <Divider />
-        <Row gutter={24}>
           <Col span={6} className="ct-field-stack">
             <Typography.Text type="secondary" className="ct-field-label">Default Airfare ($)</Typography.Text>
             <InputNumber
@@ -515,36 +512,6 @@ export default function RateConfig() {
               step={1}
               value={cfgVal('DEFAULT_AIRFARE')}
               onChange={(v) => setCfgEdits({ ...cfgEdits, DEFAULT_AIRFARE: String(v || 0) })}
-              style={{ width: '100%' }}
-            />
-          </Col>
-          <Col span={6} className="ct-field-stack">
-            <Typography.Text type="secondary" className="ct-field-label">Rental Car Rate ($/day)</Typography.Text>
-            <InputNumber
-              min={0}
-              step={1}
-              value={cfgVal('DEFAULT_RENTAL_CAR_DAILY')}
-              onChange={(v) => setCfgEdits({ ...cfgEdits, DEFAULT_RENTAL_CAR_DAILY: String(v || 0) })}
-              style={{ width: '100%' }}
-            />
-          </Col>
-          <Col span={6} className="ct-field-stack">
-            <Typography.Text type="secondary" className="ct-field-label">RPA Budget Target ($)</Typography.Text>
-            <InputNumber
-              min={0}
-              step={1000}
-              value={cfgVal('BUDGET_TARGET_RPA')}
-              onChange={(v) => setCfgEdits({ ...cfgEdits, BUDGET_TARGET_RPA: String(v || 0) })}
-              style={{ width: '100%' }}
-            />
-          </Col>
-          <Col span={6} className="ct-field-stack">
-            <Typography.Text type="secondary" className="ct-field-label">O&amp;M Budget Target ($)</Typography.Text>
-            <InputNumber
-              min={0}
-              step={1000}
-              value={cfgVal('BUDGET_TARGET_OM')}
-              onChange={(v) => setCfgEdits({ ...cfgEdits, BUDGET_TARGET_OM: String(v || 0) })}
               style={{ width: '100%' }}
             />
           </Col>
