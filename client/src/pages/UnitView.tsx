@@ -23,6 +23,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../components/AppLayout';
 import * as api from '../services/api';
 import type { PersonnelGroup, UnitBudget, FundingType, UnitCalc, GroupCalc, PerDiemRate } from '../types';
+import { getUnitDisplayLabel } from '../utils/unitLabels';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
@@ -601,7 +602,7 @@ export default function UnitView() {
 
   return (
     <div>
-      <Typography.Title level={4} className="ct-page-title">{unitCode} — Unit Budget</Typography.Title>
+      <Typography.Title level={4} className="ct-page-title">{getUnitDisplayLabel(unitCode)} — Unit Budget</Typography.Title>
 
       {/* Summary */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger">

@@ -36,6 +36,7 @@ import dayjs from 'dayjs';
 import * as api from '../services/api';
 import type { Exercise, ExerciseDetail, BudgetResult } from '../types';
 import { getStoredUser } from '../services/auth';
+import { getUnitDisplayLabel } from '../utils/unitLabels';
 
 const { Header, Sider, Content } = Layout;
 
@@ -282,7 +283,7 @@ export default function AppLayout() {
   const unitChildren = (exercise?.unitBudgets || [])
     .map((unit) => unit.unitCode)
     .sort((a, b) => a.localeCompare(b))
-    .map((unitCode) => ({ key: `/units/${unitCode}`, label: unitCode }));
+    .map((unitCode) => ({ key: `/units/${unitCode}`, label: getUnitDisplayLabel(unitCode) }));
 
   const baseMenuItems = [
     { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },

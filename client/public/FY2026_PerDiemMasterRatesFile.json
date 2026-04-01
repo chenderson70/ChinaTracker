@@ -2,7 +2,7 @@
     "title":  "FY2026 Per Diem Rates - Effective October 1, 2025",
     "sourceFile":  "FY2026_PerDiemMasterRatesFile.csv",
     "generatedAt":  "2026-02-19T18:30:22.5704625-05:00",
-    "recordCount":  650,
+    "recordCount":  651,
     "records":  [
                     {
                         "id":  null,
@@ -2383,6 +2383,16 @@
                         "seasonEnd":  "September 30",
                         "fy26LodgingRate":  147,
                         "fy26Mie":  80
+                    },
+                    {
+                        "id":  651,
+                        "state":  "GA",
+                        "destination":  "Warner Robins",
+                        "countyOrLocationDefined":  "Houston",
+                        "seasonBegin":  null,
+                        "seasonEnd":  null,
+                        "fy26LodgingRate":  110,
+                        "fy26Mie":  68
                     },
                     {
                         "id":  476,

@@ -1,4 +1,5 @@
-import { Card, Row, Col, Table, Typography, Spin } from 'antd';
+import { Card, Row, Col, Table, Typography, Spin, Button, Space, message } from 'antd';
+import { useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
@@ -6,16 +7,19 @@ import {
 } from 'recharts';
 import {
   DollarOutlined, TeamOutlined, RocketOutlined, SafetyCertificateOutlined,
-  UserOutlined, CarOutlined, ToolOutlined,
+  UserOutlined, CarOutlined, ToolOutlined, FilePdfOutlined,
 } from '@ant-design/icons';
 import { useApp } from '../components/AppLayout';
 import * as api from '../services/api';
+import { exportElementToPdf } from '../services/pdf';
+import { getUnitDisplayLabel } from '../utils/unitLabels';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
 export default function Dashboard() {
   const { exercise, budget } = useApp();
   const { data: appConfig = {} } = useQuery({ queryKey: ['appConfig'], queryFn: api.getAppConfig });
+  const exportRef = useRef<HTMLDivElement>(null);
 
   if (!exercise || !budget) return <div className="ct-loading"><Spin size="large" /></div>;
 
@@ -28,7 +32,7 @@ export default function Dashboard() {
     total: u.unitTotal,
   }));
 
-  const barData = unitData.map((u) => ({ name: u.unitCode, RPA: u.rpa, 'O&M': u.om }));
+  const barData = unitData.map((u) => ({ name: getUnitDisplayLabel(u.unitCode), RPA: u.rpa, 'O&M': u.om }));
 
   const allExecutionOmLines = (exercise.unitBudgets || [])
     .flatMap((u) => u.executionCostLines || [])
@@ -73,7 +77,7 @@ export default function Dashboard() {
 
   const columns = [
     { title: 'Unit', dataIndex: 'unitCode', key: 'unitCode', width: 80,
-      render: (v: string) => <span style={{ fontWeight: 600, color: '#1a1a2e' }}>{v}</span> },
+      render: (v: string) => <span style={{ fontWeight: 600, color: '#1a1a2e' }}>{getUnitDisplayLabel(v)}</span> },
     { title: 'Total PAX', dataIndex: 'totalPax', key: 'totalPax', width: 100 },
     { title: 'RPA', dataIndex: 'rpa', key: 'rpa', render: (v: number) => <span style={{ color: '#1677ff' }}>{fmt(v)}</span> },
     { title: 'O&M', dataIndex: 'om', key: 'om', render: (v: number) => <span style={{ color: '#52c41a' }}>{fmt(v)}</span> },
@@ -101,11 +105,31 @@ export default function Dashboard() {
     { label: 'WRM', value: fmt(budget.wrm), icon: <ToolOutlined /> },
   ];
 
+  const handleExportPdf = async () => {
+    if (!exportRef.current) return;
+    try {
+      await exportElementToPdf(`${exercise.name} Dashboard`, exportRef.current);
+    } catch (error: any) {
+      message.error(error?.message || 'Unable to export dashboard to PDF');
+    }
+  };
+
   return (
-    <div>
-      <Typography.Title level={4} className="ct-page-title">
-        {exercise.name} — Dashboard
-      </Typography.Title>
+    <div ref={exportRef}>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 24, gap: 12 }}>
+        <Col>
+          <Typography.Title level={4} className="ct-page-title" style={{ marginBottom: 0 }}>
+            {exercise.name} — Dashboard
+          </Typography.Title>
+        </Col>
+        <Col>
+          <Space>
+            <Button icon={<FilePdfOutlined />} onClick={handleExportPdf}>
+              Export to PDF
+            </Button>
+          </Space>
+        </Col>
+      </Row>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} md={8}>

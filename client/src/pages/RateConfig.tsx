@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, Table, InputNumber, Button, Typography, Row, Col, Divider, Space, message, Spin, Modal, Input, Popconfirm, Select } from 'antd';
-import { SaveOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '../services/api';
 import { useApp } from '../components/AppLayout';
@@ -19,6 +19,34 @@ const STATE_NAMES: Record<string, string> = {
 
 type MasterSearchField = 'all' | 'destination' | 'state' | 'county';
 
+function getMasterRateAliases(row: PerDiemMasterRecord): string[] {
+  const destination = String(row.destination || '').trim().toUpperCase();
+  const county = String(row.countyOrLocationDefined || '').trim().toUpperCase();
+  const state = String(row.state || '').trim().toUpperCase();
+
+  if (state === 'GA' && destination === 'MARIETTA' && county === 'COBB') {
+    return ['DOBBINS ARB', 'DOBBINS ARB / MARIETTA NAS', 'MARIETTA NAS', 'NOSC ATLANTA'];
+  }
+
+  if (state === 'GA' && destination === 'WARNER ROBINS' && county === 'HOUSTON') {
+    return ['ROBINS AFB', 'ROBINS AFB / WARNER ROBINS'];
+  }
+
+  if (state === 'GA' && destination === 'AUGUSTA' && county === 'RICHMOND') {
+    return ['FORT EISENHOWER', 'FT EISENHOWER', 'FORT GORDON', 'FT GORDON', 'NOSC AUGUSTA'];
+  }
+
+  if (state === 'GA' && destination === 'SAVANNAH' && county === 'CHATHAM') {
+    return ['HUNTER ARMY AIRFIELD', 'HUNTER AAF'];
+  }
+
+  if (state === 'GA' && destination === 'ATLANTA' && county === 'FULTON / DEKALB') {
+    return ['NOSC ATLANTA'];
+  }
+
+  return [];
+}
+
 export default function RateConfig() {
   const { exerciseId } = useApp();
   const queryClient = useQueryClient();
@@ -35,6 +63,9 @@ export default function RateConfig() {
   const [cfgEdits, setCfgEdits] = useState<Record<string, string>>({});
   const [pdSearch, setPdSearch] = useState('');
   const [pdSearchField, setPdSearchField] = useState<MasterSearchField>('all');
+  const cpdAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pdAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cfgAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['cpdRates'] });
@@ -44,26 +75,49 @@ export default function RateConfig() {
   };
 
   const saveCpdMut = useMutation({
-    mutationFn: () => {
+    mutationFn: (submittedEdits: Record<string, number>) => {
       const rates = cpdRates.map((r: RankCpdRate) => ({
         rankCode: r.rankCode,
-        costPerDay: cpdEdits[r.rankCode] ?? r.costPerDay,
+        costPerDay: submittedEdits[r.rankCode] ?? r.costPerDay,
       }));
       return api.updateCpdRates(rates);
     },
-    onSuccess: () => { invalidate(); setCpdEdits({}); message.success('CPD rates saved'); },
+    onSuccess: (_data, submittedEdits) => {
+      invalidate();
+      setCpdEdits((current) => {
+        const next = { ...current };
+        Object.entries(submittedEdits).forEach(([key, value]) => {
+          if (next[key] === value) {
+            delete next[key];
+          }
+        });
+        return next;
+      });
+    },
   });
 
   const savePdMut = useMutation({
-    mutationFn: () => {
+    mutationFn: (submittedEdits: Record<string, { lodging?: number; mie?: number }>) => {
       const rates = perDiemRates.map((r: PerDiemRate) => ({
         location: r.location,
-        lodgingRate: pdEdits[r.id]?.lodging ?? r.lodgingRate,
-        mieRate: pdEdits[r.id]?.mie ?? r.mieRate,
+        lodgingRate: submittedEdits[r.id]?.lodging ?? r.lodgingRate,
+        mieRate: submittedEdits[r.id]?.mie ?? r.mieRate,
       }));
       return api.updatePerDiemRates(rates);
     },
-    onSuccess: () => { invalidate(); setPdEdits({}); message.success('Per diem rates saved'); },
+    onSuccess: (_data, submittedEdits) => {
+      invalidate();
+      setPdEdits((current) => {
+        const next = { ...current };
+        Object.entries(submittedEdits).forEach(([key, value]) => {
+          const currentValue = next[key];
+          if (currentValue?.lodging === value?.lodging && currentValue?.mie === value?.mie) {
+            delete next[key];
+          }
+        });
+        return next;
+      });
+    },
   });
 
   const addPdMut = useMutation({
@@ -105,19 +159,65 @@ export default function RateConfig() {
         const stateCode = safeLower(row.state).trim();
         const stateName = safeLower(stateFullName(row.state));
         const county = safeLower(row.countyOrLocationDefined);
+        const aliases = getMasterRateAliases(row).map((alias) => alias.toLowerCase());
+        const aliasMatch = aliases.some((alias) => matches(alias, q));
 
-        if (pdSearchField === 'destination') return matches(destination, q);
+        if (pdSearchField === 'destination') return matches(destination, q) || aliasMatch;
         if (pdSearchField === 'state') return matches(stateCode, q) || matches(stateName, q);
-        if (pdSearchField === 'county') return matches(county, q);
+        if (pdSearchField === 'county') return matches(county, q) || aliasMatch;
 
-        return matches(destination, q) || matches(stateCode, q) || matches(stateName, q) || matches(county, q);
+        return matches(destination, q) || matches(stateCode, q) || matches(stateName, q) || matches(county, q) || aliasMatch;
       });
   }, [masterRates, pdSearch, pdSearchField]);
 
   const saveCfgMut = useMutation({
-    mutationFn: () => api.updateAppConfig({ ...config, ...cfgEdits }),
-    onSuccess: () => { invalidate(); setCfgEdits({}); message.success('Config saved'); },
+    mutationFn: (submittedEdits: Record<string, string>) => api.updateAppConfig({ ...config, ...submittedEdits }),
+    onSuccess: (_data, submittedEdits) => {
+      invalidate();
+      setCfgEdits((current) => {
+        const next = { ...current };
+        Object.entries(submittedEdits).forEach(([key, value]) => {
+          if (next[key] === value) {
+            delete next[key];
+          }
+        });
+        return next;
+      });
+    },
   });
+
+  useEffect(() => {
+    if (Object.keys(cpdEdits).length === 0 || saveCpdMut.isPending) return;
+    if (cpdAutoSaveTimer.current) clearTimeout(cpdAutoSaveTimer.current);
+    cpdAutoSaveTimer.current = setTimeout(() => {
+      saveCpdMut.mutate({ ...cpdEdits });
+    }, 700);
+    return () => {
+      if (cpdAutoSaveTimer.current) clearTimeout(cpdAutoSaveTimer.current);
+    };
+  }, [cpdEdits, saveCpdMut.isPending]);
+
+  useEffect(() => {
+    if (Object.keys(pdEdits).length === 0 || savePdMut.isPending) return;
+    if (pdAutoSaveTimer.current) clearTimeout(pdAutoSaveTimer.current);
+    pdAutoSaveTimer.current = setTimeout(() => {
+      savePdMut.mutate({ ...pdEdits });
+    }, 700);
+    return () => {
+      if (pdAutoSaveTimer.current) clearTimeout(pdAutoSaveTimer.current);
+    };
+  }, [pdEdits, savePdMut.isPending]);
+
+  useEffect(() => {
+    if (Object.keys(cfgEdits).length === 0 || saveCfgMut.isPending) return;
+    if (cfgAutoSaveTimer.current) clearTimeout(cfgAutoSaveTimer.current);
+    cfgAutoSaveTimer.current = setTimeout(() => {
+      saveCfgMut.mutate({ ...cfgEdits });
+    }, 700);
+    return () => {
+      if (cfgAutoSaveTimer.current) clearTimeout(cfgAutoSaveTimer.current);
+    };
+  }, [cfgEdits, saveCfgMut.isPending]);
 
   if (cpdLoading || pdLoading || cfgLoading) return <div className="ct-loading"><Spin size="large" /></div>;
 
@@ -182,7 +282,19 @@ export default function RateConfig() {
       title: 'Destination',
       dataIndex: 'destination',
       width: 180,
-      render: (val: string) => val?.toUpperCase(),
+      render: (val: string, row: PerDiemMasterRecord) => {
+        const aliases = getMasterRateAliases(row);
+        return (
+          <div>
+            <div>{val?.toUpperCase()}</div>
+            {aliases.length > 0 ? (
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                Alias: {aliases[0]}
+              </Typography.Text>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       title: 'State',
@@ -231,7 +343,7 @@ export default function RateConfig() {
       <Card
         title="Composite Pay & Allowance (CPD) Rates"
         className="ct-config-card"
-        extra={<Button icon={<SaveOutlined />} type="primary" onClick={() => saveCpdMut.mutate()} loading={saveCpdMut.isPending}>Save</Button>}
+        extra={<Typography.Text type="secondary">{saveCpdMut.isPending ? 'Autosaving...' : 'Changes auto-save'}</Typography.Text>}
       >
         <div className="ct-table">
           <Table
@@ -251,7 +363,7 @@ export default function RateConfig() {
         extra={
           <Space>
             <Button icon={<PlusOutlined />} onClick={() => setAddLocOpen(true)}>Add Location</Button>
-            <Button icon={<SaveOutlined />} type="primary" onClick={() => savePdMut.mutate()} loading={savePdMut.isPending}>Save</Button>
+            <Typography.Text type="secondary">{savePdMut.isPending ? 'Autosaving...' : 'Changes auto-save'}</Typography.Text>
           </Space>
         }
       >
@@ -312,17 +424,23 @@ export default function RateConfig() {
         }}
         onCancel={() => setAddLocOpen(false)}
       >
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <div className="ct-field-stack">
-            <Typography.Text type="secondary" className="ct-field-label">Location Name</Typography.Text>
+        <Space direction="vertical" size={10} style={{ width: '100%' }}>
+          <div className="ct-field-stack" style={{ gap: 6 }}>
+            <Typography.Text type="secondary" style={{ display: 'block', minHeight: 0, lineHeight: 1.2, marginBottom: 0 }}>
+              Location Name
+            </Typography.Text>
             <Input placeholder="e.g., Fort Hood" value={newLoc.name} onChange={(e) => setNewLoc({ ...newLoc, name: e.target.value })} />
           </div>
-          <div className="ct-field-stack">
-            <Typography.Text type="secondary" className="ct-field-label">Lodging Rate ($/night)</Typography.Text>
+          <div className="ct-field-stack" style={{ gap: 6 }}>
+            <Typography.Text type="secondary" style={{ display: 'block', minHeight: 0, lineHeight: 1.2, marginBottom: 0 }}>
+              Lodging Rate ($/night)
+            </Typography.Text>
             <InputNumber min={0} step={0.01} value={newLoc.lodging} onChange={(v) => setNewLoc({ ...newLoc, lodging: v || 0 })} style={{ width: '100%' }} />
           </div>
-          <div className="ct-field-stack">
-            <Typography.Text type="secondary" className="ct-field-label">M&IE Rate ($/day)</Typography.Text>
+          <div className="ct-field-stack" style={{ gap: 6 }}>
+            <Typography.Text type="secondary" style={{ display: 'block', minHeight: 0, lineHeight: 1.2, marginBottom: 0 }}>
+              M&IE Rate ($/day)
+            </Typography.Text>
             <InputNumber min={0} step={0.01} value={newLoc.mie} onChange={(v) => setNewLoc({ ...newLoc, mie: v || 0 })} style={{ width: '100%' }} />
           </div>
         </Space>
@@ -332,7 +450,7 @@ export default function RateConfig() {
       <Card
         title="Meal Rates & Billeting - Players ONLY"
         className="ct-config-card"
-        extra={<Button icon={<SaveOutlined />} type="primary" onClick={() => saveCfgMut.mutate()} loading={saveCfgMut.isPending}>Save</Button>}
+        extra={<Typography.Text type="secondary">{saveCfgMut.isPending ? 'Autosaving...' : 'Changes auto-save'}</Typography.Text>}
       >
         <Row gutter={24}>
           <Col span={6} className="ct-field-stack">

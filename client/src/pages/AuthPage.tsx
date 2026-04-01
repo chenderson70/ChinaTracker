@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Card, Form, Input, Segmented, Space, Typography, message } from 'antd';
 import { ThunderboltOutlined, LoginOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +14,13 @@ export default function AuthPage() {
   const [resetForm] = Form.useForm();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    loginForm.setFieldValue('password', '');
+    signupForm.setFieldValue('password', '');
+    resetForm.setFieldValue('currentPassword', '');
+    resetForm.setFieldValue('newPassword', '');
+  }, [loginForm, mode, resetForm, signupForm]);
 
   const loginMutation = useMutation({
     mutationFn: (values: { username: string; password: string }) => api.loginAccount(values),
