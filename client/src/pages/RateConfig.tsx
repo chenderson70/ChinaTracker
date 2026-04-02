@@ -508,6 +508,15 @@ export default function RateConfig() {
               style={{ width: '100%' }}
             />
           </Col>
+        </Row>
+      </Card>
+
+      <Card
+        title="Travel Rates Config"
+        className="ct-config-card ct-config-card-compact"
+        extra={<Typography.Text type="secondary">{saveCfgMut.isPending ? 'Autosaving...' : 'Changes auto-save'}</Typography.Text>}
+      >
+        <Row gutter={24}>
           <Col span={6} className="ct-field-stack">
             <Typography.Text type="secondary" className="ct-field-label">Default Airfare ($)</Typography.Text>
             <InputNumber
@@ -515,6 +524,16 @@ export default function RateConfig() {
               step={1}
               value={cfgVal('DEFAULT_AIRFARE')}
               onChange={(v) => setCfgEdits({ ...cfgEdits, DEFAULT_AIRFARE: String(v || 0) })}
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col span={6} className="ct-field-stack">
+            <Typography.Text type="secondary" className="ct-field-label">Default Rental Car Rate ($/day)</Typography.Text>
+            <InputNumber
+              min={0}
+              step={1}
+              value={cfgVal('DEFAULT_RENTAL_CAR_DAILY')}
+              onChange={(v) => setCfgEdits({ ...cfgEdits, DEFAULT_RENTAL_CAR_DAILY: String(v || 0) })}
               style={{ width: '100%' }}
             />
           </Col>

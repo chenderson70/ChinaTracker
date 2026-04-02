@@ -132,6 +132,9 @@ function DraftNumberInput({
   min,
   step,
   precision,
+  prefix,
+  formatter,
+  parser,
 }: {
   value: number | null | undefined;
   onSave: (value: number) => void;
@@ -140,6 +143,9 @@ function DraftNumberInput({
   min?: number;
   step?: number;
   precision?: number;
+  prefix?: React.ReactNode;
+  formatter?: (value: string | number | undefined) => string;
+  parser?: (value: string | undefined) => number;
 }) {
   const normalizedValue = value ?? 0;
   const [draft, setDraft] = useState<number | null>(normalizedValue);
@@ -166,6 +172,9 @@ function DraftNumberInput({
       min={min}
       step={step}
       precision={precision}
+      prefix={prefix}
+      formatter={formatter}
+      parser={parser}
       value={draft}
       style={style}
       onFocus={() => setIsEditing(true)}
@@ -179,10 +188,60 @@ function DraftNumberInput({
   );
 }
 
+function DraftTextInput({
+  value,
+  onSave,
+  size = 'small',
+  style,
+  placeholder,
+}: {
+  value: string | null | undefined;
+  onSave: (value: string | null) => void;
+  size?: 'small' | 'middle' | 'large';
+  style?: CSSProperties;
+  placeholder?: string;
+}) {
+  const normalizedValue = String(value || '');
+  const [draft, setDraft] = useState(normalizedValue);
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setDraft(normalizedValue);
+    }
+  }, [normalizedValue, isEditing]);
+
+  const commit = () => {
+    const nextValue = draft.trim();
+    const currentValue = normalizedValue.trim();
+    setIsEditing(false);
+    if (nextValue !== currentValue) {
+      onSave(nextValue || null);
+    }
+  };
+
+  return (
+    <Input
+      size={size}
+      value={draft}
+      style={style}
+      placeholder={placeholder}
+      onFocus={() => setIsEditing(true)}
+      onChange={(event) => {
+        setIsEditing(true);
+        setDraft(event.target.value);
+      }}
+      onBlur={commit}
+      onPressEnter={commit}
+    />
+  );
+}
+
 export default function UnitView() {
   const { unitCode } = useParams<{ unitCode: string }>();
   const { exercise, budget, exerciseId } = useApp();
   const queryClient = useQueryClient();
+  const { data: appConfig = {} } = useQuery({ queryKey: ['appConfig'], queryFn: api.getAppConfig });
   const { data: perDiemRates = [] } = useQuery({
     queryKey: ['perDiemRates'],
     queryFn: api.getPerDiemRates,
@@ -202,9 +261,12 @@ export default function UnitView() {
       return acc;
     }, {});
   }, [perDiemRates]);
+  const defaultAirfare = Number(appConfig.DEFAULT_AIRFARE ?? 400);
+  const defaultRentalCarDailyRate = Number(appConfig.DEFAULT_RENTAL_CAR_DAILY ?? 50);
   const [entryModal, setEntryModal] = useState<{ groupId: string } | null>(null);
   const [entryModalNoteDraft, setEntryModalNoteDraft] = useState('');
   const [entryModalTravelOnlyDraft, setEntryModalTravelOnlyDraft] = useState(false);
+  const [entryModalLongTermA7PlannerDraft, setEntryModalLongTermA7PlannerDraft] = useState(false);
   const [contractModalOpen, setContractModalOpen] = useState(false);
   const [gpcModalOpen, setGpcModalOpen] = useState(false);
   const [execModal, setExecModal] = useState(false);
@@ -240,6 +302,7 @@ export default function UnitView() {
       setEntryModal(null);
       setEntryModalNoteDraft('');
       setEntryModalTravelOnlyDraft(false);
+      setEntryModalLongTermA7PlannerDraft(false);
       entryForm.resetFields();
     },
   });
@@ -293,6 +356,7 @@ export default function UnitView() {
   const entryModalGroup = entryModal ? personnelGroups.find((group) => group.id === entryModal.groupId) : null;
   const entryModalIsPlanning = entryModalGroup?.role === 'PLANNING';
   const entryModalIsWhiteCell = entryModalGroup?.role === 'WHITE_CELL';
+  const entryModalSupportsRentalCars = entryModalGroup?.role === 'WHITE_CELL' || entryModalGroup?.role === 'SUPPORT';
   const entryModalAllowsTravelOnly = entryModalGroup?.fundingType === 'RPA'
     && (entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'SUPPORT');
 
@@ -348,6 +412,7 @@ export default function UnitView() {
     });
     setEntryModalNoteDraft('');
     setEntryModalTravelOnlyDraft(false);
+    setEntryModalLongTermA7PlannerDraft(false);
   }, [entryModal, entryForm, entryModalGroup?.isLocal, entryModalGroup?.location, exercise?.defaultDutyDays, perDiemLocations]);
 
   const roleSections = ['PLANNING', 'PLAYER', 'WHITE_CELL', 'SUPPORT'].filter((role) => hasRole(role));
@@ -387,7 +452,8 @@ export default function UnitView() {
     const isPlayer = role === 'PLAYER';
     const isPlanning = role === 'PLANNING';
     const isWhiteCell = role === 'WHITE_CELL';
-    const usesEntryLevelRental = isWhiteCell;
+    const supportsRentalCars = role === 'WHITE_CELL' || role === 'SUPPORT';
+    const usesEntryLevelRental = supportsRentalCars;
     const isPlayerRpa = isPlayer && ft === 'RPA';
     const isPlayerOm = isPlayer && ft === 'OM';
     const showTravelOnly = ft === 'RPA' && (role === 'PLANNING' || role === 'SUPPORT');
@@ -411,8 +477,8 @@ export default function UnitView() {
       : [];
     const unitCount = exercise?.unitBudgets?.length || 1;
     const defaultTravel = exercise?.travelConfig || {
-      airfarePerPerson: 400,
-      rentalCarDailyRate: 50,
+      airfarePerPerson: defaultAirfare,
+      rentalCarDailyRate: defaultRentalCarDailyRate,
       rentalCarCount: 0,
       rentalCarDays: 0,
     };
@@ -455,7 +521,7 @@ export default function UnitView() {
       nonPlayerTravelBreakout.rental;
     const nonPlayerSummary =
       ft === 'OM'
-        ? `Airfare: ${fmt(nonPlayerTravelBreakout.airfare)} \u2022 Per Diem: ${fmt(nonPlayerTravelBreakout.perDiem)} \u2022 Billeting: ${fmt(nonPlayerTravelBreakout.lodging)} \u2022 Total: ${fmt(nonPlayerTravelTotal)}`
+        ? `Airfare: ${fmt(nonPlayerTravelBreakout.airfare)} \u2022 Per Diem: ${fmt(nonPlayerTravelBreakout.perDiem)} \u2022 Billeting: ${fmt(nonPlayerTravelBreakout.lodging)} \u2022 Rental Car: ${fmt(nonPlayerTravelBreakout.rental)} \u2022 Total: ${fmt(nonPlayerTravelTotal)}`
         : `Mil Pay: ${fmt(calc.milPay)} \u2022 Travel Pay Total: ${fmt(nonPlayerTravelTotal)} (Per diem: ${fmt(nonPlayerTravelBreakout.perDiem)}, Lodging: ${fmt(nonPlayerTravelBreakout.lodging)}, Airfare: ${fmt(nonPlayerTravelBreakout.airfare)}, Rental: ${fmt(nonPlayerTravelBreakout.rental)}) \u2022 Total: ${fmt(calc.milPay + nonPlayerTravelTotal)}`;
     const playerTravelBreakout = {
       perDiem: calc.perDiem || 0,
@@ -496,7 +562,7 @@ export default function UnitView() {
               <DraftNumberInput
                 size="middle"
                 min={0}
-                value={group.airfarePerPerson ?? 400}
+                value={group.airfarePerPerson ?? defaultTravel.airfarePerPerson}
                 style={{ width: '100%' }}
                 onSave={(nextValue) => updateGroupMut.mutate({ id: group.id, data: { airfarePerPerson: nextValue } })}
               />
@@ -508,7 +574,7 @@ export default function UnitView() {
               <DraftNumberInput
                 size="middle"
                 min={0}
-                value={group.rentalCarDaily ?? 50}
+                value={group.rentalCarDaily ?? defaultTravel.rentalCarDailyRate}
                 style={{ width: '100%' }}
                 onSave={(nextValue) => updateGroupMut.mutate({ id: group.id, data: { rentalCarDaily: nextValue } })}
               />
@@ -589,7 +655,7 @@ export default function UnitView() {
                   />
                 ),
               },
-              ...(isWhiteCell ? [{
+              ...(supportsRentalCars ? [{
                 title: 'Rental Car',
                 dataIndex: 'rentalCarCount',
                 width: 110,
@@ -662,6 +728,21 @@ export default function UnitView() {
                   />
                 ),
               }] : []),
+              ...(isPlanning ? [{
+                title: 'Long Tour A7 Planner',
+                dataIndex: 'longTermA7Planner',
+                width: 140,
+                render: (value: boolean, row: { id: string }) => (
+                  <Switch
+                    className="ct-long-term-a7-planner-switch"
+                    size="small"
+                    checked={!!value}
+                    checkedChildren="Yes"
+                    unCheckedChildren=""
+                    onChange={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { longTermA7Planner: nextValue } })}
+                  />
+                ),
+              }] : []),
               {
                 title: 'Local / Not local',
                 dataIndex: 'isLocal',
@@ -711,9 +792,11 @@ export default function UnitView() {
       title: '',
       width: 50,
       render: (_: any, row: any) => (
-        <Popconfirm title="Remove?" onConfirm={() => deleteExecMut.mutate(row.id)}>
-          <Button size="small" danger icon={<DeleteOutlined />} />
-        </Popconfirm>
+        row.isDerived ? null : (
+          <Popconfirm title="Remove?" onConfirm={() => deleteExecMut.mutate(row.id)}>
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        )
       ),
     },
   ];
@@ -724,6 +807,21 @@ export default function UnitView() {
   const omWrmTotal = wrmLines.reduce((sum, line) => sum + (line.amount || 0), 0);
   const omContractsTotal = titleContractLines.reduce((sum, line) => sum + (line.amount || 0), 0);
   const omGpcPurchasesTotal = gpcPurchaseLines.reduce((sum, line) => sum + (line.amount || 0), 0);
+  const derivedPlayerMealsExecutionLine = (unitCalcSafe.playerRpa?.meals || 0) > 0
+    ? {
+        id: '__derived_player_meals__',
+        key: '__derived_player_meals__',
+        category: 'Player Meals',
+        fundingType: 'RPA',
+        amount: unitCalcSafe.playerRpa.meals || 0,
+        notes: 'Auto-populated from Player - Execution meals',
+        isDerived: true,
+      }
+    : null;
+  const executionCostLinesForDisplay = [
+    ...(derivedPlayerMealsExecutionLine ? [derivedPlayerMealsExecutionLine] : []),
+    ...executionCostLines.map((line) => ({ ...line, key: line.id, isDerived: false })),
+  ];
   const sgAeCabPlayerBilletingTotal = ['AE', 'CAB', 'SG'].reduce((sum, code) => {
     const calc = budget?.units?.[code];
     return sum + (calc?.playerOm?.billeting || 0);
@@ -956,13 +1054,37 @@ export default function UnitView() {
                       {
                         title: 'Type',
                         dataIndex: 'notes',
-                        render: (value: string | null) => value || '—',
+                        render: (value: string | null, row: any) => (
+                          row.isDerived
+                            ? (value || '-')
+                            : (
+                              <DraftTextInput
+                                value={value}
+                                placeholder="Contract type"
+                                onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { notes: nextValue } })}
+                              />
+                            )
+                        ),
                       },
                       {
                         title: 'Cost',
                         dataIndex: 'amount',
                         width: 140,
-                        render: (value: number) => fmt(value || 0),
+                        render: (value: number, row: any) => (
+                          row.isDerived
+                            ? fmt(value || 0)
+                            : (
+                              <DraftNumberInput
+                                value={value || 0}
+                                min={0}
+                                style={{ width: '100%' }}
+                                prefix="$"
+                                formatter={formatNumberInput}
+                                parser={parseNumberInput}
+                                onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { amount: nextValue } })}
+                              />
+                            )
+                        ),
                       },
                       {
                         title: '',
@@ -1009,13 +1131,29 @@ export default function UnitView() {
                       {
                         title: 'Type',
                         dataIndex: 'notes',
-                        render: (value: string | null) => value || '—',
+                        render: (value: string | null, row: any) => (
+                          <DraftTextInput
+                            value={value}
+                            placeholder="GPC purchase type"
+                            onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { notes: nextValue } })}
+                          />
+                        ),
                       },
                       {
                         title: 'Cost',
                         dataIndex: 'amount',
                         width: 140,
-                        render: (value: number) => fmt(value || 0),
+                        render: (value: number, row: any) => (
+                          <DraftNumberInput
+                            value={value || 0}
+                            min={0}
+                            style={{ width: '100%' }}
+                            prefix="$"
+                            formatter={formatNumberInput}
+                            parser={parseNumberInput}
+                            onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { amount: nextValue } })}
+                          />
+                        ),
                       },
                       {
                         title: '',
@@ -1060,7 +1198,7 @@ export default function UnitView() {
           <Table
             size="small"
             pagination={false}
-            dataSource={executionCostLines.map((l) => ({ ...l, key: l.id }))}
+            dataSource={executionCostLinesForDisplay}
             columns={execColumns}
             locale={{ emptyText: 'No execution cost lines yet' }}
           />
@@ -1080,10 +1218,11 @@ export default function UnitView() {
             rankCode: values.rankCode,
             count: values.count,
             dutyDays: calculatedDutyDays,
-            rentalCarCount: entryModalIsWhiteCell ? (values.rentalCarCount || 0) : 0,
+            rentalCarCount: entryModalSupportsRentalCars ? (values.rentalCarCount || 0) : 0,
             location: values.location,
             note: (entryModalIsPlanning || entryModalIsWhiteCell) ? (entryModalNoteDraft.trim() || null) : null,
             travelOnly: entryModalAllowsTravelOnly ? entryModalTravelOnlyDraft : false,
+            longTermA7Planner: entryModalIsPlanning ? entryModalLongTermA7PlannerDraft : false,
             isLocal: !!values.isLocal,
           };
           addEntryMut.mutate({ groupId: entryModal!.groupId, data: payload });
@@ -1092,6 +1231,7 @@ export default function UnitView() {
           setEntryModal(null);
           setEntryModalNoteDraft('');
           setEntryModalTravelOnlyDraft(false);
+          setEntryModalLongTermA7PlannerDraft(false);
           entryForm.resetFields();
         }}
       >
@@ -1119,7 +1259,7 @@ export default function UnitView() {
           <Form.Item name="dutyDays" label="Duty Days" initialValue={exercise.defaultDutyDays} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
-          {entryModalIsWhiteCell && (
+          {entryModalSupportsRentalCars && (
             <Form.Item name="rentalCarCount" label="Rental Car" initialValue={0}>
               <InputNumber min={0} precision={0} style={{ width: '100%' }} />
             </Form.Item>
@@ -1152,6 +1292,17 @@ export default function UnitView() {
                 checkedChildren="Travel Only"
                 unCheckedChildren=""
                 onChange={setEntryModalTravelOnlyDraft}
+              />
+            </Form.Item>
+          )}
+          {entryModalIsPlanning && (
+            <Form.Item label="Long Tour A7 Planner">
+              <Switch
+                className="ct-long-term-a7-planner-switch"
+                checked={entryModalLongTermA7PlannerDraft}
+                checkedChildren="Yes"
+                unCheckedChildren=""
+                onChange={setEntryModalLongTermA7PlannerDraft}
               />
             </Form.Item>
           )}

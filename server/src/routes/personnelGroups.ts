@@ -75,7 +75,7 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
       return res.status(404).json({ error: 'Personnel group not found' });
     }
 
-    const { rankCode, count, dutyDays, rentalCarCount, location, isLocal, note, travelOnly } = req.body;
+    const { rankCode, count, dutyDays, rentalCarCount, location, isLocal, note, travelOnly, longTermA7Planner } = req.body;
     const entry = await prisma.personnelEntry.create({
       data: {
         personnelGroupId: req.params.groupId,
@@ -87,6 +87,7 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
         isLocal,
         note: note ?? null,
         travelOnly: !!travelOnly,
+        longTermA7Planner: !!longTermA7Planner,
       },
     });
 
@@ -127,7 +128,7 @@ router.put('/personnel-entries/:entryId', async (req: Request, res: Response) =>
       return res.status(404).json({ error: 'Personnel entry not found' });
     }
 
-    const { rankCode, count, dutyDays, rentalCarCount, location, isLocal, note, travelOnly } = req.body;
+    const { rankCode, count, dutyDays, rentalCarCount, location, isLocal, note, travelOnly, longTermA7Planner } = req.body;
     const data: Record<string, unknown> = {};
     if (rankCode !== undefined) data.rankCode = rankCode;
     if (count !== undefined) data.count = count;
@@ -137,6 +138,7 @@ router.put('/personnel-entries/:entryId', async (req: Request, res: Response) =>
     if (isLocal !== undefined) data.isLocal = isLocal;
     if (note !== undefined) data.note = note ?? null;
     if (travelOnly !== undefined) data.travelOnly = !!travelOnly;
+    if (longTermA7Planner !== undefined) data.longTermA7Planner = !!longTermA7Planner;
 
     const entry = await prisma.personnelEntry.update({
       where: { id: req.params.entryId },

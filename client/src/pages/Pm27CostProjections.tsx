@@ -1,5 +1,6 @@
 import { Card, Table, Typography } from 'antd';
 import { useApp } from '../components/AppLayout';
+import BudgetOverviewSection from '../components/BudgetOverviewSection';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { ReportsPage } from './Reports';
 import type { ExecutionCostLine, FundingType, PersonnelEntry, PersonnelGroup, UnitBudget, UnitCalc } from '../types';
@@ -177,17 +178,28 @@ function buildProjectionRow(unitBudget: UnitBudget | undefined, unitCalc: UnitCa
   const playerOmGroups = findGroups(unitBudget, 'PLAYER', 'OM');
   const executionRpaGroups = findExecutionGroups(unitBudget, 'RPA');
   const executionOmGroups = findExecutionGroups(unitBudget, 'OM');
-  const executionRpaLines = findExecutionLines(unitBudget, 'RPA');
+  const playerMeals = unitCalc.playerRpa.meals || 0;
+  const derivedExecutionRpaLines = playerMeals > 0
+    ? [{
+        id: '__derived_player_meals__',
+        unitBudgetId: unitBudget?.id || '',
+        fundingType: 'RPA' as FundingType,
+        category: 'Player Meals',
+        amount: playerMeals,
+        notes: 'Auto-populated from Player - Execution meals',
+      }]
+    : [];
+  const executionRpaLines = [...derivedExecutionRpaLines, ...findExecutionLines(unitBudget, 'RPA')];
   const executionOmLines = findExecutionLines(unitBudget, 'OM');
 
   return {
     key: unitCalc.unitCode,
     planningRpa: buildProjectionCell(unitCalc.planningRpa.subtotal, planningRpaGroups, defaultDutyDays),
     planningOm: buildProjectionCell(unitCalc.planningOm.subtotal, planningOmGroups, defaultDutyDays),
-    playerRpa: buildProjectionCell(unitCalc.playerRpa.subtotal, playerRpaGroups, defaultDutyDays),
+    playerRpa: buildProjectionCell(Math.max(0, unitCalc.playerRpa.subtotal - playerMeals), playerRpaGroups, defaultDutyDays),
     playerOm: buildProjectionCell(unitCalc.playerOm.subtotal, playerOmGroups, defaultDutyDays),
     executionRpa: buildProjectionCell(
-      (unitCalc.whiteCellRpa?.subtotal || 0) + unitCalc.executionRpa,
+      (unitCalc.whiteCellRpa?.subtotal || 0) + unitCalc.executionRpa + playerMeals,
       executionRpaGroups,
       defaultDutyDays,
       executionRpaLines,
@@ -256,6 +268,9 @@ export default function Pm27CostProjections() {
   return (
     <ReportsPage
       title="PM 27 Cost Projections"
+      showBudgetDetails={false}
+      showGrandTotals={false}
+      beforeBudgetBreakdownSection={<BudgetOverviewSection />}
       extraSections={<Pm27UnitProjectionTables />}
     />
   );

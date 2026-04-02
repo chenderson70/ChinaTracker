@@ -42,10 +42,20 @@ app.get('/api/health', (_req, res) => {
 
 // Serve frontend in production
 const publicPath = path.join(__dirname, 'public');
-app.use(express.static(publicPath));
+app.use(express.static(publicPath, {
+  index: false,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  },
+}));
 app.get('*', (_req, res) => {
   const indexPath = path.join(publicPath, 'index.html');
   if (require('fs').existsSync(indexPath)) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(indexPath);
   } else {
     res.status(404).json({ error: 'Not found' });

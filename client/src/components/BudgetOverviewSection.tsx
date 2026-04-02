@@ -1,29 +1,24 @@
-import { Card, Row, Col, Table, Typography, Spin, Button, Space, message } from 'antd';
-import { useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { Card, Col, Row, Table } from 'antd';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
   CartesianGrid,
 } from 'recharts';
-import {
-  DollarOutlined, TeamOutlined, RocketOutlined, SafetyCertificateOutlined,
-  UserOutlined, FilePdfOutlined,
-} from '@ant-design/icons';
-import { useApp } from '../components/AppLayout';
-import * as api from '../services/api';
-import { exportElementToPdf } from '../services/pdf';
+import { TeamOutlined, UserOutlined, DollarOutlined, RocketOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { useApp } from './AppLayout';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
-const fmtDelta = (n: number) => (n < 0 ? `-${fmt(Math.abs(n))}` : fmt(n));
-const dangerColor = '#ff4d4f';
 
-export default function Dashboard() {
+export default function BudgetOverviewSection() {
   const { exercise, budget } = useApp();
-  const { data: appConfig = {} } = useQuery({ queryKey: ['appConfig'], queryFn: api.getAppConfig });
-  const exportRef = useRef<HTMLDivElement>(null);
 
-  if (!exercise || !budget) return <div className="ct-loading"><Spin size="large" /></div>;
+  if (!exercise || !budget) return null;
 
   const unitData = Object.values(budget.units)
     .sort((left, right) => compareUnitCodes(left.unitCode, right.unitCode))
@@ -62,6 +57,7 @@ export default function Dashboard() {
 
   const omSupportExecutionTravelTotal = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.whiteCellOm.travel || 0) + (unit.whiteCellOm.perDiem || 0), 0);
+
   const omTravelTotal = omPlanningTravelTotal + omSupportExecutionTravelTotal;
 
   const unitOmBreakdownTotal =
@@ -89,23 +85,40 @@ export default function Dashboard() {
     .reduce((sum, entry) => sum + (entry.longTermA7Planner ? (entry.count || 0) : 0), 0);
 
   const columns = [
-    { title: 'Unit', dataIndex: 'unitCode', key: 'unitCode', width: 80,
-      render: (v: string) => <span style={{ fontWeight: 600, color: '#1a1a2e' }}>{getUnitDisplayLabel(v)}</span> },
-    { title: 'Total PAX', dataIndex: 'totalPax', key: 'totalPax', width: 100 },
-    { title: 'RPA', dataIndex: 'rpa', key: 'rpa', render: (v: number) => <span style={{ color: '#1677ff' }}>{fmt(v)}</span> },
-    { title: 'O&M', dataIndex: 'om', key: 'om', render: (v: number) => <span style={{ color: '#52c41a' }}>{fmt(v)}</span> },
-    { title: 'Total', dataIndex: 'total', key: 'total', render: (v: number) => <strong>{fmt(v)}</strong> },
+    {
+      title: 'Unit',
+      dataIndex: 'unitCode',
+      key: 'unitCode',
+      width: 140,
+      align: 'center' as const,
+      render: (value: string) => <span style={{ fontWeight: 600, color: '#1a1a2e' }}>{getUnitDisplayLabel(value)}</span>,
+    },
+    { title: 'Total PAX', dataIndex: 'totalPax', key: 'totalPax', width: 120, align: 'center' as const },
+    {
+      title: 'RPA',
+      dataIndex: 'rpa',
+      key: 'rpa',
+      width: 190,
+      align: 'center' as const,
+      render: (value: number) => <span style={{ color: '#1677ff' }}>{fmt(value)}</span>,
+    },
+    {
+      title: 'O&M',
+      dataIndex: 'om',
+      key: 'om',
+      width: 190,
+      align: 'center' as const,
+      render: (value: number) => <span style={{ color: '#52c41a' }}>{fmt(value)}</span>,
+    },
+    {
+      title: 'Total',
+      dataIndex: 'total',
+      key: 'total',
+      width: 190,
+      align: 'center' as const,
+      render: (value: number) => <strong>{fmt(value)}</strong>,
+    },
   ];
-
-  const targetRpa = Number(appConfig.BUDGET_TARGET_RPA || 0);
-  const targetOm = Number(appConfig.BUDGET_TARGET_OM || 0);
-  const totalBudget = Number(exercise.totalBudget || 0);
-  const totalBudgetLeft = totalBudget - budget.grandTotal;
-  const rpaRemainingBudget = targetRpa - budget.totalRpa;
-  const omRemainingBudget = targetOm - budget.totalOm;
-  const totalBudgetLeftColor = totalBudgetLeft < 0 ? dangerColor : '#1a1a2e';
-  const rpaRemainingBudgetColor = rpaRemainingBudget < 0 ? dangerColor : '#1677ff';
-  const omRemainingBudgetColor = omRemainingBudget < 0 ? dangerColor : '#52c41a';
 
   const statCards = [
     { label: 'Grand Total', value: fmt(budget.grandTotal), color: '#1a1a2e', accent: 'ct-stat-purple', icon: <DollarOutlined /> },
@@ -120,90 +133,27 @@ export default function Dashboard() {
     { label: 'White Cell', value: totalWhiteCell.toString(), icon: <UserOutlined /> },
   ];
 
-  const handleExportPdf = async () => {
-    if (!exportRef.current) return;
-    try {
-      await exportElementToPdf(`${exercise.name} Dashboard`, exportRef.current);
-    } catch (error: any) {
-      message.error(error?.message || 'Unable to export dashboard to PDF');
-    }
-  };
-
   return (
-    <div ref={exportRef}>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 24, gap: 12 }}>
-        <Col>
-          <Typography.Title level={4} className="ct-page-title" style={{ marginBottom: 0 }}>
-            {exercise.name} — Dashboard
-          </Typography.Title>
-        </Col>
-        <Col>
-          <Space>
-            <Button icon={<FilePdfOutlined />} onClick={handleExportPdf}>
-              Export to PDF
-            </Button>
-          </Space>
-        </Col>
-      </Row>
-
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} md={8}>
-          <Card size="small" className="ct-stat-card" style={{ padding: '8px 0' }}>
-            <div style={{ padding: '6px 12px', textAlign: 'center' }}>
-              <div className="ct-stat-label">Total Budget Left</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: totalBudgetLeftColor, lineHeight: 1.2 }}>{fmtDelta(totalBudgetLeft)}</div>
-            </div>
-          </Card>
-        </Col>
-
-        <Col xs={24} md={8}>
-          <Card size="small" className="ct-stat-card" style={{ padding: '8px 0' }}>
-            <div style={{ padding: '6px 12px', textAlign: 'center' }}>
-              <div className="ct-stat-label" style={{ fontSize: 18, textDecoration: 'underline', textUnderlineOffset: 4 }}>
-                RPA
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#1677ff', lineHeight: 1.2 }}>
-                Target {fmt(targetRpa)}
-              </div>
-              <div style={{ marginTop: 4, fontSize: 14, fontWeight: 700, color: '#596577', textDecoration: 'underline', textUnderlineOffset: 3 }}>Remaining Budget</div>
-              <div style={{ marginTop: 2, fontSize: 20, fontWeight: 800, color: rpaRemainingBudgetColor, lineHeight: 1.2 }}>
-                {fmtDelta(rpaRemainingBudget)}
-              </div>
-            </div>
-          </Card>
-        </Col>
-
-        <Col xs={24} md={8}>
-          <Card size="small" className="ct-stat-card" style={{ padding: '8px 0' }}>
-            <div style={{ padding: '6px 12px', textAlign: 'center' }}>
-              <div className="ct-stat-label" style={{ fontSize: 18, textDecoration: 'underline', textUnderlineOffset: 4 }}>
-                O&amp;M
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#52c41a', lineHeight: 1.2 }}>
-                Target {fmt(targetOm)}
-              </div>
-              <div style={{ marginTop: 4, fontSize: 14, fontWeight: 700, color: '#596577', textDecoration: 'underline', textUnderlineOffset: 3 }}>
-                Remaining Budget
-              </div>
-              <div style={{ marginTop: 2, fontSize: 20, fontWeight: 800, color: omRemainingBudgetColor, lineHeight: 1.2 }}>
-                {fmtDelta(omRemainingBudget)}
-              </div>
-            </div>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Primary stat cards */}
+    <>
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger">
         {statCards.map((s) => (
           <Col xs={24} sm={8} key={s.label}>
             <Card size="small" className={`ct-stat-card ${s.accent}`} style={{ padding: '4px 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 8px' }}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: 10,
-                  background: `${s.color}10`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 18, color: s.color, flexShrink: 0,
-                }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: `${s.color}10`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 18,
+                    color: s.color,
+                    flexShrink: 0,
+                  }}
+                >
                   {s.icon}
                 </div>
                 <div>
@@ -216,18 +166,25 @@ export default function Dashboard() {
         ))}
       </Row>
 
-      {/* Detail stat cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 28 }} className="ct-stagger">
         {detailCards.map((s) => (
           <Col xs={12} sm={6} key={s.label}>
             <Card size="small" className={`ct-stat-card ${s.accent || ''}`} style={{ padding: '4px 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 8px' }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 8,
-                  background: s.color ? `${s.color}10` : '#f0f4f8',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16, color: s.color || '#596577', flexShrink: 0,
-                }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: s.color ? `${s.color}10` : '#f0f4f8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 16,
+                    color: s.color || '#596577',
+                    flexShrink: 0,
+                  }}
+                >
                   {s.icon}
                 </div>
                 <div>
@@ -240,34 +197,37 @@ export default function Dashboard() {
         ))}
       </Row>
 
-      {/* Unit table */}
       <Card title="Unit Budget Summary" className="ct-section-card" style={{ marginBottom: 28 }}>
-        <div className="ct-table">
-          <Table dataSource={unitData} columns={columns} pagination={false} size="small"
+        <div className="ct-table" style={{ maxWidth: 860, margin: '0 auto' }}>
+          <Table
+            dataSource={unitData}
+            columns={columns}
+            pagination={false}
+            size="small"
+            tableLayout="fixed"
             summary={() => (
               <Table.Summary.Row>
-                <Table.Summary.Cell index={0}><strong>Total</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={1}><strong>{budget.totalPax}</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={2}><strong style={{ color: '#1677ff' }}>{fmt(budget.totalRpa)}</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={3}><strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm - budget.exerciseOmTotal)}</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={4}><strong>{fmt(unitData.reduce((s, u) => s + u.total, 0))}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={0} align="center"><strong>Total</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={1} align="center"><strong>{budget.totalPax}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={2} align="center"><strong style={{ color: '#1677ff' }}>{fmt(budget.totalRpa)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={3} align="center"><strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm - budget.exerciseOmTotal)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={4} align="center"><strong>{fmt(unitData.reduce((sum, unit) => sum + unit.total, 0))}</strong></Table.Summary.Cell>
               </Table.Summary.Row>
             )}
           />
         </div>
       </Card>
 
-      {/* Charts */}
-      <Row gutter={[20, 20]}>
+      <Row gutter={[20, 20]} style={{ marginBottom: 28 }}>
         <Col xs={24} md={12}>
           <Card title="Unit Cost Comparison" className="ct-section-card ct-chart-card">
             <ResponsiveContainer width="100%" height={320}>
               <BarChart data={barData} barCategoryGap="25%">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f5" vertical={false} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#596577', fontSize: 12 }} />
-                <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fill: '#596577', fontSize: 12 }} />
+                <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fill: '#596577', fontSize: 12 }} />
                 <Tooltip
-                  formatter={(v: number) => fmt(v)}
+                  formatter={(value: number) => fmt(value)}
                   contentStyle={{ borderRadius: 8, border: '1px solid #e8ecf1', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                 />
                 <Legend wrapperStyle={{ paddingTop: 12 }} />
@@ -281,7 +241,7 @@ export default function Dashboard() {
           <Card size="small" className="ct-stat-card ct-stat-green" style={{ minHeight: 320 }}>
             <div style={{ padding: '18px 22px', display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 28 }}>
               <div>
-                <div className="ct-stat-label">UNIT O&amp;M</div>
+                <div className="ct-stat-label">O&amp;M</div>
                 <div style={{ fontSize: 28, fontWeight: 800, color: '#52c41a', lineHeight: 1.1, marginTop: 2 }}>
                   {fmt(unitOmBreakdownTotal)}
                 </div>
@@ -308,6 +268,6 @@ export default function Dashboard() {
           </Card>
         </Col>
       </Row>
-    </div>
+    </>
   );
 }

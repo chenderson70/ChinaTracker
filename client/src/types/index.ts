@@ -69,6 +69,7 @@ export interface PersonnelEntry {
   isLocal: boolean;
   note: string | null;
   travelOnly: boolean;
+  longTermA7Planner: boolean;
 }
 
 export interface TravelConfig {

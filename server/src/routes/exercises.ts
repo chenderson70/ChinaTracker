@@ -23,6 +23,23 @@ async function loadRates(): Promise<RateInputs> {
     },
     playerBilletingPerNight: cfg['PLAYER_BILLETING_NIGHT'] || 27,
     playerPerDiemPerDay: cfg['PLAYER_PER_DIEM_PER_DAY'] || cfg['FIELD_CONDITIONS_PER_DIEM'] || 5,
+    defaultAirfare: cfg['DEFAULT_AIRFARE'] || 400,
+    defaultRentalCarDailyRate: cfg['DEFAULT_RENTAL_CAR_DAILY'] || 50,
+  };
+}
+
+async function loadTravelDefaults(): Promise<{ airfarePerPerson: number; rentalCarDailyRate: number }> {
+  const configs = await prisma.appConfig.findMany({
+    where: {
+      key: {
+        in: ['DEFAULT_AIRFARE', 'DEFAULT_RENTAL_CAR_DAILY'],
+      },
+    },
+  });
+  const cfg = Object.fromEntries(configs.map((c) => [c.key, parseFloat(c.value)]));
+  return {
+    airfarePerPerson: cfg['DEFAULT_AIRFARE'] || 400,
+    rentalCarDailyRate: cfg['DEFAULT_RENTAL_CAR_DAILY'] || 50,
   };
 }
 
@@ -87,6 +104,7 @@ async function ensurePlanningGroups(exerciseId: string): Promise<void> {
 
 // Helper: seed default unit budgets and personnel groups for a new exercise
 async function seedExerciseDefaults(exerciseId: string) {
+  const travelDefaults = await loadTravelDefaults();
   const units: Array<{ code: 'SG' | 'AE' | 'CAB' | 'A7' }> = [
     { code: 'SG' },
     { code: 'AE' },
@@ -131,7 +149,13 @@ async function seedExerciseDefaults(exerciseId: string) {
 
   // Default travel config
   await prisma.travelConfig.create({
-    data: { exerciseId, airfarePerPerson: 400, rentalCarDailyRate: 50, rentalCarCount: 0, rentalCarDays: 0 },
+    data: {
+      exerciseId,
+      airfarePerPerson: travelDefaults.airfarePerPerson,
+      rentalCarDailyRate: travelDefaults.rentalCarDailyRate,
+      rentalCarCount: 0,
+      rentalCarDays: 0,
+    },
   });
 }
 
@@ -279,7 +303,7 @@ router.get('/:id/export', async (req: Request, res: Response) => {
       ['Total RPA', budget.totalRpa],
       ['Total O&M', budget.totalOm],
       ['Grand Total', budget.grandTotal],
-      ['RPA Travel-Only', budget.rpaTravel],
+      ['RPA Travel', budget.rpaTravel],
       ['WRM', budget.wrm],
       [''],
       ['Total PAX', budget.totalPax],

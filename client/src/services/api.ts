@@ -257,6 +257,7 @@ export async function addPersonnelEntry(
     isLocal?: boolean;
     note?: string | null;
     travelOnly?: boolean;
+    longTermA7Planner?: boolean;
   },
 ): Promise<PersonnelEntry> {
   return apiRequest<PersonnelEntry>(`/personnel-groups/${groupId}/entries`, { method: 'POST', body: data });
@@ -264,7 +265,7 @@ export async function addPersonnelEntry(
 
 export async function updatePersonnelEntry(
   entryId: string,
-  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'dutyDays' | 'rentalCarCount' | 'location' | 'isLocal' | 'note' | 'travelOnly'>>,
+  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'dutyDays' | 'rentalCarCount' | 'location' | 'isLocal' | 'note' | 'travelOnly' | 'longTermA7Planner'>>,
 ): Promise<PersonnelEntry> {
   return apiRequest<PersonnelEntry>(`/personnel-entries/${entryId}`, { method: 'PUT', body: data });
 }

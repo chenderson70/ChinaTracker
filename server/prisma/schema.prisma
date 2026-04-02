@@ -104,6 +104,7 @@ model PersonnelEntry {
   isLocal          Boolean        @default(false) @map("is_local")
   note             String?
   travelOnly       Boolean        @default(false) @map("travel_only")
+  longTermA7Planner Boolean       @default(false) @map("long_term_a7_planner")
   personnelGroup   PersonnelGroup @relation(fields: [personnelGroupId], references: [id], onDelete: Cascade)
 
   @@map("personnel_entries")

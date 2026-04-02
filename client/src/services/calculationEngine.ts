@@ -9,6 +9,8 @@ export interface RateInputs {
   mealRates: { breakfast: number; lunchMre: number; dinner: number };
   playerBilletingPerNight: number;
   playerPerDiemPerDay: number;
+  defaultAirfare: number;
+  defaultRentalCarDailyRate: number;
 }
 
 function emptyGroup(pax = 0, days = 0): GroupCalc {
@@ -33,6 +35,10 @@ function isTravelOnlyFlag(value: any): boolean {
   return false;
 }
 
+function qualifiesForRpaTravel(fundingType: any, entryIsLocal: boolean, entryTravelOnly: boolean): boolean {
+  return fundingType === 'RPA' && (entryTravelOnly || !entryIsLocal);
+}
+
 function calcMilPay(
   group: { isLongTour: boolean; avgCpdOverride: number | null; paxCount: number },
   entry: { rankCode: string | null; count: number },
@@ -51,8 +57,8 @@ function calcMilPay(
 export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): BudgetResult {
   const defaultDays = exercise.defaultDutyDays || 1;
   const travel = exercise.travelConfig || {
-    airfarePerPerson: 400,
-    rentalCarDailyRate: 50,
+    airfarePerPerson: rates.defaultAirfare,
+    rentalCarDailyRate: rates.defaultRentalCarDailyRate,
     rentalCarCount: 0,
     rentalCarDays: 0,
   };
@@ -72,7 +78,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
   };
 
   const mealsPerDay = rates.mealRates.breakfast + rates.mealRates.lunchMre + rates.mealRates.dinner;
-  const playerRpaMealsPerDay = rates.mealRates.breakfast + rates.mealRates.dinner;
+  const playerRpaMealsPerDay = mealsPerDay;
 
   for (const ub of exercise.unitBudgets || []) {
     const unitCalc: UnitCalc = {
@@ -105,7 +111,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
       const isPlanning = pg.role === 'PLANNING';
       const isSupport = pg.role === 'SUPPORT';
       const isWhiteCell = pg.role === 'WHITE_CELL' || isSupport;
-      const isNamedWhiteCell = pg.role === 'WHITE_CELL';
+      const usesWhiteCellStyleRental = pg.role === 'WHITE_CELL' || isSupport;
       const isPlayer = pg.role === 'PLAYER';
       const isPlanningGroup = isPlanning;
       const allowsTravelOnly = isPlanningGroup || isSupport;
@@ -117,7 +123,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
       const hasLegacyGroupRental = (pg.rentalCarCount || 0) > 0 || (pg.rentalCarDays || 0) > 0 || pg.rentalCarDaily != null;
       const groupRentalCost = (pg.rentalCarCount || 0) * rentalDaily * (pg.rentalCarDays || 0);
       const appliedLegacyRentalCost = hasLegacyGroupRental ? groupRentalCost : rentalCost;
-      const usesEntryLevelRental = isNamedWhiteCell && entries.length > 0;
+      const usesEntryLevelRental = usesWhiteCellStyleRental && entries.length > 0;
       unitCalc.totalPax += pax;
 
       const calcEntries = entries.length > 0
@@ -129,6 +135,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
       let groupMeals = 0;
       let groupTravel = 0;
       let groupBilleting = 0;
+      let groupRpaTravel = 0;
       let dutyDaysAccumulator = 0;
 
       for (const entry of calcEntries) {
@@ -138,6 +145,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
         const entryIsLocal = isLocalFlag(entry.isLocal) || isLocalFlag(pg.isLocal);
         const entryTravelOnly = allowsTravelOnly && isTravelOnlyFlag(entry.travelOnly);
         const entryRentalCarCount = Math.max(0, Number((entry as any).rentalCarCount || 0));
+        const includeEntryInRpaTravel = qualifiesForRpaTravel(pg.fundingType, entryIsLocal, entryTravelOnly);
         const pdRates = rates.perDiemRates[entryLoc] || { lodging: 0, mie: 0 };
 
         dutyDaysAccumulator += entryDays * entryCount;
@@ -149,9 +157,15 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
           if (usesLocationPerDiemRates && !entryIsLocal) {
             groupPerDiem += entryCount * (pdRates.lodging + pdRates.mie) * entryDays;
             groupTravel += entryCount * airfarePerPerson;
+            if (includeEntryInRpaTravel) {
+              groupRpaTravel += entryCount * airfarePerPerson;
+            }
           }
           if (usesEntryLevelRental && entryRentalCarCount > 0) {
             groupTravel += entryRentalCarCount * rentalDaily * entryDays;
+            if (includeEntryInRpaTravel) {
+              groupRpaTravel += entryRentalCarCount * rentalDaily * entryDays;
+            }
           }
         } else if (isPlanningGroup && pg.fundingType === 'RPA') {
           if (!entryTravelOnly) {
@@ -160,6 +174,9 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
           if (usesLocationPerDiemRates && !entryIsLocal) {
             groupPerDiem += entryCount * (pdRates.lodging + pdRates.mie) * entryDays;
             groupTravel += entryCount * airfarePerPerson;
+            if (includeEntryInRpaTravel) {
+              groupRpaTravel += entryCount * airfarePerPerson;
+            }
           }
         } else if (isPlanningGroup && pg.fundingType === 'OM') {
           if (usesLocationPerDiemRates && !entryIsLocal) {
@@ -182,6 +199,9 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
           if (isSgAeCabPlayer) {
             if (!entryIsLocal) {
               groupTravel += entryCount * travel.airfarePerPerson;
+              if (includeEntryInRpaTravel) {
+                groupRpaTravel += entryCount * travel.airfarePerPerson;
+              }
               const nights = Math.max(entryDays, 0);
               groupBilleting += entryCount * rates.playerBilletingPerNight * nights;
             }
@@ -201,10 +221,13 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
         }
       }
 
-      if ((isSupport || (isNamedWhiteCell && !usesEntryLevelRental)) && pg.fundingType === 'RPA' && hasLegacyGroupRental && groupTravel > 0 && !calcEntries.every((entry) => isLocalFlag(entry.isLocal) || isLocalFlag(pg.isLocal))) {
+      if (usesWhiteCellStyleRental && !usesEntryLevelRental && pg.fundingType === 'RPA' && hasLegacyGroupRental && groupTravel > 0 && !calcEntries.every((entry) => isLocalFlag(entry.isLocal) || isLocalFlag(pg.isLocal))) {
         groupTravel += appliedLegacyRentalCost;
+        if (calcEntries.some((entry) => qualifiesForRpaTravel(pg.fundingType, isLocalFlag(entry.isLocal) || isLocalFlag(pg.isLocal), allowsTravelOnly && isTravelOnlyFlag(entry.travelOnly)))) {
+          groupRpaTravel += appliedLegacyRentalCost;
+        }
       }
-      if (!usesEntryLevelRental && isNamedWhiteCell && pg.fundingType === 'OM' && hasLegacyGroupRental) {
+      if (usesWhiteCellStyleRental && !usesEntryLevelRental && pg.fundingType === 'OM' && hasLegacyGroupRental) {
         groupTravel += appliedLegacyRentalCost;
       }
 
@@ -218,7 +241,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
         g.subtotal = g.milPay + g.perDiem + g.travel;
         unitCalc.whiteCellRpa = g;
         result.totalWhiteCell += pax;
-        if (pg.isLongTour) result.rpaTravel += g.travel;
+        result.rpaTravel += groupRpaTravel;
       } else if (isWhiteCell && pg.fundingType === 'OM') {
         const g = emptyGroup(pax, avgDays);
         g.perDiem = groupPerDiem;
@@ -236,6 +259,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
         g.subtotal = g.milPay + g.travel + g.perDiem + g.billeting;
         unitCalc.planningRpa = g;
         result.totalPlayers += pax;
+        result.rpaTravel += groupRpaTravel;
       } else if (isPlanningGroup && pg.fundingType === 'OM') {
         const g = emptyGroup(pax, avgDays);
         g.travel = groupTravel;
@@ -257,6 +281,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
         sgAeCabPlayerBilletingToOm += billetingToOm;
         unitCalc.playerRpa = g;
         result.totalPlayers += pax;
+        result.rpaTravel += groupRpaTravel;
       } else if (isPlayer && pg.fundingType === 'OM') {
         const g = emptyGroup(pax, avgDays);
         g.travel = groupTravel;
