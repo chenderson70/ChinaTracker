@@ -13,6 +13,7 @@ import { useApp } from '../components/AppLayout';
 import * as api from '../services/api';
 import { exportElementToPdf } from '../services/pdf';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
+import { getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const fmtDelta = (n: number) => (n < 0 ? `-${fmt(Math.abs(n))}` : fmt(n));
@@ -25,12 +26,15 @@ export default function Dashboard() {
 
   if (!exercise || !budget) return <div className="ct-loading"><Spin size="large" /></div>;
 
+  const siteVisitPaxExclusions = getPlanningEventPaxExclusions(exercise);
+  const displayTotalPax = getDisplayedPax(budget.totalPax, siteVisitPaxExclusions.totalExcludedPax);
+
   const unitData = Object.values(budget.units)
     .sort((left, right) => compareUnitCodes(left.unitCode, right.unitCode))
     .map((u) => ({
       key: u.unitCode,
       unitCode: u.unitCode,
-      totalPax: u.totalPax,
+      totalPax: getDisplayedPax(u.totalPax, siteVisitPaxExclusions.excludedByUnit[String(u.unitCode || '').toUpperCase()] || 0),
       rpa: u.unitTotalRpa,
       om: u.unitTotalOm,
       total: u.unitTotal,
@@ -57,17 +61,27 @@ export default function Dashboard() {
     .filter((line) => String(line.category || '').toUpperCase() === 'GPC_PURCHASES')
     .reduce((sum, line) => sum + (line.amount || 0), 0);
 
-  const omPlanningTravelTotal = Object.values(budget.units)
-    .reduce((sum, unit) => sum + (unit.planningOm.travel || 0) + (unit.planningOm.perDiem || 0), 0);
+  const omBilletingTotal = Object.values(budget.units)
+    .reduce((sum, unit) => sum + (unit.planningOm.billeting || 0) + (unit.whiteCellOm.billeting || 0) + (unit.playerOm.billeting || 0), 0);
 
-  const omSupportExecutionTravelTotal = Object.values(budget.units)
-    .reduce((sum, unit) => sum + (unit.whiteCellOm.travel || 0) + (unit.whiteCellOm.perDiem || 0), 0);
-  const omTravelTotal = omPlanningTravelTotal + omSupportExecutionTravelTotal;
+  const omTravelTotal = Object.values(budget.units)
+    .reduce(
+      (sum, unit) =>
+        sum +
+        (unit.planningOm.travel || 0) +
+        (unit.planningOm.perDiem || 0) +
+        (unit.whiteCellOm.travel || 0) +
+        (unit.whiteCellOm.perDiem || 0) +
+        (unit.playerOm.travel || 0) +
+        (unit.playerOm.perDiem || 0),
+      0,
+    );
 
   const unitOmBreakdownTotal =
     omWrmTotal +
     omContractsTotal +
     omGpcPurchasesTotal +
+    omBilletingTotal +
     omTravelTotal;
 
   const rpaMilPayTotal = Object.values(budget.units)
@@ -114,7 +128,7 @@ export default function Dashboard() {
   ];
 
   const detailCards = [
-    { label: 'Total PAX', value: budget.totalPax.toString(), icon: <TeamOutlined />, color: '#722ed1', accent: 'ct-stat-purple' },
+    { label: 'Total PAX', value: displayTotalPax.toString(), icon: <TeamOutlined />, color: '#722ed1', accent: 'ct-stat-purple' },
     { label: 'Planners (Only long tour A7/ Unit of Action personnel)', value: totalLongTermA7Planners.toString(), icon: <UserOutlined /> },
     { label: 'Players', value: totalPlayers.toString(), icon: <UserOutlined /> },
     { label: 'White Cell', value: totalWhiteCell.toString(), icon: <UserOutlined /> },
@@ -131,20 +145,18 @@ export default function Dashboard() {
 
   return (
     <div ref={exportRef}>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 24, gap: 12 }}>
-        <Col>
-          <Typography.Title level={4} className="ct-page-title" style={{ marginBottom: 0 }}>
+      <div className="ct-page-header">
+        <Typography.Title level={4} className="ct-page-title">
             {exercise.name} — Dashboard
-          </Typography.Title>
-        </Col>
-        <Col>
-          <Space>
+        </Typography.Title>
+        <div className="ct-page-actions">
+          <Space wrap>
             <Button icon={<FilePdfOutlined />} onClick={handleExportPdf}>
               Export to PDF
             </Button>
           </Space>
-        </Col>
-      </Row>
+        </div>
+      </div>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} md={8}>
@@ -247,7 +259,7 @@ export default function Dashboard() {
             summary={() => (
               <Table.Summary.Row>
                 <Table.Summary.Cell index={0}><strong>Total</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={1}><strong>{budget.totalPax}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={1}><strong>{displayTotalPax}</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={2}><strong style={{ color: '#1677ff' }}>{fmt(budget.totalRpa)}</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={3}><strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm - budget.exerciseOmTotal)}</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={4}><strong>{fmt(unitData.reduce((s, u) => s + u.total, 0))}</strong></Table.Summary.Cell>
@@ -289,6 +301,7 @@ export default function Dashboard() {
                   <div>WRM: {fmt(omWrmTotal)}</div>
                   <div>Contracts: {fmt(omContractsTotal)}</div>
                   <div>GPC Purchases: {fmt(omGpcPurchasesTotal)}</div>
+                  {omBilletingTotal > 0 && <div>Billeting: {fmt(omBilletingTotal)}</div>}
                   <div>Travel: {fmt(omTravelTotal)}</div>
                 </div>
               </div>

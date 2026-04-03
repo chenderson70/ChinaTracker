@@ -354,6 +354,91 @@ body {
   font-weight: 600;
 }
 
+.ct-quick-summary-card .ant-card-body {
+  padding: 20px 24px;
+}
+
+.ct-quick-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.ct-quick-summary-item {
+  border: 1px solid var(--ct-border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f5f8fc 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.ct-quick-summary-label {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #596577;
+}
+
+.ct-quick-summary-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #102039;
+  font-weight: 600;
+}
+
+.ct-quick-summary-rates {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e8ecf1;
+}
+
+.ct-quick-summary-rates-title {
+  margin-bottom: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #596577;
+}
+
+.ct-quick-summary-rate-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ct-quick-summary-rate-item {
+  border: 1px solid #e8ecf1;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.ct-quick-summary-rate-label {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #596577;
+}
+
+.ct-quick-summary-rate-value {
+  font-size: 15px;
+  line-height: 1.4;
+  color: #102039;
+  font-weight: 700;
+}
+
+.ct-quick-summary-rate-detail {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #738296;
+}
+
 /* --- Tables --- */
 .ct-table .ant-table {
   border-radius: 8px;
@@ -542,22 +627,45 @@ body {
 }
 
 /* --- Dashboard Title --- */
+.ct-page-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.ct-page-actions {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
 .ct-page-title {
-  font-weight: 700 !important;
-  letter-spacing: -0.3px;
-  margin-bottom: 24px !important;
+  width: 100%;
+  margin: 0 !important;
+  text-align: center;
+  font-size: clamp(2rem, 3.2vw, 3rem) !important;
+  line-height: 1.05 !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.04em;
   position: relative;
-  display: inline-block;
+  display: block;
+  padding-top: 4px;
+  padding-bottom: 18px;
+  color: #102039 !important;
+  text-wrap: balance;
 }
 
 .ct-page-title::after {
   content: '';
   position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 40px;
-  height: 3px;
-  border-radius: 2px;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 96px;
+  height: 4px;
+  border-radius: 999px;
   background: linear-gradient(90deg, var(--ct-primary), var(--ct-accent));
 }
 
@@ -754,6 +862,24 @@ body {
 @media (max-width: 768px) {
   .ct-field-label {
     min-height: 0;
+  }
+
+  .ct-page-header {
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .ct-page-actions .ant-space {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ct-quick-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ct-quick-summary-rate-list {
+    grid-template-columns: 1fr;
   }
 
   .ct-header-stats {

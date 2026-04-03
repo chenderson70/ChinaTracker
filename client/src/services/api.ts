@@ -461,6 +461,7 @@ export async function exportAllData(): Promise<string> {
           isLocal: entry.isLocal,
           note: entry.note,
           travelOnly: entry.travelOnly,
+          longTermA7Planner: entry.longTermA7Planner,
         })),
       ),
     ),
@@ -517,6 +518,7 @@ export async function importAllData(json: string): Promise<void> {
       isLocal?: boolean;
       note?: string | null;
       travelOnly?: boolean;
+      longTermA7Planner?: boolean;
     }>;
     travelConfigs?: Array<{
       exerciseId: string;
@@ -648,6 +650,7 @@ export async function importAllData(json: string): Promise<void> {
           isLocal: !!entry.isLocal,
           note: entry.note ?? null,
           travelOnly: !!entry.travelOnly,
+          longTermA7Planner: !!entry.longTermA7Planner,
         });
       }
     }

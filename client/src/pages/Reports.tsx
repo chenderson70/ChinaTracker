@@ -7,8 +7,177 @@ import * as api from '../services/api';
 import dayjs from 'dayjs';
 import { exportElementToPdf } from '../services/pdf';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
+import { getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
+import type { ExerciseDetail } from '../types';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+const DAYS_PER_MONTH = 30;
+
+function fmtRate(n: number): string {
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+type PlanningSummaryEntry = {
+  unitCode: string;
+  count: number;
+  dutyDays: number;
+  isLocal: boolean;
+  note: string;
+  longTermA7Planner: boolean;
+  fundingType: string;
+  location: string;
+};
+
+function pluralize(value: number, singular: string, plural = `${singular}s`): string {
+  return `${value} ${value === 1 ? singular : plural}`;
+}
+
+function normalizePlanningNote(value: string | null | undefined): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getPlanningNoteCategory(value: string | null | undefined): string {
+  const normalized = normalizePlanningNote(value);
+  if ([
+    'planning conference',
+    'initial planning conference',
+    'mid planning conference',
+    'final planning conference',
+  ].includes(normalized)) {
+    return 'planning conference';
+  }
+  return normalized;
+}
+
+function getPlanningEventKey(entry: PlanningSummaryEntry): string {
+  const normalizedNote = normalizePlanningNote(entry.note);
+  const normalizedLocation = String(entry.location || '').trim().toUpperCase() || 'UNKNOWN';
+  const normalizedDutyDays = Number(entry.dutyDays || 0);
+  return `${normalizedNote}::${normalizedLocation}::${normalizedDutyDays}`;
+}
+
+function formatPlannerDuration(dutyDays: number): string {
+  const months = dutyDays / DAYS_PER_MONTH;
+  if (dutyDays > 0 && Number.isInteger(months) && months >= 1) {
+    return pluralize(months, 'month');
+  }
+  return pluralize(dutyDays, 'duty day');
+}
+
+function formatDutyDayDuration(dutyDays: number): string {
+  return pluralize(dutyDays, 'duty day');
+}
+
+function getPlannerUnitLabel(unitCode: string): string {
+  return String(unitCode || '').toUpperCase() === 'CAB' ? 'UoA' : getUnitDisplayLabel(unitCode);
+}
+
+function getPlanningSummaryEntries(exercise: ExerciseDetail): PlanningSummaryEntry[] {
+  return (exercise.unitBudgets || [])
+    .flatMap((unitBudget) =>
+      (unitBudget.personnelGroups || [])
+        .filter((group) => group.role === 'PLANNING')
+        .flatMap((group) => {
+          const entries = group.personnelEntries.length > 0
+            ? group.personnelEntries.map((entry) => ({
+                count: Number(entry.count || 0),
+                dutyDays: Number(entry.dutyDays ?? group.dutyDays ?? exercise.defaultDutyDays ?? 0),
+                isLocal: !!(entry.isLocal ?? group.isLocal),
+                note: String(entry.note || '').trim(),
+                longTermA7Planner: !!entry.longTermA7Planner,
+                fundingType: String(group.fundingType || ''),
+                location: String(entry.location ?? group.location ?? ''),
+              }))
+            : (group.paxCount || 0) > 0
+              ? [{
+                  count: Number(group.paxCount || 0),
+                  dutyDays: Number(group.dutyDays ?? exercise.defaultDutyDays ?? 0),
+                  isLocal: !!group.isLocal,
+                  note: 'Planning',
+                  longTermA7Planner: false,
+                  fundingType: String(group.fundingType || ''),
+                  location: String(group.location || ''),
+                }]
+              : [];
+
+          return entries.map((entry) => ({
+            unitCode: unitBudget.unitCode,
+            ...entry,
+          }));
+        }),
+    )
+    .filter((entry) => entry.count > 0);
+}
+
+function buildPlannerSummary(entries: PlanningSummaryEntry[]): string {
+  if (entries.length === 0) return 'No long-tour planners configured';
+
+  const totalPlanners = entries.reduce((sum, entry) => sum + entry.count, 0);
+  const localPlanners = entries.reduce((sum, entry) => sum + (entry.isLocal ? entry.count : 0), 0);
+  const nonLocalPlanners = totalPlanners - localPlanners;
+  const unitCounts = entries.reduce<Record<string, number>>((acc, entry) => {
+    const normalizedUnitCode = String(entry.unitCode || '').toUpperCase();
+    acc[normalizedUnitCode] = (acc[normalizedUnitCode] || 0) + entry.count;
+    return acc;
+  }, {});
+  const unitBreakdown = Object.entries(unitCounts)
+    .sort(([left], [right]) => compareUnitCodes(left, right))
+    .map(([unitCode, count]) => {
+      const label = getPlannerUnitLabel(unitCode);
+      return label === 'A7' ? `${count} A7 planners` : `${count} ${label}`;
+    })
+    .join(' / ');
+  const uniqueDutyDays = [...new Set(entries.map((entry) => entry.dutyDays).filter((value) => value > 0))];
+  const durationText = uniqueDutyDays.length === 1
+    ? formatPlannerDuration(uniqueDutyDays[0])
+    : 'mixed durations';
+
+  return `${totalPlanners} total planners: ${unitBreakdown} - ${durationText} (${localPlanners} local / ${nonLocalPlanners} not local)`;
+}
+
+function buildPlanningEventSummary(entries: PlanningSummaryEntry[], singular: string, plural: string): string {
+  if (entries.length === 0) return `No ${plural} configured`;
+
+  const groupedEvents = Array.from(
+    entries.reduce((acc, entry) => {
+      const key = getPlanningEventKey(entry);
+      const existing = acc.get(key) || { totalPax: 0, rpaPax: 0, omPax: 0, dutyDays: entry.dutyDays };
+      existing.totalPax += entry.count;
+      if (String(entry.fundingType || '').toUpperCase() === 'RPA') existing.rpaPax += entry.count;
+      if (String(entry.fundingType || '').toUpperCase() === 'OM') existing.omPax += entry.count;
+      acc.set(key, existing);
+      return acc;
+    }, new Map<string, { totalPax: number; rpaPax: number; omPax: number; dutyDays: number }>()),
+  ).map(([, value]) => value);
+
+  const eventCount = groupedEvents.length;
+  const uniqueTotalPax = [...new Set(groupedEvents.map((event) => event.totalPax).filter((value) => value > 0))];
+  const uniqueRpaPax = [...new Set(groupedEvents.map((event) => event.rpaPax).filter((value) => value >= 0))];
+  const uniqueOmPax = [...new Set(groupedEvents.map((event) => event.omPax).filter((value) => value >= 0))];
+  const nonZeroRpaPax = [...new Set(groupedEvents.map((event) => event.rpaPax).filter((value) => value > 0))];
+  const nonZeroOmPax = [...new Set(groupedEvents.map((event) => event.omPax).filter((value) => value > 0))];
+  const uniqueDutyDays = [...new Set(groupedEvents.map((event) => event.dutyDays).filter((value) => value > 0))];
+  const dutyText = uniqueDutyDays.length === 1
+    ? `${formatDutyDayDuration(uniqueDutyDays[0])}${eventCount > 1 ? ' each' : ''}`
+    : 'mixed duty days';
+
+  if (eventCount > 1 && nonZeroRpaPax.length === 1 && nonZeroOmPax.length === 1) {
+    const rpaPaxEach = nonZeroRpaPax[0];
+    const omPaxEach = nonZeroOmPax[0];
+    const totalPaxEach = rpaPaxEach + omPaxEach;
+    return `${eventCount} - ${totalPaxEach} PAX each (${rpaPaxEach} RPA/${omPaxEach} O&M) - ${dutyText}`;
+  }
+
+  if (eventCount === 1 || (uniqueTotalPax.length === 1 && uniqueRpaPax.length === 1 && uniqueOmPax.length === 1)) {
+    const sampleEvent = groupedEvents[0];
+    const paxText = `${sampleEvent.totalPax} PAX${eventCount > 1 ? ' each' : ''}`;
+    return `${eventCount} - ${paxText} (${sampleEvent.rpaPax} RPA/${sampleEvent.omPax} O&M) - ${dutyText}`;
+  }
+
+  const totalRpaPax = groupedEvents.reduce((sum, event) => sum + event.rpaPax, 0);
+  const totalOmPax = groupedEvents.reduce((sum, event) => sum + event.omPax, 0);
+  return `${eventCount} - mixed PAX (${totalRpaPax} RPA/${totalOmPax} O&M across events) - ${dutyText}`;
+}
 
 interface ReportsPageProps {
   title?: string;
@@ -80,6 +249,9 @@ export function ReportsPage({
 
   if (!exercise || !budget) return <div className="ct-loading"><Spin size="large" /></div>;
 
+  const siteVisitPaxExclusions = getPlanningEventPaxExclusions(exercise);
+  const displayTotalPax = getDisplayedPax(budget.totalPax, siteVisitPaxExclusions.totalExcludedPax);
+
   const defaultAirfare = Number(appConfig.DEFAULT_AIRFARE ?? 400);
   const defaultRentalCarDailyRate = Number(appConfig.DEFAULT_RENTAL_CAR_DAILY ?? 50);
 
@@ -130,12 +302,10 @@ export function ReportsPage({
       unit: getUnitDisplayLabel(u.unitCode),
       planningRpa: u.planningRpa.subtotal,
       planningOm: u.planningOm.subtotal,
-      wcRpa: u.whiteCellRpa.subtotal,
-      wcOm: u.whiteCellOm.subtotal,
+      wcExecRpa: u.whiteCellRpa.subtotal + u.executionRpa + (u.playerRpa.meals || 0),
+      wcExecOm: u.whiteCellOm.subtotal + u.executionOm,
       playerRpa: Math.max(0, u.playerRpa.subtotal - (u.playerRpa.meals || 0)),
       playerOm: u.playerOm.subtotal,
-      execRpa: u.executionRpa + (u.playerRpa.meals || 0),
-      execOm: u.executionOm,
       totalRpa: u.unitTotalRpa,
       totalOm: u.unitTotalOm,
       total: u.unitTotal,
@@ -146,12 +316,10 @@ export function ReportsPage({
       ...totals,
       planningRpa: totals.planningRpa + row.planningRpa,
       planningOm: totals.planningOm + row.planningOm,
-      wcRpa: totals.wcRpa + row.wcRpa,
-      wcOm: totals.wcOm + row.wcOm,
+      wcExecRpa: totals.wcExecRpa + row.wcExecRpa,
+      wcExecOm: totals.wcExecOm + row.wcExecOm,
       playerRpa: totals.playerRpa + row.playerRpa,
       playerOm: totals.playerOm + row.playerOm,
-      execRpa: totals.execRpa + row.execRpa,
-      execOm: totals.execOm + row.execOm,
       totalRpa: totals.totalRpa + row.totalRpa,
       totalOm: totals.totalOm + row.totalOm,
       total: totals.total + row.total,
@@ -161,12 +329,10 @@ export function ReportsPage({
       unit: 'Total',
       planningRpa: 0,
       planningOm: 0,
-      wcRpa: 0,
-      wcOm: 0,
+      wcExecRpa: 0,
+      wcExecOm: 0,
       playerRpa: 0,
       playerOm: 0,
-      execRpa: 0,
-      execOm: 0,
       totalRpa: 0,
       totalOm: 0,
       total: 0,
@@ -186,12 +352,10 @@ export function ReportsPage({
     { title: 'Unit', dataIndex: 'unit', width: 60, render: renderBudgetLabel, align: 'center' as const },
     { title: 'Planning RPA', dataIndex: 'planningRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Planning O&M', dataIndex: 'planningOm', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'White Cell RPA', dataIndex: 'wcRpa', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'White Cell O&M', dataIndex: 'wcOm', render: renderBudgetAmount, align: 'center' as const },
+    { title: 'White Cell + Execution RPA', dataIndex: 'wcExecRpa', render: renderBudgetAmount, align: 'center' as const },
+    { title: 'White Cell + Execution O&M', dataIndex: 'wcExecOm', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Player RPA', dataIndex: 'playerRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Player O&M', dataIndex: 'playerOm', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'Execution RPA', dataIndex: 'execRpa', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'Execution O&M', dataIndex: 'execOm', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Total RPA', dataIndex: 'totalRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Total O&M', dataIndex: 'totalOm', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Total', dataIndex: 'total', render: renderBudgetAmount, align: 'center' as const },
@@ -221,6 +385,71 @@ export function ReportsPage({
     hasStoredBudgetTargets || hasBudgetDraftChanges
       ? draftOverallBudget
       : Number(exercise.totalBudget || draftOverallBudget);
+  const planningSummaryEntries = getPlanningSummaryEntries(exercise);
+  const explicitLongTourPlannerEntries = planningSummaryEntries.filter((entry) => entry.longTermA7Planner);
+  const fallbackPlannerEntries = planningSummaryEntries.filter(
+    (entry) =>
+      ['A7', 'CAB'].includes(String(entry.unitCode || '').toUpperCase())
+      && getPlanningNoteCategory(entry.note) === 'planning',
+  );
+  const plannerSummaryEntries = explicitLongTourPlannerEntries.length > 0
+    ? explicitLongTourPlannerEntries
+    : fallbackPlannerEntries;
+  const siteVisitEntries = planningSummaryEntries.filter(
+    (entry) => getPlanningNoteCategory(entry.note) === 'site visit',
+  );
+  const planningConferenceEntries = planningSummaryEntries.filter(
+    (entry) => getPlanningNoteCategory(entry.note) === 'planning conference',
+  );
+  const quickPlanningSummaryItems = [
+    {
+      key: 'planners',
+      label: 'Long-Tour Planners',
+      text: buildPlannerSummary(plannerSummaryEntries),
+    },
+    {
+      key: 'site-visits',
+      label: 'Site Visits',
+      text: buildPlanningEventSummary(siteVisitEntries, 'site visit', 'site visits'),
+    },
+    {
+      key: 'planning-conferences',
+      label: 'Planning Conferences',
+      text: buildPlanningEventSummary(planningConferenceEntries, 'planning conference', 'planning conferences'),
+    },
+  ];
+  const quickPlanningRateItems = [
+    {
+      key: 'breakfast',
+      label: 'Breakfast',
+      value: `${fmtRate(Number(appConfig.BREAKFAST_COST ?? 14))}/day`,
+      detail: 'A rations',
+    },
+    {
+      key: 'lunch-mre',
+      label: 'Lunch/MRE',
+      value: `${fmtRate(Number(appConfig.LUNCH_MRE_COST ?? 15.91))}/day`,
+      detail: 'Player meal rate',
+    },
+    {
+      key: 'dinner',
+      label: 'Dinner',
+      value: `${fmtRate(Number(appConfig.DINNER_COST ?? 14))}/day`,
+      detail: 'A rations',
+    },
+    {
+      key: 'player-billeting',
+      label: 'Player Billeting',
+      value: `${fmtRate(Number(appConfig.PLAYER_BILLETING_NIGHT ?? 27))}/night`,
+      detail: 'CRTC cost',
+    },
+    {
+      key: 'player-per-diem',
+      label: 'Player Per Diem',
+      value: `${fmtRate(Number(appConfig.PLAYER_PER_DIEM_PER_DAY ?? appConfig.FIELD_CONDITIONS_PER_DIEM ?? 5))}/day`,
+      detail: 'M&IE, field conditions',
+    },
+  ];
 
   useEffect(() => {
     skipBudgetTargetsSaveRef.current = true;
@@ -294,18 +523,16 @@ export function ReportsPage({
 
   return (
     <div ref={exportRef}>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
-        <Col>
-          <Typography.Title level={4} className="ct-page-title" style={{ marginBottom: 0 }}>{title}</Typography.Title>
-        </Col>
-        <Col>
-          <Space>
+      <div className="ct-page-header">
+        <Typography.Title level={4} className="ct-page-title">{title}</Typography.Title>
+        <div className="ct-page-actions">
+          <Space wrap>
             <Button icon={<FilePdfOutlined />} onClick={handleExportPdf}>Export to PDF</Button>
             <Button icon={<FileExcelOutlined />} type="primary" onClick={handleExport}>Export to Excel</Button>
             <Button icon={<PrinterOutlined />} onClick={handlePrint}>Print</Button>
           </Space>
-        </Col>
-      </Row>
+        </div>
+      </div>
 
       {/* Exercise info */}
       <Card
@@ -358,13 +585,38 @@ export function ReportsPage({
               min={1}
               value={draftDutyDays}
               onChange={(v) => setDraftDutyDays(v ?? 1)}
-              style={{ width: 70 }}
+              formatter={(value) => (value == null ? '' : `${value} days`)}
+              parser={(value) => Number((value ?? '').replace(/\s*days?$/i, '').trim())}
+              style={{ width: 110 }}
             />
           </Descriptions.Item>
         </Descriptions>
       </Card>
 
       {beforeBudgetBreakdownSection}
+
+      <Card title="Quick Planning Summary" className="ct-section-card ct-quick-summary-card" style={{ marginBottom: 24 }}>
+        <div className="ct-quick-summary-grid">
+          {quickPlanningSummaryItems.map((item) => (
+            <div key={item.key} className="ct-quick-summary-item">
+              <div className="ct-quick-summary-label">{item.label}</div>
+              <div className="ct-quick-summary-text">{item.text}</div>
+            </div>
+          ))}
+        </div>
+        <div className="ct-quick-summary-rates">
+          <div className="ct-quick-summary-rates-title">Player Cost Rates</div>
+          <div className="ct-quick-summary-rate-list">
+            {quickPlanningRateItems.map((item) => (
+              <div key={item.key} className="ct-quick-summary-rate-item">
+                <div className="ct-quick-summary-rate-label">{item.label}</div>
+                <div className="ct-quick-summary-rate-value">{item.value}</div>
+                <div className="ct-quick-summary-rate-detail">{item.detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       {/* Full budget table */}
       <Card title="Full Budget Breakdown" className="ct-section-card" style={{ marginBottom: 24 }}>
@@ -394,8 +646,6 @@ export function ReportsPage({
               travelForm.setFieldsValue({
                 airfarePerPerson: Number(travel?.airfarePerPerson ?? defaultAirfare),
                 rentalCarDailyRate: Number(travel?.rentalCarDailyRate ?? defaultRentalCarDailyRate),
-                rentalCarCount: Number(travel?.rentalCarCount ?? 0),
-                rentalCarDays: Number(travel?.rentalCarDays ?? 0),
               });
             }}>
               Edit
@@ -410,8 +660,6 @@ export function ReportsPage({
             initialValues={{
               airfarePerPerson: Number(travel?.airfarePerPerson ?? defaultAirfare),
               rentalCarDailyRate: Number(travel?.rentalCarDailyRate ?? defaultRentalCarDailyRate),
-              rentalCarCount: Number(travel?.rentalCarCount ?? 0),
-              rentalCarDays: Number(travel?.rentalCarDays ?? 0),
             }}
           >
             <Form.Item name="airfarePerPerson" label="Airfare ($/person)">
@@ -420,19 +668,11 @@ export function ReportsPage({
             <Form.Item name="rentalCarDailyRate" label="Rental Car ($/day)">
               <InputNumber min={0} />
             </Form.Item>
-            <Form.Item name="rentalCarCount" label="# Cars">
-              <InputNumber min={0} />
-            </Form.Item>
-            <Form.Item name="rentalCarDays" label="# Days">
-              <InputNumber min={0} />
-            </Form.Item>
           </Form>
         ) : (
-          <Descriptions column={4} size="small">
+          <Descriptions column={2} size="small">
             <Descriptions.Item label="Airfare">{fmt(travel?.airfarePerPerson ?? defaultAirfare)}/person</Descriptions.Item>
-            <Descriptions.Item label="Rental Cars">{travel?.rentalCarCount || 0} vehicles</Descriptions.Item>
             <Descriptions.Item label="Car Rate">{fmt(travel?.rentalCarDailyRate ?? defaultRentalCarDailyRate)}/day</Descriptions.Item>
-            <Descriptions.Item label="Car Days">{travel?.rentalCarDays || 0} days</Descriptions.Item>
           </Descriptions>
         )}
       </Card>
@@ -447,7 +687,7 @@ export function ReportsPage({
             <Descriptions.Item label="RPA Travel">{fmt(budget.rpaTravel)}</Descriptions.Item>
             <Descriptions.Item label="Exercise O&M">{fmt(budget.exerciseOmTotal)}</Descriptions.Item>
             <Descriptions.Item label="WRM">{fmt(budget.wrm)}</Descriptions.Item>
-            <Descriptions.Item label="Total PAX">{budget.totalPax}</Descriptions.Item>
+            <Descriptions.Item label="Total PAX">{displayTotalPax}</Descriptions.Item>
             <Descriptions.Item label="Players">{budget.totalPlayers}</Descriptions.Item>
             <Descriptions.Item label="White Cell">{budget.totalWhiteCell}</Descriptions.Item>
           </Descriptions>

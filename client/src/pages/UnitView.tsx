@@ -59,6 +59,9 @@ const PLANNING_NOTE_OPTIONS = [
   { value: 'Planning' },
   { value: 'Site Visit' },
   { value: 'Planning Conference' },
+  { value: 'Initial Planning Conference' },
+  { value: 'Mid Planning Conference' },
+  { value: 'Final Planning Conference' },
 ];
 const WHITE_CELL_TYPE_OPTIONS = [
   { value: 'White Cell' },
@@ -861,9 +864,11 @@ export default function UnitView() {
       notes: String(line.notes || '').trim() || 'General GPC Purchase',
     }));
   const contractsDisplayTotal = sgAeCabPlayerBilletingTotal + userContractLines.reduce((sum, line) => sum + (line.amount || 0), 0);
+  const omBilletingTotal = (planningOm.billeting || 0) + (whiteCellOm.billeting || 0) + (playerOm.billeting || 0);
   const omPlanningTravelTotal = (planningOm.travel || 0) + (planningOm.perDiem || 0);
   const omSupportExecutionTravelTotal = (whiteCellOm.travel || 0) + (whiteCellOm.perDiem || 0);
-  const omTravelTotal = omPlanningTravelTotal + omSupportExecutionTravelTotal;
+  const omPlayerTravelTotal = (playerOm.travel || 0) + (playerOm.perDiem || 0);
+  const omTravelTotal = omPlanningTravelTotal + omSupportExecutionTravelTotal + omPlayerTravelTotal;
   const ufrCost = Math.round(((Number(wrmCost) || 0) * 0.1) * 100) / 100;
 
   const saveWrmCost = useCallback(async () => {
@@ -959,12 +964,14 @@ export default function UnitView() {
                 {isSgAeCabUnit ? (
                   <>
                     <div>Travel: {fmt(omTravelTotal)}</div>
+                    {omBilletingTotal > 0 && <div>Billeting: {fmt(omBilletingTotal)}</div>}
                   </>
                 ) : (
                   <>
                     <div>WRM (10%): {fmt(omWrmTotal)}</div>
                     <div>Contracts: {fmt(omContractsTotal)}</div>
                     <div>GPC Purchases: {fmt(omGpcPurchasesTotal)}</div>
+                    {omBilletingTotal > 0 && <div>Billeting: {fmt(omBilletingTotal)}</div>}
                     <div>Travel: {fmt(omTravelTotal)}</div>
                   </>
                 )}

@@ -38,6 +38,7 @@ import * as api from '../services/api';
 import type { Exercise, ExerciseDetail, BudgetResult } from '../types';
 import { getStoredUser } from '../services/auth';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
+import { getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
 
 const { Header, Sider, Content } = Layout;
 
@@ -101,6 +102,10 @@ export default function AppLayout() {
     queryFn: () => api.calculateBudget(exerciseId!),
     enabled: !!exerciseId,
   });
+  const siteVisitPaxExclusions = getPlanningEventPaxExclusions(exercise);
+  const displayTotalPax = budget
+    ? getDisplayedPax(budget.totalPax, siteVisitPaxExclusions.totalExcludedPax)
+    : 0;
 
   // Auto-select first exercise
   useEffect(() => {
@@ -496,7 +501,7 @@ export default function AppLayout() {
                 </div>
                 <div className="ct-header-stat">
                   <div className="ct-header-stat-label">PAX</div>
-                  <div className="ct-header-stat-value">{budget.totalPax}</div>
+                  <div className="ct-header-stat-value">{displayTotalPax}</div>
                 </div>
               </div>
             )}
