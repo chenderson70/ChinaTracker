@@ -32,6 +32,14 @@ type ProjectionRow = {
   executionOm: ProjectionCell;
 };
 
+type ProjectionFieldKey =
+  | 'planningRpa'
+  | 'planningOm'
+  | 'playerRpa'
+  | 'playerOm'
+  | 'executionRpa'
+  | 'executionOm';
+
 function pluralize(value: number, label: string): string {
   return `${value} ${label}${value === 1 ? '' : 's'}`;
 }
@@ -155,6 +163,15 @@ function renderProjectionCell(value: ProjectionCell) {
   );
 }
 
+const projectionSections: Array<{ key: ProjectionFieldKey; label: string }> = [
+  { key: 'planningRpa', label: 'Planning RPA' },
+  { key: 'planningOm', label: 'Planning O&M' },
+  { key: 'playerRpa', label: 'Player RPA' },
+  { key: 'playerOm', label: 'Player O&M' },
+  { key: 'executionRpa', label: 'Execution RPA' },
+  { key: 'executionOm', label: 'Execution O&M' },
+];
+
 function findGroups(unitBudget: UnitBudget | undefined, role: string, fundingType: FundingType): PersonnelGroup[] {
   return (unitBudget?.personnelGroups || []).filter(
     (group) => group.role === role && group.fundingType === fundingType,
@@ -236,30 +253,56 @@ function Pm27UnitProjectionTables() {
 
   return (
     <div style={{ marginBottom: 24 }}>
-      {units.map((unit) => (
-        <Card
-          key={unit.unitCode}
-          title={getUnitDisplayLabel(unit.unitCode)}
-          className="ct-section-card"
-          style={{ marginBottom: 16 }}
-        >
-          <div className="ct-table">
-            <Table
-              size="small"
-              pagination={false}
-              columns={columns}
-              scroll={{ x: 1480 }}
-              dataSource={[
-                buildProjectionRow(
-                  unitBudgetsByCode.get(String(unit.unitCode || '').toUpperCase()),
-                  unit,
-                  exercise.defaultDutyDays || 1,
-                ),
-              ]}
-            />
-          </div>
-        </Card>
-      ))}
+      {units.map((unit) => {
+        const projectionRow = buildProjectionRow(
+          unitBudgetsByCode.get(String(unit.unitCode || '').toUpperCase()),
+          unit,
+          exercise.defaultDutyDays || 1,
+        );
+
+        return (
+          <Card
+            key={unit.unitCode}
+            title={getUnitDisplayLabel(unit.unitCode)}
+            className="ct-section-card"
+            style={{ marginBottom: 16 }}
+          >
+            <div className="ct-table ct-screen-only">
+              <Table
+                size="small"
+                pagination={false}
+                columns={columns}
+                scroll={{ x: 1480 }}
+                dataSource={[projectionRow]}
+              />
+            </div>
+            <div className="ct-print-only ct-pm27-print-grid">
+              {projectionSections.map((section) => {
+                const cell = projectionRow[section.key];
+                return (
+                  <div key={section.key} className="ct-pm27-print-item">
+                    <div className="ct-pm27-print-item-header">
+                      <div className="ct-pm27-print-item-label">{section.label}</div>
+                      <div className="ct-pm27-print-item-total">{fmt(cell.total)}</div>
+                    </div>
+                    {cell.details.length > 0 ? (
+                      <div className="ct-pm27-print-item-details">
+                        {cell.details.map((detail) => (
+                          <div key={detail} className="ct-pm27-print-item-detail">
+                            {detail}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="ct-pm27-print-item-empty">No entries yet</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }

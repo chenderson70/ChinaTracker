@@ -187,6 +187,16 @@ interface ReportsPageProps {
   extraSections?: ReactNode;
 }
 
+type PrintBudgetFieldKey =
+  | 'planningRpa'
+  | 'planningOm'
+  | 'wcExecRpa'
+  | 'wcExecOm'
+  | 'playerRpa'
+  | 'playerOm'
+  | 'totalRpa'
+  | 'totalOm';
+
 export function ReportsPage({
   title = 'Reports & Export',
   showBudgetDetails = true,
@@ -347,6 +357,16 @@ export function ReportsPage({
   const renderBudgetAmount = (value: number, row: { key: string }) => (
     isSummaryRow(row) ? <strong>{fmt(value)}</strong> : fmt(value)
   );
+  const printBudgetFields: Array<{ key: PrintBudgetFieldKey; label: string }> = [
+    { key: 'planningRpa', label: 'Planning RPA' },
+    { key: 'planningOm', label: 'Planning O&M' },
+    { key: 'wcExecRpa', label: 'White Cell + Execution RPA' },
+    { key: 'wcExecOm', label: 'White Cell + Execution O&M' },
+    { key: 'playerRpa', label: 'Player RPA' },
+    { key: 'playerOm', label: 'Player O&M' },
+    { key: 'totalRpa', label: 'Total RPA' },
+    { key: 'totalOm', label: 'Total O&M' },
+  ];
 
   const columns = [
     { title: 'Unit', dataIndex: 'unit', width: 60, render: renderBudgetLabel, align: 'center' as const },
@@ -401,6 +421,9 @@ export function ReportsPage({
   const planningConferenceEntries = planningSummaryEntries.filter(
     (entry) => getPlanningNoteCategory(entry.note) === 'planning conference',
   );
+  const breakfastCost = Number(appConfig.BREAKFAST_COST ?? 14);
+  const dinnerCost = Number(appConfig.DINNER_COST ?? 14);
+  const combinedBreakfastDinnerCost = breakfastCost + dinnerCost;
   const quickPlanningSummaryItems = [
     {
       key: 'planners',
@@ -420,34 +443,28 @@ export function ReportsPage({
   ];
   const quickPlanningRateItems = [
     {
-      key: 'breakfast',
-      label: 'Breakfast',
-      value: `${fmtRate(Number(appConfig.BREAKFAST_COST ?? 14))}/day`,
-      detail: 'A rations',
+      key: 'breakfast-dinner',
+      label: 'Breakfast/Dinner',
+      value: `${fmtRate(breakfastCost)} per meal = ${fmtRate(combinedBreakfastDinnerCost)}/day`,
+      detail: 'RPA',
     },
     {
       key: 'lunch-mre',
       label: 'Lunch/MRE',
       value: `${fmtRate(Number(appConfig.LUNCH_MRE_COST ?? 15.91))}/day`,
-      detail: 'Player meal rate',
-    },
-    {
-      key: 'dinner',
-      label: 'Dinner',
-      value: `${fmtRate(Number(appConfig.DINNER_COST ?? 14))}/day`,
-      detail: 'A rations',
-    },
-    {
-      key: 'player-billeting',
-      label: 'Player Billeting',
-      value: `${fmtRate(Number(appConfig.PLAYER_BILLETING_NIGHT ?? 27))}/night`,
-      detail: 'CRTC cost',
+      detail: 'RPA',
     },
     {
       key: 'player-per-diem',
       label: 'Player Per Diem',
       value: `${fmtRate(Number(appConfig.PLAYER_PER_DIEM_PER_DAY ?? appConfig.FIELD_CONDITIONS_PER_DIEM ?? 5))}/day`,
-      detail: 'M&IE, field conditions',
+      detail: 'RPA',
+    },
+    {
+      key: 'player-billeting',
+      label: 'Player Billeting',
+      value: `${fmtRate(Number(appConfig.PLAYER_BILLETING_NIGHT ?? 27))}/night`,
+      detail: 'O&M',
     },
   ];
 
@@ -591,6 +608,14 @@ export function ReportsPage({
             />
           </Descriptions.Item>
         </Descriptions>
+        <div style={{ marginTop: 16 }}>
+          <Typography.Text strong>Estimations include:</Typography.Text>
+          <ul style={{ margin: '8px 0 0', paddingLeft: 18, color: '#596577' }}>
+            <li>Location of exercise: Gulfport, MS</li>
+            <li>Unit of Action execution costs to be mainly funded by the NAF</li>
+            <li>Pay estimations for long tour orders include MAJ&apos;s &amp; SMSGT&apos;s. Site visits and planning conferences used CAPT&apos;s</li>
+          </ul>
+        </div>
       </Card>
 
       {beforeBudgetBreakdownSection}
@@ -611,7 +636,17 @@ export function ReportsPage({
               <div key={item.key} className="ct-quick-summary-rate-item">
                 <div className="ct-quick-summary-rate-label">{item.label}</div>
                 <div className="ct-quick-summary-rate-value">{item.value}</div>
-                <div className="ct-quick-summary-rate-detail">{item.detail}</div>
+                <div
+                  className={`ct-quick-summary-rate-detail ${
+                    item.detail === 'RPA'
+                      ? 'ct-quick-summary-rate-detail-rpa'
+                      : item.detail === 'O&M'
+                        ? 'ct-quick-summary-rate-detail-om'
+                        : ''
+                  }`}
+                >
+                  {item.detail}
+                </div>
               </div>
             ))}
           </div>
@@ -620,8 +655,29 @@ export function ReportsPage({
 
       {/* Full budget table */}
       <Card title="Full Budget Breakdown" className="ct-section-card" style={{ marginBottom: 24 }}>
-        <div className="ct-table">
+        <div className="ct-table ct-screen-only">
             <Table size="small" pagination={false} dataSource={fullBudgetRows} columns={columns} scroll={{ x: 1320 }} />
+        </div>
+        <div className="ct-print-only ct-print-budget-list">
+          {fullBudgetRows.map((row) => (
+            <div
+              key={row.key}
+              className={`ct-print-budget-unit ${isSummaryRow(row) ? 'ct-print-budget-unit-total' : ''}`}
+            >
+              <div className="ct-print-budget-header">
+                <div className="ct-print-budget-unit-name">{row.unit}</div>
+                <div className="ct-print-budget-unit-total-value">Total: {fmt(row.total)}</div>
+              </div>
+              <div className="ct-print-budget-grid">
+                {printBudgetFields.map((field) => (
+                  <div key={field.key} className="ct-print-budget-item">
+                    <div className="ct-print-budget-item-label">{field.label}</div>
+                    <div className="ct-print-budget-item-value">{fmt(row[field.key])}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </Card>
 
@@ -689,7 +745,7 @@ export function ReportsPage({
             <Descriptions.Item label="WRM">{fmt(budget.wrm)}</Descriptions.Item>
             <Descriptions.Item label="Total PAX">{displayTotalPax}</Descriptions.Item>
             <Descriptions.Item label="Players">{budget.totalPlayers}</Descriptions.Item>
-            <Descriptions.Item label="White Cell">{budget.totalWhiteCell}</Descriptions.Item>
+            <Descriptions.Item label="White Cell & Exercise Support">{budget.totalWhiteCell}</Descriptions.Item>
           </Descriptions>
         </Card>
       ) : null}

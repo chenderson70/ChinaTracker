@@ -4,20 +4,23 @@ import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
   CartesianGrid,
+  LabelList,
 } from 'recharts';
 import {
   DollarOutlined, TeamOutlined, RocketOutlined, SafetyCertificateOutlined,
   UserOutlined, FilePdfOutlined,
 } from '@ant-design/icons';
 import { useApp } from '../components/AppLayout';
+import { renderCostBarLabel } from '../components/charts/CostBarLabel';
 import * as api from '../services/api';
 import { exportElementToPdf } from '../services/pdf';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
-import { getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
+import { formatFundingPaxBreakdown, getDisplayedPax, getPlanningEventPaxExclusions, getSupportOmPaxExclusions } from '../utils/paxDisplay';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const fmtDelta = (n: number) => (n < 0 ? `-${fmt(Math.abs(n))}` : fmt(n));
 const dangerColor = '#ff4d4f';
+const applyPlusUp = (n: number) => Number(n || 0) * 1.1;
 
 export default function Dashboard() {
   const { exercise, budget } = useApp();
@@ -27,7 +30,14 @@ export default function Dashboard() {
   if (!exercise || !budget) return <div className="ct-loading"><Spin size="large" /></div>;
 
   const siteVisitPaxExclusions = getPlanningEventPaxExclusions(exercise);
+  const supportOmPaxExclusions = getSupportOmPaxExclusions(exercise);
   const displayTotalPax = getDisplayedPax(budget.totalPax, siteVisitPaxExclusions.totalExcludedPax);
+  const supportOmExclusionEntries = Object.entries(supportOmPaxExclusions.excludedByUnit).filter(([, count]) => count > 0);
+  const supportOmExclusionNote = supportOmExclusionEntries.length === 1
+    ? `Includes ${supportOmExclusionEntries[0][1]} ${getUnitDisplayLabel(supportOmExclusionEntries[0][0])} Support O&M excluded from Total PAX`
+    : supportOmPaxExclusions.totalExcludedPax > 0
+      ? `Includes ${supportOmPaxExclusions.totalExcludedPax} Support O&M excluded from Total PAX`
+      : '';
 
   const unitData = Object.values(budget.units)
     .sort((left, right) => compareUnitCodes(left.unitCode, right.unitCode))
@@ -92,15 +102,39 @@ export default function Dashboard() {
 
   const totalPlayers = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.playerRpa.paxCount || 0) + (unit.playerOm.paxCount || 0), 0);
+  const totalPlayersRpa = Object.values(budget.units)
+    .reduce((sum, unit) => sum + (unit.playerRpa.paxCount || 0), 0);
+  const totalPlayersOm = Object.values(budget.units)
+    .reduce((sum, unit) => sum + (unit.playerOm.paxCount || 0), 0);
 
   const totalWhiteCell = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.whiteCellRpa.paxCount || 0) + (unit.whiteCellOm.paxCount || 0), 0);
+  const totalWhiteCellRpa = Object.values(budget.units)
+    .reduce((sum, unit) => sum + (unit.whiteCellRpa.paxCount || 0), 0);
+  const totalWhiteCellOm = Object.values(budget.units)
+    .reduce((sum, unit) => sum + (unit.whiteCellOm.paxCount || 0), 0);
 
   const totalLongTermA7Planners = (exercise.unitBudgets || [])
     .flatMap((unitBudget) => unitBudget.personnelGroups || [])
     .filter((group) => group.role === 'PLANNING')
     .flatMap((group) => group.personnelEntries || [])
     .reduce((sum, entry) => sum + (entry.longTermA7Planner ? (entry.count || 0) : 0), 0);
+  const longTermPlannerFundingBreakdown = (exercise.unitBudgets || [])
+    .flatMap((unitBudget) => unitBudget.personnelGroups || [])
+    .filter((group) => group.role === 'PLANNING')
+    .reduce(
+      (totals, group) => {
+        const plannerCount = (group.personnelEntries || [])
+          .reduce((sum, entry) => sum + (entry.longTermA7Planner ? Number(entry.count || 0) : 0), 0);
+        if (String(group.fundingType || '').toUpperCase() === 'OM') {
+          totals.om += plannerCount;
+        } else {
+          totals.rpa += plannerCount;
+        }
+        return totals;
+      },
+      { rpa: 0, om: 0 },
+    );
 
   const columns = [
     { title: 'Unit', dataIndex: 'unitCode', key: 'unitCode', width: 80,
@@ -126,12 +160,33 @@ export default function Dashboard() {
     { label: 'Total RPA', value: fmt(budget.totalRpa), color: '#1677ff', accent: 'ct-stat-blue', icon: <RocketOutlined /> },
     { label: 'Total O&M', value: fmt(budget.totalOm), color: '#52c41a', accent: 'ct-stat-green', icon: <SafetyCertificateOutlined /> },
   ];
+  const plusUpStatCards = [
+    { label: 'Grand Total', badge: '10% Plus-Up', value: fmt(applyPlusUp(budget.grandTotal)), color: '#1a1a2e', accent: 'ct-stat-purple', icon: <DollarOutlined /> },
+    { label: 'Total RPA', badge: '10% Plus-Up', value: fmt(applyPlusUp(budget.totalRpa)), color: '#1677ff', accent: 'ct-stat-blue', icon: <RocketOutlined /> },
+    { label: 'Total O&M', badge: '10% Plus-Up', value: fmt(applyPlusUp(budget.totalOm)), color: '#52c41a', accent: 'ct-stat-green', icon: <SafetyCertificateOutlined /> },
+  ];
 
   const detailCards = [
     { label: 'Total PAX', value: displayTotalPax.toString(), icon: <TeamOutlined />, color: '#722ed1', accent: 'ct-stat-purple' },
-    { label: 'Planners (Only long tour A7/ Unit of Action personnel)', value: totalLongTermA7Planners.toString(), icon: <UserOutlined /> },
-    { label: 'Players', value: totalPlayers.toString(), icon: <UserOutlined /> },
-    { label: 'White Cell', value: totalWhiteCell.toString(), icon: <UserOutlined /> },
+    {
+      label: 'Planners (Only long tour A7/ Unit of Action personnel)',
+      value: totalLongTermA7Planners.toString(),
+      detail: formatFundingPaxBreakdown(longTermPlannerFundingBreakdown.rpa, longTermPlannerFundingBreakdown.om),
+      icon: <UserOutlined />,
+    },
+    {
+      label: 'Players',
+      value: totalPlayers.toString(),
+      detail: formatFundingPaxBreakdown(totalPlayersRpa, totalPlayersOm),
+      icon: <UserOutlined />,
+    },
+    {
+      label: 'White Cell & Exercise Support',
+      value: totalWhiteCell.toString(),
+      detail: formatFundingPaxBreakdown(totalWhiteCellRpa, totalWhiteCellOm),
+      note: supportOmExclusionNote,
+      icon: <UserOutlined />,
+    },
   ];
 
   const handleExportPdf = async () => {
@@ -228,6 +283,31 @@ export default function Dashboard() {
         ))}
       </Row>
 
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger">
+        {plusUpStatCards.map((s) => (
+          <Col xs={24} sm={8} key={s.label}>
+            <Card size="small" className={`ct-stat-card ct-stat-plusup-card ${s.accent}`} style={{ padding: '4px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 8px' }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10,
+                  background: `${s.color}10`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 18, color: s.color, flexShrink: 0,
+                }}>
+                  {s.icon}
+                </div>
+                <div>
+                  <div className="ct-stat-label-row">
+                    <div className="ct-stat-label">{s.label}</div>
+                    <span className="ct-stat-plusup-chip">{s.badge}</span>
+                  </div>
+                  <div className="ct-stat-value" style={{ color: s.color }}>{s.value}</div>
+                </div>
+              </div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
       {/* Detail stat cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 28 }} className="ct-stagger">
         {detailCards.map((s) => (
@@ -245,6 +325,8 @@ export default function Dashboard() {
                 <div>
                   <div className="ct-stat-label">{s.label}</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: s.color || '#1a1a2e', lineHeight: 1.2 }}>{s.value}</div>
+                  {s.detail ? <div className="ct-stat-subdetail">{s.detail}</div> : null}
+                  {s.note ? <div className="ct-stat-note">{s.note}</div> : null}
                 </div>
               </div>
             </Card>
@@ -283,8 +365,12 @@ export default function Dashboard() {
                   contentStyle={{ borderRadius: 8, border: '1px solid #e8ecf1', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                 />
                 <Legend wrapperStyle={{ paddingTop: 12 }} />
-                <Bar dataKey="RPA" fill="#1677ff" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="O&M" fill="#52c41a" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="RPA" fill="#1677ff" radius={[6, 6, 0, 0]}>
+                  <LabelList dataKey="RPA" content={renderCostBarLabel} />
+                </Bar>
+                <Bar dataKey="O&M" fill="#52c41a" radius={[6, 6, 0, 0]}>
+                  <LabelList dataKey="O&M" content={renderCostBarLabel} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </Card>

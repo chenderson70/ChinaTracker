@@ -39,18 +39,20 @@ export async function exportElementToPdf(title: string, element: HTMLElement): P
   inlineStyle.textContent = `
     body {
       margin: 0;
-      padding: 24px;
+      padding: 18px;
       background: #ffffff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
 
     .ct-pdf-shell {
-      max-width: 1280px;
+      max-width: 1180px;
       margin: 0 auto;
     }
 
     @page {
       size: auto;
-      margin: 12mm;
+      margin: 10mm;
     }
 
     @media print {
