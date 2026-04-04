@@ -22,6 +22,11 @@ export interface Exercise {
   startDate: string;
   endDate: string;
   defaultDutyDays: number;
+  reportAssumption1?: string;
+  reportAssumption2?: string;
+  reportAssumption3?: string;
+  reportLimfac1?: string;
+  reportLimfac2?: string;
   createdAt: string;
   updatedAt: string;
 }

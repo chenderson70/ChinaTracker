@@ -205,6 +205,11 @@ export async function createExercise(data: {
   startDate: string;
   endDate: string;
   defaultDutyDays: number;
+  reportAssumption1?: string;
+  reportAssumption2?: string;
+  reportAssumption3?: string;
+  reportLimfac1?: string;
+  reportLimfac2?: string;
 }): Promise<ExerciseDetail> {
   return apiRequest<ExerciseDetail>('/exercises', { method: 'POST', body: data });
 }
@@ -584,6 +589,11 @@ export async function importAllData(json: string): Promise<void> {
       startDate: sourceExercise.startDate,
       endDate: sourceExercise.endDate,
       defaultDutyDays: sourceExercise.defaultDutyDays,
+      reportAssumption1: sourceExercise.reportAssumption1,
+      reportAssumption2: sourceExercise.reportAssumption2,
+      reportAssumption3: sourceExercise.reportAssumption3,
+      reportLimfac1: sourceExercise.reportLimfac1,
+      reportLimfac2: sourceExercise.reportLimfac2,
     });
 
     const sourceExerciseUnits = sourceUnits.filter((unit) => unit.exerciseId === sourceExercise.id);

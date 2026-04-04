@@ -1,4 +1,4 @@
-import { Card, Typography, Button, Row, Col, Table, Descriptions, Space, Spin, InputNumber, Form, message } from 'antd';
+import { Card, Typography, Button, Row, Col, Table, Descriptions, Space, Spin, InputNumber, Form, message, Input } from 'antd';
 import { FileExcelOutlined, PrinterOutlined, EditOutlined, SaveOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -12,6 +12,27 @@ import type { ExerciseDetail } from '../types';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const DAYS_PER_MONTH = 30;
+const DEFAULT_REPORT_ASSUMPTIONS: [string, string, string] = [
+  'Location of exercise: Fort Hunter Liggett, CA',
+  'Unit of Action execution costs to be mainly funded by the NAF',
+  'Pay estimations for long tour orders include MAJ\'s & SMSGT\'s. Site visits and planning conferences used CAPT\'s',
+];
+const DEFAULT_REPORT_LIMFACS: [string, string] = ['', ''];
+
+function getReportAssumptions(exercise: ExerciseDetail): [string, string, string] {
+  return [
+    String(exercise.reportAssumption1 ?? DEFAULT_REPORT_ASSUMPTIONS[0]),
+    String(exercise.reportAssumption2 ?? DEFAULT_REPORT_ASSUMPTIONS[1]),
+    String(exercise.reportAssumption3 ?? DEFAULT_REPORT_ASSUMPTIONS[2]),
+  ];
+}
+
+function getReportLimfacs(exercise: ExerciseDetail): [string, string] {
+  return [
+    String(exercise.reportLimfac1 ?? DEFAULT_REPORT_LIMFACS[0]),
+    String(exercise.reportLimfac2 ?? DEFAULT_REPORT_LIMFACS[1]),
+  ];
+}
 
 function fmtRate(n: number): string {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -214,13 +235,19 @@ export function ReportsPage({
   const travelAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const budgetAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dutyDaysAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reportAssumptionsAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reportLimfacsAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const travelDraft = Form.useWatch([], travelForm);
   const [draftRpaBudgetTarget, setDraftRpaBudgetTarget] = useState(0);
   const [draftOmBudgetTarget, setDraftOmBudgetTarget] = useState(0);
   const [draftDutyDays, setDraftDutyDays] = useState(1);
+  const [draftReportAssumptions, setDraftReportAssumptions] = useState<[string, string, string]>(DEFAULT_REPORT_ASSUMPTIONS);
+  const [draftReportLimfacs, setDraftReportLimfacs] = useState<[string, string]>(DEFAULT_REPORT_LIMFACS);
   const skipBudgetTargetsSaveRef = useRef(true);
   const skipTotalBudgetSaveRef = useRef(true);
   const skipDutyDaysSaveRef = useRef(true);
+  const skipReportAssumptionsSaveRef = useRef(true);
+  const skipReportLimfacsSaveRef = useRef(true);
 
   const travelMut = useMutation({
     mutationFn: (data: any) => api.updateTravelConfig(exerciseId!, data),
@@ -237,6 +264,24 @@ export function ReportsPage({
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
       queryClient.invalidateQueries({ queryKey: ['budget', exerciseId] });
       message.success('Exercise updated');
+    },
+  });
+
+  const reportAssumptionsMut = useMutation({
+    mutationFn: (data: Pick<ExerciseDetail, 'reportAssumption1' | 'reportAssumption2' | 'reportAssumption3'>) =>
+      api.updateExercise(exerciseId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+    },
+  });
+
+  const reportLimfacsMut = useMutation({
+    mutationFn: (data: Pick<ExerciseDetail, 'reportLimfac1' | 'reportLimfac2'>) =>
+      api.updateExercise(exerciseId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
     },
   });
 
@@ -278,6 +323,10 @@ export function ReportsPage({
   };
 
   const travel = exercise.travelConfig;
+  const currentReportAssumptions = getReportAssumptions(exercise);
+  const [currentReportAssumption1, currentReportAssumption2, currentReportAssumption3] = currentReportAssumptions;
+  const currentReportLimfacs = getReportLimfacs(exercise);
+  const [currentReportLimfac1, currentReportLimfac2] = currentReportLimfacs;
 
   useEffect(() => {
     if (!editTravel || !travelDraft || travelMut.isPending) return;
@@ -489,6 +538,23 @@ export function ReportsPage({
   }, [exercise.defaultDutyDays]);
 
   useEffect(() => {
+    skipReportAssumptionsSaveRef.current = true;
+    setDraftReportAssumptions(currentReportAssumptions);
+  }, [
+    currentReportAssumption1,
+    currentReportAssumption2,
+    currentReportAssumption3,
+  ]);
+
+  useEffect(() => {
+    skipReportLimfacsSaveRef.current = true;
+    setDraftReportLimfacs(currentReportLimfacs);
+  }, [
+    currentReportLimfac1,
+    currentReportLimfac2,
+  ]);
+
+  useEffect(() => {
     if (skipBudgetTargetsSaveRef.current) {
       skipBudgetTargetsSaveRef.current = false;
       return;
@@ -546,6 +612,64 @@ export function ReportsPage({
     };
   }, [draftDutyDays, exercise.defaultDutyDays, exerciseMut]);
 
+  useEffect(() => {
+    if (skipReportAssumptionsSaveRef.current) {
+      skipReportAssumptionsSaveRef.current = false;
+      return;
+    }
+    if (reportAssumptionsMut.isPending) return;
+
+    const hasChanges = draftReportAssumptions.some((line, index) => line !== currentReportAssumptions[index]);
+    if (!hasChanges) return;
+
+    if (reportAssumptionsAutoSaveTimer.current) clearTimeout(reportAssumptionsAutoSaveTimer.current);
+    reportAssumptionsAutoSaveTimer.current = setTimeout(() => {
+      reportAssumptionsMut.mutate({
+        reportAssumption1: draftReportAssumptions[0],
+        reportAssumption2: draftReportAssumptions[1],
+        reportAssumption3: draftReportAssumptions[2],
+      });
+    }, 700);
+
+    return () => {
+      if (reportAssumptionsAutoSaveTimer.current) clearTimeout(reportAssumptionsAutoSaveTimer.current);
+    };
+  }, [
+    currentReportAssumption1,
+    currentReportAssumption2,
+    currentReportAssumption3,
+    draftReportAssumptions,
+    reportAssumptionsMut,
+  ]);
+
+  useEffect(() => {
+    if (skipReportLimfacsSaveRef.current) {
+      skipReportLimfacsSaveRef.current = false;
+      return;
+    }
+    if (reportLimfacsMut.isPending) return;
+
+    const hasChanges = draftReportLimfacs.some((line, index) => line !== currentReportLimfacs[index]);
+    if (!hasChanges) return;
+
+    if (reportLimfacsAutoSaveTimer.current) clearTimeout(reportLimfacsAutoSaveTimer.current);
+    reportLimfacsAutoSaveTimer.current = setTimeout(() => {
+      reportLimfacsMut.mutate({
+        reportLimfac1: draftReportLimfacs[0],
+        reportLimfac2: draftReportLimfacs[1],
+      });
+    }, 700);
+
+    return () => {
+      if (reportLimfacsAutoSaveTimer.current) clearTimeout(reportLimfacsAutoSaveTimer.current);
+    };
+  }, [
+    currentReportLimfac1,
+    currentReportLimfac2,
+    draftReportLimfacs,
+    reportLimfacsMut,
+  ]);
+
   return (
     <div ref={exportRef}>
       <div className="ct-page-header">
@@ -562,11 +686,11 @@ export function ReportsPage({
       {/* Exercise info */}
       <Card
         title="Exercise Details"
-        className="ct-section-card"
+        className="ct-section-card ct-exercise-details-card"
         style={{ marginBottom: 24 }}
         extra={
           <Typography.Text type="secondary">
-            {appConfigMut.isPending || totalBudgetMut.isPending || exerciseMut.isPending ? 'Autosaving...' : 'Changes auto-save'}
+            {appConfigMut.isPending || totalBudgetMut.isPending || exerciseMut.isPending || reportAssumptionsMut.isPending || reportLimfacsMut.isPending ? 'Autosaving...' : 'Changes auto-save'}
           </Typography.Text>
         }
       >
@@ -616,13 +740,56 @@ export function ReportsPage({
             />
           </Descriptions.Item>
         </Descriptions>
-        <div style={{ marginTop: 16 }}>
-          <Typography.Text strong>Estimations include:</Typography.Text>
-          <ul style={{ margin: '8px 0 0', paddingLeft: 18, color: '#596577' }}>
-            <li>Location of exercise: Fort Hunter Ligget, CA</li>
-            <li>Unit of Action execution costs to be mainly funded by the NAF</li>
-            <li>Pay estimations for long tour orders include MAJ&apos;s &amp; SMSGT&apos;s. Site visits and planning conferences used CAPT&apos;s</li>
-          </ul>
+        <div className="ct-report-notes-layout">
+          <div className="ct-report-notes-section">
+            <Typography.Text strong>Estimations include:</Typography.Text>
+            <div className="ct-report-notes-list">
+              {draftReportAssumptions.map((line, index) => (
+                <div
+                  key={`report-assumption-${index + 1}`}
+                  className="ct-report-notes-row"
+                >
+                  <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
+                  <Input
+                    value={line}
+                    onChange={(event) => {
+                      const next = [...draftReportAssumptions] as [string, string, string];
+                      next[index] = event.target.value;
+                      setDraftReportAssumptions(next);
+                    }}
+                    placeholder={`Estimation line ${index + 1}`}
+                    bordered={false}
+                    style={{ color: '#596577', paddingInline: 0, background: 'transparent' }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="ct-report-notes-section">
+            <Typography.Text strong>LIMFACs</Typography.Text>
+            <div className="ct-report-notes-list">
+              {draftReportLimfacs.map((line, index) => (
+                <div
+                  key={`report-limfac-${index + 1}`}
+                  className="ct-report-notes-row"
+                >
+                  <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
+                  <Input
+                    value={line}
+                    onChange={(event) => {
+                      const next = [...draftReportLimfacs] as [string, string];
+                      next[index] = event.target.value;
+                      setDraftReportLimfacs(next);
+                    }}
+                    placeholder={`LIMFAC line ${index + 1}`}
+                    bordered={false}
+                    style={{ color: '#596577', paddingInline: 0, background: 'transparent' }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </Card>
 

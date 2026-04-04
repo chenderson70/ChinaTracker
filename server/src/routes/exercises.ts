@@ -248,7 +248,18 @@ router.get('/', async (_req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   try {
     const userId = getRequestUserId(req);
-    const { name, startDate, endDate, defaultDutyDays, totalBudget } = req.body;
+    const {
+      name,
+      startDate,
+      endDate,
+      defaultDutyDays,
+      totalBudget,
+      reportAssumption1,
+      reportAssumption2,
+      reportAssumption3,
+      reportLimfac1,
+      reportLimfac2,
+    } = req.body;
     const parsedTotalBudget = Number(totalBudget);
     const exercise = await prisma.exercise.create({
       data: {
@@ -258,6 +269,11 @@ router.post('/', async (req: Request, res: Response) => {
         startDate: new Date(startDate),
         endDate: new Date(endDate),
         defaultDutyDays: defaultDutyDays || 14,
+        ...(reportAssumption1 !== undefined ? { reportAssumption1: String(reportAssumption1) } : {}),
+        ...(reportAssumption2 !== undefined ? { reportAssumption2: String(reportAssumption2) } : {}),
+        ...(reportAssumption3 !== undefined ? { reportAssumption3: String(reportAssumption3) } : {}),
+        ...(reportLimfac1 !== undefined ? { reportLimfac1: String(reportLimfac1) } : {}),
+        ...(reportLimfac2 !== undefined ? { reportLimfac2: String(reportLimfac2) } : {}),
       },
     });
     await seedExerciseDefaults(exercise.id);
@@ -287,12 +303,28 @@ router.put('/:id', async (req: Request, res: Response) => {
     const existing = await prisma.exercise.findFirst({ where: { id: req.params.id, ownerUserId: userId } });
     if (!existing) return res.status(404).json({ error: 'Exercise not found' });
 
-    const { name, startDate, endDate, defaultDutyDays, totalBudget } = req.body;
+    const {
+      name,
+      startDate,
+      endDate,
+      defaultDutyDays,
+      totalBudget,
+      reportAssumption1,
+      reportAssumption2,
+      reportAssumption3,
+      reportLimfac1,
+      reportLimfac2,
+    } = req.body;
     const data: any = {};
     if (name !== undefined) data.name = name;
     if (startDate !== undefined) data.startDate = new Date(startDate);
     if (endDate !== undefined) data.endDate = new Date(endDate);
     if (defaultDutyDays !== undefined) data.defaultDutyDays = defaultDutyDays;
+    if (reportAssumption1 !== undefined) data.reportAssumption1 = String(reportAssumption1);
+    if (reportAssumption2 !== undefined) data.reportAssumption2 = String(reportAssumption2);
+    if (reportAssumption3 !== undefined) data.reportAssumption3 = String(reportAssumption3);
+    if (reportLimfac1 !== undefined) data.reportLimfac1 = String(reportLimfac1);
+    if (reportLimfac2 !== undefined) data.reportLimfac2 = String(reportLimfac2);
     if (totalBudget !== undefined) {
       const parsedTotalBudget = Number(totalBudget);
       if (!Number.isFinite(parsedTotalBudget)) {

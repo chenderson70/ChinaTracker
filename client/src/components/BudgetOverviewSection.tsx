@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { TeamOutlined, UserOutlined, DollarOutlined, RocketOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { useApp } from './AppLayout';
+import BudgetHeroSummary from './BudgetHeroSummary';
 import { renderCostBarLabel } from './charts/CostBarLabel';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { formatFundingPaxBreakdown, getDisplayedPax, getPlanningEventPaxExclusions, getSupportOmPaxExclusions } from '../utils/paxDisplay';
@@ -81,6 +82,7 @@ export default function BudgetOverviewSection() {
         (unit.playerOm.perDiem || 0),
       0,
     );
+  const allOtherOmCostsTotal = budget.totalOm - omTravelTotal;
 
   const unitOmBreakdownTotal =
     omWrmTotal +
@@ -102,9 +104,15 @@ export default function BudgetOverviewSection() {
 
   const rpaRationsTotal = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.playerRpa.meals || 0) + (unit.annualTourRpa?.meals || 0), 0);
+  const annualTourMilPayTotal = Object.values(budget.units)
+    .reduce((sum, unit) => sum + (unit.annualTourRpa?.milPay || 0), 0);
+  const annualTourTravelTotal = Object.values(budget.units)
+    .reduce((sum, unit) => sum + (unit.annualTourRpa?.travel || 0), 0);
   const annualTourRpaTotal = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.annualTourRpa?.subtotal || 0), 0);
   const a7BudgetPlanningTotal = budget.units.A7?.unitTotal || 0;
+  const overallExerciseTotalLabel = 'Overall Exercise Total (AT + RPA + O&M)';
+  const a7PlanningTotalLabel = 'A7 RPA & O&M Total';
 
   const totalPlayers = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.playerRpa.paxCount || 0) + (unit.playerOm.paxCount || 0), 0);
@@ -181,18 +189,38 @@ export default function BudgetOverviewSection() {
 
   const statCards = [
     {
-      label: 'Grand Total',
-      color: '#1a1a2e',
-      accent: 'ct-stat-purple',
-      icon: <DollarOutlined />,
-      sections: [
-        { label: 'Overall Exercise Total', value: fmt(budget.grandTotal) },
-        { label: 'A7 Budget Planning Total', value: fmt(a7BudgetPlanningTotal) },
+      label: 'Total RPA',
+      value: fmt(budget.totalRpa),
+      color: '#1677ff',
+      accent: 'ct-stat-blue',
+      icon: <RocketOutlined />,
+      detailLines: [
+        { label: 'RPA Mil Pay', value: fmt(rpaMilPayTotal) },
+        { label: 'Travel RPA Pay', value: fmt(budget.rpaTravel) },
       ],
     },
-    { label: 'Total RPA', value: fmt(budget.totalRpa), color: '#1677ff', accent: 'ct-stat-blue', icon: <RocketOutlined /> },
-    { label: 'Total O&M', value: fmt(budget.totalOm), color: '#52c41a', accent: 'ct-stat-green', icon: <SafetyCertificateOutlined /> },
-    { label: 'Annual Tour', value: fmt(annualTourRpaTotal), color: '#0958d9', accent: 'ct-stat-blue', icon: <UserOutlined /> },
+    {
+      label: 'Total O&M',
+      value: fmt(budget.totalOm),
+      color: '#52c41a',
+      accent: 'ct-stat-green',
+      icon: <SafetyCertificateOutlined />,
+      detailLines: [
+        { label: 'O&M Travel', value: fmt(omTravelTotal) },
+        { label: 'All Other O&M Costs', value: fmt(allOtherOmCostsTotal) },
+      ],
+    },
+    {
+      label: 'Annual Tour',
+      value: fmt(annualTourRpaTotal),
+      color: '#0958d9',
+      accent: 'ct-stat-blue',
+      icon: <UserOutlined />,
+      detailLines: [
+        { label: 'Annual Tour Mil Pay', value: fmt(annualTourMilPayTotal) },
+        { label: 'Annual Tour Travel Pay', value: fmt(annualTourTravelTotal) },
+      ],
+    },
   ];
   const plusUpStatCards = [
     {
@@ -202,13 +230,46 @@ export default function BudgetOverviewSection() {
       accent: 'ct-stat-purple',
       icon: <DollarOutlined />,
       sections: [
-        { label: 'Overall Exercise Total', value: fmt(applyPlusUp(budget.grandTotal)) },
-        { label: 'A7 Budget Planning Total', value: fmt(applyPlusUp(a7BudgetPlanningTotal)) },
+        { label: overallExerciseTotalLabel, value: fmt(applyPlusUp(budget.grandTotal)) },
+        { label: a7PlanningTotalLabel, value: fmt(applyPlusUp(a7BudgetPlanningTotal)) },
       ],
     },
-    { label: 'Total RPA', badge: '10% Plus-Up', value: fmt(applyPlusUp(budget.totalRpa)), color: '#1677ff', accent: 'ct-stat-blue', icon: <RocketOutlined /> },
-    { label: 'Total O&M', badge: '10% Plus-Up', value: fmt(applyPlusUp(budget.totalOm)), color: '#52c41a', accent: 'ct-stat-green', icon: <SafetyCertificateOutlined /> },
-    { label: 'Annual Tour', badge: '10% Plus-Up', value: fmt(applyPlusUp(annualTourRpaTotal)), color: '#0958d9', accent: 'ct-stat-blue', icon: <UserOutlined /> },
+    {
+      label: 'Total RPA',
+      badge: '10% Plus-Up',
+      value: fmt(applyPlusUp(budget.totalRpa)),
+      color: '#1677ff',
+      accent: 'ct-stat-blue',
+      icon: <RocketOutlined />,
+      detailLines: [
+        { label: 'RPA Mil Pay', value: fmt(applyPlusUp(rpaMilPayTotal)) },
+        { label: 'Travel RPA Pay', value: fmt(applyPlusUp(budget.rpaTravel)) },
+      ],
+    },
+    {
+      label: 'Total O&M',
+      badge: '10% Plus-Up',
+      value: fmt(applyPlusUp(budget.totalOm)),
+      color: '#52c41a',
+      accent: 'ct-stat-green',
+      icon: <SafetyCertificateOutlined />,
+      detailLines: [
+        { label: 'O&M Travel', value: fmt(applyPlusUp(omTravelTotal)) },
+        { label: 'All Other O&M Costs', value: fmt(applyPlusUp(allOtherOmCostsTotal)) },
+      ],
+    },
+    {
+      label: 'Annual Tour',
+      badge: '10% Plus-Up',
+      value: fmt(applyPlusUp(annualTourRpaTotal)),
+      color: '#0958d9',
+      accent: 'ct-stat-blue',
+      icon: <UserOutlined />,
+      detailLines: [
+        { label: 'Annual Tour Mil Pay', value: fmt(applyPlusUp(annualTourMilPayTotal)) },
+        { label: 'Annual Tour Travel Pay', value: fmt(applyPlusUp(annualTourTravelTotal)) },
+      ],
+    },
   ];
 
   const detailCards = [
@@ -241,9 +302,16 @@ export default function BudgetOverviewSection() {
 
   return (
     <>
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger">
+      <BudgetHeroSummary
+        grandTotal={budget.grandTotal}
+        a7BudgetPlanningTotal={a7BudgetPlanningTotal}
+        overallExerciseTotalLabel={overallExerciseTotalLabel}
+        a7PlanningTotalLabel={a7PlanningTotalLabel}
+      />
+
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger" justify="center">
         {statCards.map((s) => (
-          <Col xs={24} sm={12} xl={6} key={s.label}>
+          <Col xs={24} sm={12} lg={8} key={s.label}>
             <Card size="small" className={`ct-stat-card ${s.accent}`} style={{ padding: '4px 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 8px' }}>
                 <div
@@ -264,21 +332,17 @@ export default function BudgetOverviewSection() {
                 </div>
                 <div>
                   <div className="ct-stat-label">{s.label}</div>
-                  {s.sections ? (
-                    <div style={{ display: 'grid', gap: 8, marginTop: 6 }}>
-                      {s.sections.map((section, index) => (
-                        <div
-                          key={section.label}
-                          style={index === 0 ? undefined : { paddingTop: 8, borderTop: '1px solid #edf1f6' }}
-                        >
-                          <div className="ct-stat-label" style={{ fontSize: 10 }}>{section.label}</div>
-                          <div className="ct-stat-value" style={{ color: s.color, fontSize: 20 }}>{section.value}</div>
+                  <div className="ct-stat-value" style={{ color: s.color }}>{s.value}</div>
+                  {s.detailLines ? (
+                    <div className="ct-stat-breakdown">
+                      {s.detailLines.map((detail) => (
+                        <div key={detail.label} className="ct-stat-breakdown-line">
+                          <span>{detail.label}</span>
+                          <span>{detail.value}</span>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <div className="ct-stat-value" style={{ color: s.color }}>{s.value}</div>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </Card>
@@ -325,7 +389,19 @@ export default function BudgetOverviewSection() {
                       ))}
                     </div>
                   ) : (
-                    <div className="ct-stat-value" style={{ color: s.color }}>{s.value}</div>
+                    <>
+                      <div className="ct-stat-value" style={{ color: s.color }}>{s.value}</div>
+                      {s.detailLines ? (
+                        <div className="ct-stat-breakdown">
+                          {s.detailLines.map((detail) => (
+                            <div key={detail.label} className="ct-stat-breakdown-line">
+                              <span>{detail.label}</span>
+                              <span>{detail.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </>
                   )}
                 </div>
               </div>

@@ -70,10 +70,12 @@ export default function AppLayout() {
   const [createOpen, setCreateOpen] = useState(false);
   const [addUnitOpen, setAddUnitOpen] = useState(false);
   const [removeUnitOpen, setRemoveUnitOpen] = useState(false);
+  const [editExerciseOpen, setEditExerciseOpen] = useState(false);
   const [editBudgetOpen, setEditBudgetOpen] = useState(false);
   const [form] = Form.useForm();
   const [unitForm] = Form.useForm();
   const [removeUnitForm] = Form.useForm();
+  const [editExerciseForm] = Form.useForm();
   const [editBudgetForm] = Form.useForm();
   const editBudgetDraft = Form.useWatch([], editBudgetForm);
 
@@ -165,6 +167,36 @@ export default function AppLayout() {
       createMut.mutate({
         name: vals.name,
         totalBudget: vals.totalBudget,
+        startDate: vals.dates[0].format('YYYY-MM-DD'),
+        endDate: vals.dates[1].format('YYYY-MM-DD'),
+        defaultDutyDays: vals.defaultDutyDays,
+      });
+    });
+  };
+
+  const editExerciseMut = useMutation({
+    mutationFn: (data: {
+      name: string;
+      startDate: string;
+      endDate: string;
+      defaultDutyDays: number;
+    }) => api.updateExercise(exerciseId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      queryClient.invalidateQueries({ queryKey: ['budget', exerciseId] });
+      setEditExerciseOpen(false);
+      message.success('Exercise updated');
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to update exercise');
+    },
+  });
+
+  const handleEditExercise = () => {
+    editExerciseForm.validateFields().then((vals) => {
+      editExerciseMut.mutate({
+        name: vals.name,
         startDate: vals.dates[0].format('YYYY-MM-DD'),
         endDate: vals.dates[1].format('YYYY-MM-DD'),
         defaultDutyDays: vals.defaultDutyDays,
@@ -368,6 +400,15 @@ export default function AppLayout() {
   };
 
   useEffect(() => {
+    if (!editExerciseOpen || !exercise) return;
+    editExerciseForm.setFieldsValue({
+      name: exercise.name,
+      dates: [dayjs(exercise.startDate), dayjs(exercise.endDate)],
+      defaultDutyDays: exercise.defaultDutyDays,
+    });
+  }, [editExerciseOpen, exercise, editExerciseForm]);
+
+  useEffect(() => {
     if (!editBudgetOpen) return;
     editBudgetForm.setFieldsValue({
       rpaBudgetTarget: Number(appConfig.BUDGET_TARGET_RPA || 0),
@@ -424,6 +465,13 @@ export default function AppLayout() {
                   {hasAnyExercise ? 'New Exercise' : 'Start here to create your exercise'}
                 </Button>
               </Tooltip>
+              {exerciseId && exercise && (
+                <Tooltip title="Edit exercise name, dates, duty days, and total budget">
+                  <Button icon={<EditOutlined />} onClick={() => setEditExerciseOpen(true)}>
+                    Edit Exercise
+                  </Button>
+                </Tooltip>
+              )}
               {exerciseId && (
                 <Tooltip title="Edit overall exercise budget">
                   <Button icon={<EditOutlined />} onClick={() => setEditBudgetOpen(true)}>
@@ -554,6 +602,37 @@ export default function AppLayout() {
             rules={[{ required: true, message: 'Enter total exercise budget' }]}
           >
             <InputNumber min={0} style={{ width: '100%' }} size="large" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Edit Exercise"
+        open={editExerciseOpen}
+        onOk={handleEditExercise}
+        confirmLoading={editExerciseMut.isPending}
+        onCancel={() => setEditExerciseOpen(false)}
+        okText="Save Exercise"
+        width={520}
+      >
+        <Form form={editExerciseForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="name" label="Exercise Name" rules={[{ required: true }]}>
+            <Input placeholder="e.g., China Focus FY26 Spring" size="large" />
+          </Form.Item>
+          <Form.Item name="dates" label="Start / End Date" rules={[{ required: true }]}>
+            <DatePicker.RangePicker
+              style={{ width: '100%' }}
+              size="large"
+              onChange={(dates) => {
+                if (dates && dates[0] && dates[1]) {
+                  const days = dates[1].diff(dates[0], 'day') + 1;
+                  editExerciseForm.setFieldsValue({ defaultDutyDays: days });
+                }
+              }}
+            />
+          </Form.Item>
+          <Form.Item name="defaultDutyDays" label="Default Duty Days" rules={[{ required: true }]}>
+            <InputNumber min={1} max={365} style={{ width: '100%' }} size="large" />
           </Form.Item>
         </Form>
       </Modal>

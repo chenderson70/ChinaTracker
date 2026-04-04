@@ -22,6 +22,11 @@ model Exercise {
   startDate       DateTime       @map("start_date")
   endDate         DateTime       @map("end_date")
   defaultDutyDays Int            @map("default_duty_days")
+  reportAssumption1 String       @default("Location of exercise: Fort Hunter Liggett, CA") @map("report_assumption_1")
+  reportAssumption2 String       @default("Unit of Action execution costs to be mainly funded by the NAF") @map("report_assumption_2")
+  reportAssumption3 String       @default("Pay estimations for long tour orders include MAJ's & SMSGT's. Site visits and planning conferences used CAPT's") @map("report_assumption_3")
+  reportLimfac1   String         @default("") @map("report_limfac_1")
+  reportLimfac2   String         @default("") @map("report_limfac_2")
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
   unitBudgets     UnitBudget[]

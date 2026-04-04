@@ -18,12 +18,13 @@ import {
   Divider,
   Spin,
   Popconfirm,
+  message,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../components/AppLayout';
 import * as api from '../services/api';
-import type { PersonnelGroup, UnitBudget, FundingType, UnitCalc, GroupCalc, PerDiemRate } from '../types';
+import type { ExerciseDetail, PersonnelGroup, UnitBudget, FundingType, UnitCalc, GroupCalc, PerDiemRate } from '../types';
 import { getUnitDisplayLabel } from '../utils/unitLabels';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
@@ -293,6 +294,43 @@ export default function UnitView() {
     await queryClient.refetchQueries({ queryKey: ['budget', exerciseId], type: 'active' });
   };
 
+  const removeEntryFromExerciseCache = useCallback((current: ExerciseDetail | null | undefined, entryId: string) => {
+    if (!current || !unitCode) return current;
+
+    let exerciseChanged = false;
+    const nextUnitBudgets = current.unitBudgets.map((unitBudget) => {
+      if (unitBudget.unitCode !== unitCode) return unitBudget;
+
+      let unitChanged = false;
+      const nextGroups = unitBudget.personnelGroups.map((group) => {
+        const nextEntries = group.personnelEntries.filter((entry) => entry.id !== entryId);
+        if (nextEntries.length === group.personnelEntries.length) {
+          return group;
+        }
+
+        unitChanged = true;
+        return {
+          ...group,
+          personnelEntries: nextEntries,
+          paxCount: nextEntries.reduce((sum, entry) => sum + entry.count, 0),
+        };
+      });
+
+      if (!unitChanged) return unitBudget;
+      exerciseChanged = true;
+      return {
+        ...unitBudget,
+        personnelGroups: nextGroups,
+      };
+    });
+
+    if (!exerciseChanged) return current;
+    return {
+      ...current,
+      unitBudgets: nextUnitBudgets,
+    };
+  }, [unitCode]);
+
   const updateGroupMut = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => api.updatePersonnelGroup(id, data),
     onSuccess: refreshExerciseAndBudget,
@@ -312,7 +350,30 @@ export default function UnitView() {
 
   const deleteEntryMut = useMutation({
     mutationFn: (id: string) => api.deletePersonnelEntry(id),
-    onSuccess: refreshExerciseAndBudget,
+    onMutate: async (entryId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['exercise', exerciseId] });
+
+      const previousExercise = queryClient.getQueryData<ExerciseDetail>(['exercise', exerciseId]);
+      queryClient.setQueryData<ExerciseDetail | null>(['exercise', exerciseId], (current) =>
+        removeEntryFromExerciseCache(current, entryId) ?? current,
+      );
+
+      return { previousExercise };
+    },
+    onSuccess: async () => {
+      message.success('Entry removed');
+      try {
+        await refreshExerciseAndBudget();
+      } catch {
+        message.warning('Entry removed, but totals could not refresh automatically.');
+      }
+    },
+    onError: (error: any, _entryId, context) => {
+      if (context?.previousExercise !== undefined) {
+        queryClient.setQueryData(['exercise', exerciseId], context.previousExercise);
+      }
+      message.error(error?.message || 'Failed to remove entry');
+    },
   });
 
   const updateEntryMut = useMutation({

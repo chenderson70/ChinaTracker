@@ -73,6 +73,26 @@ function calcMilPay(
   return group.paxCount * avgCpd * dutyDays;
 }
 
+function buildPlayerLikeRpaGroup(
+  pax: number,
+  avgDays: number,
+  costs: Pick<GroupCalc, 'milPay' | 'meals' | 'travel' | 'perDiem' | 'billeting'>,
+  isSgAeCabPlayer: boolean,
+): { group: GroupCalc; billetingToOm: number } {
+  const group = emptyGroup(pax, avgDays);
+  group.milPay = costs.milPay;
+  group.meals = costs.meals;
+  group.travel = costs.travel;
+  group.perDiem = costs.perDiem;
+  group.billeting = costs.billeting;
+
+  const billetingToOm = isSgAeCabPlayer ? group.billeting : 0;
+  const rpaBilletingCharge = isSgAeCabPlayer ? 0 : group.billeting;
+  group.subtotal = group.milPay + group.meals + group.travel + group.perDiem + rpaBilletingCharge;
+
+  return { group, billetingToOm };
+}
+
 export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): BudgetResult {
   const defaultDays = exercise.defaultDutyDays || 1;
   const travel = exercise.travelConfig || {
@@ -291,29 +311,27 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
         g.subtotal = g.travel + g.perDiem;
         unitCalc.planningOm = g;
         result.totalPlayers += pax;
-      } else if (isPlayer && pg.fundingType === 'RPA') {
-        const g = emptyGroup(pax, avgDays);
-        const billetingToOm = isSgAeCabPlayer ? groupBilleting : 0;
-        g.milPay = groupMilPay;
-        g.meals = groupMeals;
-        g.travel = groupTravel;
-        g.perDiem = groupPerDiem;
-        g.billeting = groupBilleting;
-        const rpaBilletingCharge = isSgAeCabPlayer ? 0 : g.billeting;
-        g.subtotal = g.milPay + g.meals + g.travel + g.perDiem + rpaBilletingCharge;
+      } else if (isPlayerLike && pg.fundingType === 'RPA') {
+        const { group: g, billetingToOm } = buildPlayerLikeRpaGroup(
+          pax,
+          avgDays,
+          {
+            milPay: groupMilPay,
+            meals: groupMeals,
+            travel: groupTravel,
+            perDiem: groupPerDiem,
+            billeting: groupBilleting,
+          },
+          isSgAeCabPlayer,
+        );
         sgAeCabPlayerBilletingToOm += billetingToOm;
-        unitCalc.playerRpa = g;
-        result.totalPlayers += pax;
-        result.rpaTravel += groupRpaTravel;
-      } else if (isAnnualTour && pg.fundingType === 'RPA') {
-        const g = emptyGroup(pax, avgDays);
-        g.milPay = groupMilPay;
-        g.meals = groupMeals;
-        g.travel = groupTravel;
-        g.perDiem = groupPerDiem;
-        g.subtotal = g.milPay + g.meals + g.travel + g.perDiem;
-        accumulateGroup(unitCalc.annualTourRpa, g);
-        result.totalAnnualTour += pax;
+        if (isAnnualTour) {
+          accumulateGroup(unitCalc.annualTourRpa, g);
+          result.totalAnnualTour += pax;
+        } else {
+          unitCalc.playerRpa = g;
+          result.totalPlayers += pax;
+        }
         result.rpaTravel += groupRpaTravel;
       } else if (isPlayer && pg.fundingType === 'OM') {
         const g = emptyGroup(pax, avgDays);
