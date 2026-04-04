@@ -257,8 +257,10 @@ router.post('/', async (req: Request, res: Response) => {
       reportAssumption1,
       reportAssumption2,
       reportAssumption3,
+      reportAssumption4,
       reportLimfac1,
       reportLimfac2,
+      reportLimfac3,
     } = req.body;
     const parsedTotalBudget = Number(totalBudget);
     const exercise = await prisma.exercise.create({
@@ -272,8 +274,10 @@ router.post('/', async (req: Request, res: Response) => {
         ...(reportAssumption1 !== undefined ? { reportAssumption1: String(reportAssumption1) } : {}),
         ...(reportAssumption2 !== undefined ? { reportAssumption2: String(reportAssumption2) } : {}),
         ...(reportAssumption3 !== undefined ? { reportAssumption3: String(reportAssumption3) } : {}),
+        ...(reportAssumption4 !== undefined ? { reportAssumption4: String(reportAssumption4) } : {}),
         ...(reportLimfac1 !== undefined ? { reportLimfac1: String(reportLimfac1) } : {}),
         ...(reportLimfac2 !== undefined ? { reportLimfac2: String(reportLimfac2) } : {}),
+        ...(reportLimfac3 !== undefined ? { reportLimfac3: String(reportLimfac3) } : {}),
       },
     });
     await seedExerciseDefaults(exercise.id);
@@ -312,8 +316,10 @@ router.put('/:id', async (req: Request, res: Response) => {
       reportAssumption1,
       reportAssumption2,
       reportAssumption3,
+      reportAssumption4,
       reportLimfac1,
       reportLimfac2,
+      reportLimfac3,
     } = req.body;
     const data: any = {};
     if (name !== undefined) data.name = name;
@@ -323,8 +329,10 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (reportAssumption1 !== undefined) data.reportAssumption1 = String(reportAssumption1);
     if (reportAssumption2 !== undefined) data.reportAssumption2 = String(reportAssumption2);
     if (reportAssumption3 !== undefined) data.reportAssumption3 = String(reportAssumption3);
+    if (reportAssumption4 !== undefined) data.reportAssumption4 = String(reportAssumption4);
     if (reportLimfac1 !== undefined) data.reportLimfac1 = String(reportLimfac1);
     if (reportLimfac2 !== undefined) data.reportLimfac2 = String(reportLimfac2);
+    if (reportLimfac3 !== undefined) data.reportLimfac3 = String(reportLimfac3);
     if (totalBudget !== undefined) {
       const parsedTotalBudget = Number(totalBudget);
       if (!Number.isFinite(parsedTotalBudget)) {

@@ -12,25 +12,31 @@ import type { ExerciseDetail } from '../types';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const DAYS_PER_MONTH = 30;
-const DEFAULT_REPORT_ASSUMPTIONS: [string, string, string] = [
+type ReportAssumptions = [string, string, string, string];
+type ReportLimfacs = [string, string, string];
+
+const DEFAULT_REPORT_ASSUMPTIONS: ReportAssumptions = [
   'Location of exercise: Fort Hunter Liggett, CA',
   'Unit of Action execution costs to be mainly funded by the NAF',
   'Pay estimations for long tour orders include MAJ\'s & SMSGT\'s. Site visits and planning conferences used CAPT\'s',
+  '',
 ];
-const DEFAULT_REPORT_LIMFACS: [string, string] = ['', ''];
+const DEFAULT_REPORT_LIMFACS: ReportLimfacs = ['', '', ''];
 
-function getReportAssumptions(exercise: ExerciseDetail): [string, string, string] {
+function getReportAssumptions(exercise: ExerciseDetail): ReportAssumptions {
   return [
     String(exercise.reportAssumption1 ?? DEFAULT_REPORT_ASSUMPTIONS[0]),
     String(exercise.reportAssumption2 ?? DEFAULT_REPORT_ASSUMPTIONS[1]),
     String(exercise.reportAssumption3 ?? DEFAULT_REPORT_ASSUMPTIONS[2]),
+    String(exercise.reportAssumption4 ?? DEFAULT_REPORT_ASSUMPTIONS[3]),
   ];
 }
 
-function getReportLimfacs(exercise: ExerciseDetail): [string, string] {
+function getReportLimfacs(exercise: ExerciseDetail): ReportLimfacs {
   return [
     String(exercise.reportLimfac1 ?? DEFAULT_REPORT_LIMFACS[0]),
     String(exercise.reportLimfac2 ?? DEFAULT_REPORT_LIMFACS[1]),
+    String(exercise.reportLimfac3 ?? DEFAULT_REPORT_LIMFACS[2]),
   ];
 }
 
@@ -241,8 +247,8 @@ export function ReportsPage({
   const [draftRpaBudgetTarget, setDraftRpaBudgetTarget] = useState(0);
   const [draftOmBudgetTarget, setDraftOmBudgetTarget] = useState(0);
   const [draftDutyDays, setDraftDutyDays] = useState(1);
-  const [draftReportAssumptions, setDraftReportAssumptions] = useState<[string, string, string]>(DEFAULT_REPORT_ASSUMPTIONS);
-  const [draftReportLimfacs, setDraftReportLimfacs] = useState<[string, string]>(DEFAULT_REPORT_LIMFACS);
+  const [draftReportAssumptions, setDraftReportAssumptions] = useState<ReportAssumptions>(DEFAULT_REPORT_ASSUMPTIONS);
+  const [draftReportLimfacs, setDraftReportLimfacs] = useState<ReportLimfacs>(DEFAULT_REPORT_LIMFACS);
   const skipBudgetTargetsSaveRef = useRef(true);
   const skipTotalBudgetSaveRef = useRef(true);
   const skipDutyDaysSaveRef = useRef(true);
@@ -268,7 +274,7 @@ export function ReportsPage({
   });
 
   const reportAssumptionsMut = useMutation({
-    mutationFn: (data: Pick<ExerciseDetail, 'reportAssumption1' | 'reportAssumption2' | 'reportAssumption3'>) =>
+    mutationFn: (data: Pick<ExerciseDetail, 'reportAssumption1' | 'reportAssumption2' | 'reportAssumption3' | 'reportAssumption4'>) =>
       api.updateExercise(exerciseId!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
@@ -277,7 +283,7 @@ export function ReportsPage({
   });
 
   const reportLimfacsMut = useMutation({
-    mutationFn: (data: Pick<ExerciseDetail, 'reportLimfac1' | 'reportLimfac2'>) =>
+    mutationFn: (data: Pick<ExerciseDetail, 'reportLimfac1' | 'reportLimfac2' | 'reportLimfac3'>) =>
       api.updateExercise(exerciseId!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
@@ -324,9 +330,9 @@ export function ReportsPage({
 
   const travel = exercise.travelConfig;
   const currentReportAssumptions = getReportAssumptions(exercise);
-  const [currentReportAssumption1, currentReportAssumption2, currentReportAssumption3] = currentReportAssumptions;
+  const [currentReportAssumption1, currentReportAssumption2, currentReportAssumption3, currentReportAssumption4] = currentReportAssumptions;
   const currentReportLimfacs = getReportLimfacs(exercise);
-  const [currentReportLimfac1, currentReportLimfac2] = currentReportLimfacs;
+  const [currentReportLimfac1, currentReportLimfac2, currentReportLimfac3] = currentReportLimfacs;
 
   useEffect(() => {
     if (!editTravel || !travelDraft || travelMut.isPending) return;
@@ -544,6 +550,7 @@ export function ReportsPage({
     currentReportAssumption1,
     currentReportAssumption2,
     currentReportAssumption3,
+    currentReportAssumption4,
   ]);
 
   useEffect(() => {
@@ -552,6 +559,7 @@ export function ReportsPage({
   }, [
     currentReportLimfac1,
     currentReportLimfac2,
+    currentReportLimfac3,
   ]);
 
   useEffect(() => {
@@ -628,6 +636,7 @@ export function ReportsPage({
         reportAssumption1: draftReportAssumptions[0],
         reportAssumption2: draftReportAssumptions[1],
         reportAssumption3: draftReportAssumptions[2],
+        reportAssumption4: draftReportAssumptions[3],
       });
     }, 700);
 
@@ -638,6 +647,7 @@ export function ReportsPage({
     currentReportAssumption1,
     currentReportAssumption2,
     currentReportAssumption3,
+    currentReportAssumption4,
     draftReportAssumptions,
     reportAssumptionsMut,
   ]);
@@ -657,6 +667,7 @@ export function ReportsPage({
       reportLimfacsMut.mutate({
         reportLimfac1: draftReportLimfacs[0],
         reportLimfac2: draftReportLimfacs[1],
+        reportLimfac3: draftReportLimfacs[2],
       });
     }, 700);
 
@@ -666,6 +677,7 @@ export function ReportsPage({
   }, [
     currentReportLimfac1,
     currentReportLimfac2,
+    currentReportLimfac3,
     draftReportLimfacs,
     reportLimfacsMut,
   ]);
@@ -753,7 +765,7 @@ export function ReportsPage({
                   <Input
                     value={line}
                     onChange={(event) => {
-                      const next = [...draftReportAssumptions] as [string, string, string];
+                      const next = [...draftReportAssumptions] as ReportAssumptions;
                       next[index] = event.target.value;
                       setDraftReportAssumptions(next);
                     }}
@@ -778,7 +790,7 @@ export function ReportsPage({
                   <Input
                     value={line}
                     onChange={(event) => {
-                      const next = [...draftReportLimfacs] as [string, string];
+                      const next = [...draftReportLimfacs] as ReportLimfacs;
                       next[index] = event.target.value;
                       setDraftReportLimfacs(next);
                     }}

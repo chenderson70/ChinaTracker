@@ -191,8 +191,8 @@ export default function Dashboard() {
       accent: 'ct-stat-blue',
       icon: <UserOutlined />,
       detailLines: [
-        { label: 'Annual Tour Mil Pay', value: fmt(annualTourMilPayTotal) },
-        { label: 'Annual Tour Travel Pay', value: fmt(annualTourTravelTotal) },
+        { label: 'AT Mil Pay', value: fmt(annualTourMilPayTotal) },
+        { label: 'AT Travel Pay', value: fmt(annualTourTravelTotal) },
       ],
     },
   ];
@@ -240,8 +240,8 @@ export default function Dashboard() {
       accent: 'ct-stat-blue',
       icon: <UserOutlined />,
       detailLines: [
-        { label: 'Annual Tour Mil Pay', value: fmt(applyPlusUp(annualTourMilPayTotal)) },
-        { label: 'Annual Tour Travel Pay', value: fmt(applyPlusUp(annualTourTravelTotal)) },
+        { label: 'AT Mil Pay', value: fmt(applyPlusUp(annualTourMilPayTotal)) },
+        { label: 'AT Travel Pay', value: fmt(applyPlusUp(annualTourTravelTotal)) },
       ],
     },
   ];

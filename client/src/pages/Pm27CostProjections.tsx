@@ -279,7 +279,7 @@ function buildProjectionRow(unitBudget: UnitBudget | undefined, unitCalc: UnitCa
       defaultDutyDays,
       [],
       false,
-      buildRpaBreakdowns(unitCalc.annualTourRpa, { includeMeals: true, labelPrefix: 'Annual Tour' }),
+      buildRpaBreakdowns(unitCalc.annualTourRpa, { includeMeals: true, labelPrefix: 'AT' }),
     ),
     playerOm: buildProjectionCell(unitCalc.playerOm.subtotal, playerOmGroups, defaultDutyDays),
     executionRpa: buildProjectionCell(

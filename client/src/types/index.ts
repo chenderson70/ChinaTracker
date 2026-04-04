@@ -25,8 +25,10 @@ export interface Exercise {
   reportAssumption1?: string;
   reportAssumption2?: string;
   reportAssumption3?: string;
+  reportAssumption4?: string;
   reportLimfac1?: string;
   reportLimfac2?: string;
+  reportLimfac3?: string;
   createdAt: string;
   updatedAt: string;
 }

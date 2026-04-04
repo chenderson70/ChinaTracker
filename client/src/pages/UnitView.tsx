@@ -528,12 +528,15 @@ export default function UnitView() {
     const isPlayerRpa = isPlayerLike && ft === 'RPA';
     const isPlayerOm = isPlayer && ft === 'OM';
     const showTravelOnly = ft === 'RPA' && (role === 'PLANNING' || role === 'SUPPORT');
+    const fundingBadgeLabel = isAnnualTour && ft === 'RPA' ? 'AT' : (ft === 'OM' ? 'O&M' : ft);
+    const fundingBadgeClass = isAnnualTour && ft === 'RPA' ? 'ct-badge-at' : (ft === 'RPA' ? 'ct-badge-rpa' : 'ct-badge-om');
+    const subtotalColor = isAnnualTour && ft === 'RPA' ? '#0958d9' : (ft === 'RPA' ? '#1677ff' : '#52c41a');
     const fundingNote = role === 'PLANNING'
       ? (ft === 'RPA'
           ? '(Exercise planning, planning meetings, site visits)'
           : '(Planning meetings, site visits)')
       : role === 'ANNUAL_TOUR'
-        ? '(Calculated using the same formula as RPA player costs)'
+        ? '(Calculated using the same formula as player costs)'
       : role === 'SUPPORT'
         ? '(ADVON, REARVON, exercise execution)'
         : '';
@@ -631,7 +634,7 @@ export default function UnitView() {
       <Card
         title={
           <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className={ft === 'RPA' ? 'ct-badge-rpa' : 'ct-badge-om'}>{ft === 'OM' ? 'O&M' : ft}</span>
+            <span className={fundingBadgeClass}>{fundingBadgeLabel}</span>
             {fundingNote ? (
               <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>{fundingNote}</span>
             ) : null}
@@ -639,7 +642,7 @@ export default function UnitView() {
         }
         size="small"
         className="ct-personnel-card"
-        extra={<Space><strong>PAX: {group.paxCount || totalEntryPax}</strong><span style={{ fontSize: 16, fontWeight: 700, color: ft === 'RPA' ? '#1677ff' : '#52c41a' }}>{fmt(calc.subtotal)}</span></Space>}
+        extra={<Space><strong>PAX: {group.paxCount || totalEntryPax}</strong><span style={{ fontSize: 16, fontWeight: 700, color: subtotalColor }}>{fmt(calc.subtotal)}</span></Space>}
       >
         <Row gutter={16} style={{ marginBottom: 12 }}>
           {!isPlayerRpa && (

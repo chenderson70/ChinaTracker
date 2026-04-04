@@ -41,7 +41,8 @@ export default function BudgetOverviewSection() {
       key: u.unitCode,
       unitCode: u.unitCode,
       totalPax: getDisplayedPax(u.totalPax, siteVisitPaxExclusions.excludedByUnit[String(u.unitCode || '').toUpperCase()] || 0),
-      rpa: u.unitTotalRpa,
+      rpa: Math.max(0, u.unitTotalRpa - (u.annualTourRpa?.subtotal || 0)),
+      annualTour: u.annualTourRpa?.subtotal || 0,
       om: u.unitTotalOm,
       total: u.unitTotal,
     }));
@@ -165,15 +166,23 @@ export default function BudgetOverviewSection() {
       title: 'RPA',
       dataIndex: 'rpa',
       key: 'rpa',
-      width: 190,
+      width: 170,
       align: 'center' as const,
       render: (value: number) => <span style={{ color: '#1677ff' }}>{fmt(value)}</span>,
+    },
+    {
+      title: 'Annual Tour',
+      dataIndex: 'annualTour',
+      key: 'annualTour',
+      width: 170,
+      align: 'center' as const,
+      render: (value: number) => <span style={{ color: '#0958d9' }}>{fmt(value)}</span>,
     },
     {
       title: 'O&M',
       dataIndex: 'om',
       key: 'om',
-      width: 190,
+      width: 170,
       align: 'center' as const,
       render: (value: number) => <span style={{ color: '#52c41a' }}>{fmt(value)}</span>,
     },
@@ -181,7 +190,7 @@ export default function BudgetOverviewSection() {
       title: 'Total',
       dataIndex: 'total',
       key: 'total',
-      width: 190,
+      width: 170,
       align: 'center' as const,
       render: (value: number) => <strong>{fmt(value)}</strong>,
     },
@@ -217,8 +226,8 @@ export default function BudgetOverviewSection() {
       accent: 'ct-stat-blue',
       icon: <UserOutlined />,
       detailLines: [
-        { label: 'Annual Tour Mil Pay', value: fmt(annualTourMilPayTotal) },
-        { label: 'Annual Tour Travel Pay', value: fmt(annualTourTravelTotal) },
+        { label: 'AT Mil Pay', value: fmt(annualTourMilPayTotal) },
+        { label: 'AT Travel Pay', value: fmt(annualTourTravelTotal) },
       ],
     },
   ];
@@ -266,8 +275,8 @@ export default function BudgetOverviewSection() {
       accent: 'ct-stat-blue',
       icon: <UserOutlined />,
       detailLines: [
-        { label: 'Annual Tour Mil Pay', value: fmt(applyPlusUp(annualTourMilPayTotal)) },
-        { label: 'Annual Tour Travel Pay', value: fmt(applyPlusUp(annualTourTravelTotal)) },
+        { label: 'AT Mil Pay', value: fmt(applyPlusUp(annualTourMilPayTotal)) },
+        { label: 'AT Travel Pay', value: fmt(applyPlusUp(annualTourTravelTotal)) },
       ],
     },
   ];
@@ -443,7 +452,7 @@ export default function BudgetOverviewSection() {
       </Row>
 
       <Card title="Unit Budget Summary" className="ct-section-card" style={{ marginBottom: 28 }}>
-        <div className="ct-table" style={{ maxWidth: 860, margin: '0 auto' }}>
+        <div className="ct-table" style={{ maxWidth: 1040, margin: '0 auto' }}>
           <Table
             dataSource={unitData}
             columns={columns}
@@ -454,9 +463,10 @@ export default function BudgetOverviewSection() {
               <Table.Summary.Row>
                 <Table.Summary.Cell index={0} align="center"><strong>Total</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={1} align="center"><strong>{displayTotalPax}</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={2} align="center"><strong style={{ color: '#1677ff' }}>{fmt(budget.totalRpa)}</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={3} align="center"><strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm - budget.exerciseOmTotal)}</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={4} align="center"><strong>{fmt(unitData.reduce((sum, unit) => sum + unit.total, 0))}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={2} align="center"><strong style={{ color: '#1677ff' }}>{fmt(Math.max(0, budget.totalRpa - annualTourRpaTotal))}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={3} align="center"><strong style={{ color: '#0958d9' }}>{fmt(annualTourRpaTotal)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={4} align="center"><strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm - budget.exerciseOmTotal)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={5} align="center"><strong>{fmt(unitData.reduce((sum, unit) => sum + unit.total, 0))}</strong></Table.Summary.Cell>
               </Table.Summary.Row>
             )}
           />
