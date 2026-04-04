@@ -3,7 +3,7 @@ import { useApp } from '../components/AppLayout';
 import BudgetOverviewSection from '../components/BudgetOverviewSection';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { ReportsPage } from './Reports';
-import type { ExecutionCostLine, FundingType, PersonnelEntry, PersonnelGroup, UnitBudget, UnitCalc } from '../types';
+import type { ExecutionCostLine, FundingType, GroupCalc, PersonnelEntry, PersonnelGroup, UnitBudget, UnitCalc } from '../types';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const DAYS_PER_MONTH = 30;
@@ -19,6 +19,7 @@ const LOCATION_LABELS: Record<string, string> = {
 
 type ProjectionCell = {
   total: number;
+  breakdowns: Array<{ label: string; amount: number }>;
   details: string[];
 };
 
@@ -27,6 +28,7 @@ type ProjectionRow = {
   planningRpa: ProjectionCell;
   planningOm: ProjectionCell;
   playerRpa: ProjectionCell;
+  annualTourRpa: ProjectionCell;
   playerOm: ProjectionCell;
   executionRpa: ProjectionCell;
   executionOm: ProjectionCell;
@@ -36,6 +38,7 @@ type ProjectionFieldKey =
   | 'planningRpa'
   | 'planningOm'
   | 'playerRpa'
+  | 'annualTourRpa'
   | 'playerOm'
   | 'executionRpa'
   | 'executionOm';
@@ -130,14 +133,43 @@ function buildProjectionCell(
   defaultDutyDays: number,
   executionLines: ExecutionCostLine[] = [],
   includeRolePrefix = false,
+  breakdowns: Array<{ label: string; amount: number }> = [],
 ): ProjectionCell {
   return {
     total,
+    breakdowns,
     details: [
       ...getPersonnelDetails(personnelGroups, defaultDutyDays, includeRolePrefix),
       ...getExecutionLineDetails(executionLines),
     ],
   };
+}
+
+function buildRpaBreakdowns(
+  group: GroupCalc | undefined,
+  options?: {
+    includeMeals?: boolean;
+    extraItems?: Array<{ label: string; amount: number }>;
+  },
+): Array<{ label: string; amount: number }> {
+  const milPay = group?.milPay || 0;
+  const travel = (group?.travel || 0) + (group?.perDiem || 0) + (group?.billeting || 0);
+  const breakdowns = [
+    { label: 'RPA Mil Pay', amount: milPay },
+    { label: 'RPA Travel', amount: travel },
+  ];
+
+  if (options?.includeMeals && (group?.meals || 0) > 0) {
+    breakdowns.push({ label: 'RPA Meals', amount: group?.meals || 0 });
+  }
+
+  for (const item of options?.extraItems || []) {
+    if ((item.amount || 0) > 0) {
+      breakdowns.push(item);
+    }
+  }
+
+  return breakdowns;
 }
 
 function renderProjectionCell(value: ProjectionCell) {
@@ -146,6 +178,15 @@ function renderProjectionCell(value: ProjectionCell) {
       <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>
         {fmt(value.total)}
       </Typography.Text>
+      {value.breakdowns.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: value.details.length > 0 ? 8 : 0 }}>
+          {value.breakdowns.map((breakdown) => (
+            <Typography.Text key={`${breakdown.label}-${breakdown.amount}`} style={{ fontSize: 12, lineHeight: 1.35, color: '#596577' }}>
+              {breakdown.label}: {fmt(breakdown.amount)}
+            </Typography.Text>
+          ))}
+        </div>
+      ) : null}
       {value.details.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {value.details.map((detail) => (
@@ -154,11 +195,11 @@ function renderProjectionCell(value: ProjectionCell) {
             </Typography.Text>
           ))}
         </div>
-      ) : (
+      ) : value.breakdowns.length === 0 ? (
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           No entries yet
         </Typography.Text>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -167,6 +208,7 @@ const projectionSections: Array<{ key: ProjectionFieldKey; label: string }> = [
   { key: 'planningRpa', label: 'Planning RPA' },
   { key: 'planningOm', label: 'Planning O&M' },
   { key: 'playerRpa', label: 'Player RPA' },
+  { key: 'annualTourRpa', label: 'Annual Tour RPA' },
   { key: 'playerOm', label: 'Player O&M' },
   { key: 'executionRpa', label: 'Execution RPA' },
   { key: 'executionOm', label: 'Execution O&M' },
@@ -192,6 +234,7 @@ function buildProjectionRow(unitBudget: UnitBudget | undefined, unitCalc: UnitCa
   const planningRpaGroups = findGroups(unitBudget, 'PLANNING', 'RPA');
   const planningOmGroups = findGroups(unitBudget, 'PLANNING', 'OM');
   const playerRpaGroups = findGroups(unitBudget, 'PLAYER', 'RPA');
+  const annualTourRpaGroups = findGroups(unitBudget, 'ANNUAL_TOUR', 'RPA');
   const playerOmGroups = findGroups(unitBudget, 'PLAYER', 'OM');
   const executionRpaGroups = findExecutionGroups(unitBudget, 'RPA');
   const executionOmGroups = findExecutionGroups(unitBudget, 'OM');
@@ -203,7 +246,7 @@ function buildProjectionRow(unitBudget: UnitBudget | undefined, unitCalc: UnitCa
         fundingType: 'RPA' as FundingType,
         category: 'Player Meals',
         amount: playerMeals,
-        notes: 'Auto-populated from Player - Execution meals',
+        notes: 'Auto-populated from Player - Execution (RPA) meals',
       }]
     : [];
   const executionRpaLines = [...derivedExecutionRpaLines, ...findExecutionLines(unitBudget, 'RPA')];
@@ -211,9 +254,31 @@ function buildProjectionRow(unitBudget: UnitBudget | undefined, unitCalc: UnitCa
 
   return {
     key: unitCalc.unitCode,
-    planningRpa: buildProjectionCell(unitCalc.planningRpa.subtotal, planningRpaGroups, defaultDutyDays),
+    planningRpa: buildProjectionCell(
+      unitCalc.planningRpa.subtotal,
+      planningRpaGroups,
+      defaultDutyDays,
+      [],
+      false,
+      buildRpaBreakdowns(unitCalc.planningRpa),
+    ),
     planningOm: buildProjectionCell(unitCalc.planningOm.subtotal, planningOmGroups, defaultDutyDays),
-    playerRpa: buildProjectionCell(Math.max(0, unitCalc.playerRpa.subtotal - playerMeals), playerRpaGroups, defaultDutyDays),
+    playerRpa: buildProjectionCell(
+      Math.max(0, unitCalc.playerRpa.subtotal - playerMeals),
+      playerRpaGroups,
+      defaultDutyDays,
+      [],
+      false,
+      buildRpaBreakdowns(unitCalc.playerRpa),
+    ),
+    annualTourRpa: buildProjectionCell(
+      unitCalc.annualTourRpa?.subtotal || 0,
+      annualTourRpaGroups,
+      defaultDutyDays,
+      [],
+      false,
+      buildRpaBreakdowns(unitCalc.annualTourRpa, { includeMeals: true }),
+    ),
     playerOm: buildProjectionCell(unitCalc.playerOm.subtotal, playerOmGroups, defaultDutyDays),
     executionRpa: buildProjectionCell(
       (unitCalc.whiteCellRpa?.subtotal || 0) + unitCalc.executionRpa + playerMeals,
@@ -221,6 +286,12 @@ function buildProjectionRow(unitBudget: UnitBudget | undefined, unitCalc: UnitCa
       defaultDutyDays,
       executionRpaLines,
       true,
+      buildRpaBreakdowns(unitCalc.whiteCellRpa, {
+        extraItems: [
+          { label: 'RPA Meals', amount: playerMeals },
+          { label: 'Execution Costs', amount: unitCalc.executionRpa },
+        ],
+      }),
     ),
     executionOm: buildProjectionCell(
       (unitCalc.whiteCellOm?.subtotal || 0) + unitCalc.executionOm,
@@ -246,6 +317,7 @@ function Pm27UnitProjectionTables() {
     { title: 'Planning RPA', dataIndex: 'planningRpa', key: 'planningRpa', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Planning O&M', dataIndex: 'planningOm', key: 'planningOm', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Player RPA', dataIndex: 'playerRpa', key: 'playerRpa', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
+    { title: 'Annual Tour RPA', dataIndex: 'annualTourRpa', key: 'annualTourRpa', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Player O&M', dataIndex: 'playerOm', key: 'playerOm', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Execution RPA', dataIndex: 'executionRpa', key: 'executionRpa', width: 260, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Execution O&M', dataIndex: 'executionOm', key: 'executionOm', width: 260, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
@@ -272,7 +344,7 @@ function Pm27UnitProjectionTables() {
                 size="small"
                 pagination={false}
                 columns={columns}
-                scroll={{ x: 1480 }}
+                scroll={{ x: 1720 }}
                 dataSource={[projectionRow]}
               />
             </div>
@@ -285,6 +357,15 @@ function Pm27UnitProjectionTables() {
                       <div className="ct-pm27-print-item-label">{section.label}</div>
                       <div className="ct-pm27-print-item-total">{fmt(cell.total)}</div>
                     </div>
+                    {cell.breakdowns.length > 0 ? (
+                      <div className="ct-pm27-print-item-details">
+                        {cell.breakdowns.map((breakdown) => (
+                          <div key={`${breakdown.label}-${breakdown.amount}`} className="ct-pm27-print-item-detail">
+                            {breakdown.label}: {fmt(breakdown.amount)}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                     {cell.details.length > 0 ? (
                       <div className="ct-pm27-print-item-details">
                         {cell.details.map((detail) => (

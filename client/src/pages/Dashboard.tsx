@@ -95,10 +95,21 @@ export default function Dashboard() {
     omTravelTotal;
 
   const rpaMilPayTotal = Object.values(budget.units)
-    .reduce((sum, unit) => sum + (unit.planningRpa.milPay || 0) + (unit.whiteCellRpa.milPay || 0) + (unit.playerRpa.milPay || 0), 0);
+    .reduce(
+      (sum, unit) =>
+        sum +
+        (unit.planningRpa.milPay || 0) +
+        (unit.whiteCellRpa.milPay || 0) +
+        (unit.playerRpa.milPay || 0) +
+        (unit.annualTourRpa?.milPay || 0),
+      0,
+    );
 
   const rpaRationsTotal = Object.values(budget.units)
-    .reduce((sum, unit) => sum + (unit.playerRpa.meals || 0), 0);
+    .reduce((sum, unit) => sum + (unit.playerRpa.meals || 0) + (unit.annualTourRpa?.meals || 0), 0);
+  const annualTourRpaTotal = Object.values(budget.units)
+    .reduce((sum, unit) => sum + (unit.annualTourRpa?.subtotal || 0), 0);
+  const a7BudgetPlanningTotal = budget.units.A7?.unitTotal || 0;
 
   const totalPlayers = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.playerRpa.paxCount || 0) + (unit.playerOm.paxCount || 0), 0);
@@ -113,6 +124,7 @@ export default function Dashboard() {
     .reduce((sum, unit) => sum + (unit.whiteCellRpa.paxCount || 0), 0);
   const totalWhiteCellOm = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.whiteCellOm.paxCount || 0), 0);
+  const totalAnnualTour = budget.totalAnnualTour || 0;
 
   const totalLongTermA7Planners = (exercise.unitBudgets || [])
     .flatMap((unitBudget) => unitBudget.personnelGroups || [])
@@ -156,14 +168,35 @@ export default function Dashboard() {
   const omRemainingBudgetColor = omRemainingBudget < 0 ? dangerColor : '#52c41a';
 
   const statCards = [
-    { label: 'Grand Total', value: fmt(budget.grandTotal), color: '#1a1a2e', accent: 'ct-stat-purple', icon: <DollarOutlined /> },
+    {
+      label: 'Grand Total',
+      color: '#1a1a2e',
+      accent: 'ct-stat-purple',
+      icon: <DollarOutlined />,
+      sections: [
+        { label: 'Overall Exercise Total', value: fmt(budget.grandTotal) },
+        { label: 'A7 Budget Planning Total', value: fmt(a7BudgetPlanningTotal) },
+      ],
+    },
     { label: 'Total RPA', value: fmt(budget.totalRpa), color: '#1677ff', accent: 'ct-stat-blue', icon: <RocketOutlined /> },
     { label: 'Total O&M', value: fmt(budget.totalOm), color: '#52c41a', accent: 'ct-stat-green', icon: <SafetyCertificateOutlined /> },
+    { label: 'Annual Tour', value: fmt(annualTourRpaTotal), color: '#0958d9', accent: 'ct-stat-blue', icon: <UserOutlined /> },
   ];
   const plusUpStatCards = [
-    { label: 'Grand Total', badge: '10% Plus-Up', value: fmt(applyPlusUp(budget.grandTotal)), color: '#1a1a2e', accent: 'ct-stat-purple', icon: <DollarOutlined /> },
+    {
+      label: 'Grand Total',
+      badge: '10% Plus-Up',
+      color: '#1a1a2e',
+      accent: 'ct-stat-purple',
+      icon: <DollarOutlined />,
+      sections: [
+        { label: 'Overall Exercise Total', value: fmt(applyPlusUp(budget.grandTotal)) },
+        { label: 'A7 Budget Planning Total', value: fmt(applyPlusUp(a7BudgetPlanningTotal)) },
+      ],
+    },
     { label: 'Total RPA', badge: '10% Plus-Up', value: fmt(applyPlusUp(budget.totalRpa)), color: '#1677ff', accent: 'ct-stat-blue', icon: <RocketOutlined /> },
     { label: 'Total O&M', badge: '10% Plus-Up', value: fmt(applyPlusUp(budget.totalOm)), color: '#52c41a', accent: 'ct-stat-green', icon: <SafetyCertificateOutlined /> },
+    { label: 'Annual Tour', badge: '10% Plus-Up', value: fmt(applyPlusUp(annualTourRpaTotal)), color: '#0958d9', accent: 'ct-stat-blue', icon: <UserOutlined /> },
   ];
 
   const detailCards = [
@@ -175,9 +208,14 @@ export default function Dashboard() {
       icon: <UserOutlined />,
     },
     {
-      label: 'Players',
+      label: 'Players - Annual Tour',
+      value: totalAnnualTour.toString(),
+      detail: formatFundingPaxBreakdown(totalAnnualTour, 0),
+      icon: <UserOutlined />,
+    },
+    {
+      label: 'Players - RPA',
       value: totalPlayers.toString(),
-      detail: formatFundingPaxBreakdown(totalPlayersRpa, totalPlayersOm),
       icon: <UserOutlined />,
     },
     {
@@ -263,7 +301,7 @@ export default function Dashboard() {
       {/* Primary stat cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger">
         {statCards.map((s) => (
-          <Col xs={24} sm={8} key={s.label}>
+          <Col xs={24} sm={12} xl={6} key={s.label}>
             <Card size="small" className={`ct-stat-card ${s.accent}`} style={{ padding: '4px 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 8px' }}>
                 <div style={{
@@ -275,7 +313,21 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <div className="ct-stat-label">{s.label}</div>
-                  <div className="ct-stat-value" style={{ color: s.color }}>{s.value}</div>
+                  {s.sections ? (
+                    <div style={{ display: 'grid', gap: 8, marginTop: 6 }}>
+                      {s.sections.map((section, index) => (
+                        <div
+                          key={section.label}
+                          style={index === 0 ? undefined : { paddingTop: 8, borderTop: '1px solid #edf1f6' }}
+                        >
+                          <div className="ct-stat-label" style={{ fontSize: 10 }}>{section.label}</div>
+                          <div className="ct-stat-value" style={{ color: s.color, fontSize: 20 }}>{section.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="ct-stat-value" style={{ color: s.color }}>{s.value}</div>
+                  )}
                 </div>
               </div>
             </Card>
@@ -285,7 +337,7 @@ export default function Dashboard() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger">
         {plusUpStatCards.map((s) => (
-          <Col xs={24} sm={8} key={s.label}>
+          <Col xs={24} sm={12} xl={6} key={s.label}>
             <Card size="small" className={`ct-stat-card ct-stat-plusup-card ${s.accent}`} style={{ padding: '4px 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 8px' }}>
                 <div style={{
@@ -300,7 +352,21 @@ export default function Dashboard() {
                     <div className="ct-stat-label">{s.label}</div>
                     <span className="ct-stat-plusup-chip">{s.badge}</span>
                   </div>
-                  <div className="ct-stat-value" style={{ color: s.color }}>{s.value}</div>
+                  {s.sections ? (
+                    <div style={{ display: 'grid', gap: 8, marginTop: 6 }}>
+                      {s.sections.map((section, index) => (
+                        <div
+                          key={section.label}
+                          style={index === 0 ? undefined : { paddingTop: 8, borderTop: '1px solid #f0e2b2' }}
+                        >
+                          <div className="ct-stat-label" style={{ fontSize: 10 }}>{section.label}</div>
+                          <div className="ct-stat-value" style={{ color: s.color, fontSize: 20 }}>{section.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="ct-stat-value" style={{ color: s.color }}>{s.value}</div>
+                  )}
                 </div>
               </div>
             </Card>
@@ -311,7 +377,7 @@ export default function Dashboard() {
       {/* Detail stat cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 28 }} className="ct-stagger">
         {detailCards.map((s) => (
-          <Col xs={12} sm={6} key={s.label}>
+          <Col key={s.label} flex="1 1 0" style={{ minWidth: 220 }}>
             <Card size="small" className={`ct-stat-card ${s.accent || ''}`} style={{ padding: '4px 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 8px' }}>
                 <div style={{
@@ -401,6 +467,7 @@ export default function Dashboard() {
                   <div>RPA Mil Pay: {fmt(rpaMilPayTotal)}</div>
                   <div>RPA Travel: {fmt(budget.rpaTravel)}</div>
                   <div>Player Meals: {fmt(rpaRationsTotal)}</div>
+                  <div>Annual Tour: {fmt(annualTourRpaTotal)}</div>
                 </div>
               </div>
             </div>

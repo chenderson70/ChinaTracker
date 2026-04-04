@@ -43,6 +43,56 @@ async function loadTravelDefaults(): Promise<{ airfarePerPerson: number; rentalC
   };
 }
 
+function shouldCreateAnnualTourGroup(unitCode: string): boolean {
+  return ['SG', 'AE', 'CAB'].includes(String(unitCode || '').trim().toUpperCase());
+}
+
+async function consolidateAnnualTourGroups(groups: Array<{
+  id: string;
+  paxCount: number;
+}>): Promise<void> {
+  if (groups.length <= 1) return;
+
+  const [primaryGroup, ...duplicateGroups] = groups;
+  const duplicateGroupIds = duplicateGroups.map((group) => group.id);
+  if (duplicateGroupIds.length === 0) return;
+
+  const fallbackPaxCount = groups.reduce((sum, group) => sum + (group.paxCount || 0), 0);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.personnelEntry.updateMany({
+      where: {
+        personnelGroupId: {
+          in: duplicateGroupIds,
+        },
+      },
+      data: {
+        personnelGroupId: primaryGroup.id,
+      },
+    });
+
+    const mergedEntryCounts = await tx.personnelEntry.aggregate({
+      where: { personnelGroupId: primaryGroup.id },
+      _sum: { count: true },
+    });
+
+    await tx.personnelGroup.update({
+      where: { id: primaryGroup.id },
+      data: {
+        paxCount: mergedEntryCounts._sum.count ?? fallbackPaxCount,
+      },
+    });
+
+    await tx.personnelGroup.deleteMany({
+      where: {
+        id: {
+          in: duplicateGroupIds,
+        },
+      },
+    });
+  });
+}
+
 // Helper: load full exercise with all relations
 async function loadFullExercise(id: string) {
   return prisma.exercise.findUnique({
@@ -75,8 +125,15 @@ async function ensurePlanningGroups(exerciseId: string): Promise<void> {
   });
 
   for (const unitBudget of unitBudgets) {
+    const normalizedUnitCode = String(unitBudget.unitCode || '').trim().toUpperCase();
     const hasPlanningRpa = unitBudget.personnelGroups.some((group) => group.role === 'PLANNING' && group.fundingType === 'RPA');
     const hasPlanningOm = unitBudget.personnelGroups.some((group) => group.role === 'PLANNING' && group.fundingType === 'OM');
+    const annualTourGroups = unitBudget.personnelGroups.filter((group) => group.role === 'ANNUAL_TOUR' && group.fundingType === 'RPA');
+    const hasAnnualTourRpa = annualTourGroups.length > 0;
+
+    if (annualTourGroups.length > 1) {
+      await consolidateAnnualTourGroups(annualTourGroups);
+    }
 
     if (!hasPlanningRpa) {
       await prisma.personnelGroup.create({
@@ -95,6 +152,17 @@ async function ensurePlanningGroups(exerciseId: string): Promise<void> {
           unitBudgetId: unitBudget.id,
           role: 'PLANNING',
           fundingType: 'OM',
+          location: 'GULFPORT',
+        },
+      });
+    }
+
+    if (shouldCreateAnnualTourGroup(normalizedUnitCode) && !hasAnnualTourRpa) {
+      await prisma.personnelGroup.create({
+        data: {
+          unitBudgetId: unitBudget.id,
+          role: 'ANNUAL_TOUR',
+          fundingType: 'RPA',
           location: 'GULFPORT',
         },
       });
@@ -138,6 +206,9 @@ async function seedExerciseDefaults(exerciseId: string) {
         { role: 'PLAYER' as const, fundingType: 'OM' as const },
         { role: 'WHITE_CELL' as const, fundingType: 'RPA' as const },
         { role: 'WHITE_CELL' as const, fundingType: 'OM' as const },
+        ...(shouldCreateAnnualTourGroup(u.code)
+          ? [{ role: 'ANNUAL_TOUR' as const, fundingType: 'RPA' as const }]
+          : []),
       ];
       for (const g of groups) {
         await prisma.personnelGroup.create({
@@ -309,6 +380,7 @@ router.get('/:id/export', async (req: Request, res: Response) => {
       ['Total PAX', budget.totalPax],
       ['Total Players', budget.totalPlayers],
       ['Total White Cell', budget.totalWhiteCell],
+      ['Total Annual Tour', budget.totalAnnualTour],
       [''],
       ['Unit', 'RPA', 'O&M', 'Total'],
       ...Object.values(budget.units).map((u) => [u.unitCode, u.unitTotalRpa, u.unitTotalOm, u.unitTotal]),
@@ -340,6 +412,14 @@ router.get('/:id/export', async (req: Request, res: Response) => {
         ['Meals', u.playerRpa.meals],
         ['Travel', u.playerRpa.travel],
         ['Subtotal', u.playerRpa.subtotal],
+        [''],
+        ['Annual Tour RPA'],
+        ['PAX', u.annualTourRpa.paxCount, 'Days', u.annualTourRpa.dutyDays],
+        ['Mil Pay', u.annualTourRpa.milPay],
+        ['Per Diem', u.annualTourRpa.perDiem],
+        ['Meals', u.annualTourRpa.meals],
+        ['Travel', u.annualTourRpa.travel],
+        ['Subtotal', u.annualTourRpa.subtotal],
         [''],
         ['Player O&M'],
         ['PAX', u.playerOm.paxCount, 'Days', u.playerOm.dutyDays],
@@ -403,6 +483,17 @@ router.post('/:id/units', async (req: Request, res: Response) => {
           },
         });
       }
+    }
+
+    if (template !== 'A7' && shouldCreateAnnualTourGroup(unitCodeRaw)) {
+      await prisma.personnelGroup.create({
+        data: {
+          unitBudgetId: ub.id,
+          role: 'ANNUAL_TOUR',
+          fundingType: 'RPA',
+          location: 'GULFPORT',
+        },
+      });
     }
 
     const full = await loadFullExercise(req.params.id);

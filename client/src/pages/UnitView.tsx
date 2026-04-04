@@ -347,6 +347,7 @@ export default function UnitView() {
     whiteCellOm: { ...emptyCalcGroup },
     playerRpa: { ...emptyCalcGroup },
     playerOm: { ...emptyCalcGroup },
+    annualTourRpa: { ...emptyCalcGroup },
     executionRpa: 0,
     executionOm: 0,
     unitTotalRpa: 0,
@@ -418,17 +419,18 @@ export default function UnitView() {
     setEntryModalLongTermA7PlannerDraft(false);
   }, [entryModal, entryForm, entryModalGroup?.isLocal, entryModalGroup?.location, exercise?.defaultDutyDays, perDiemLocations]);
 
-  const roleSections = ['PLANNING', 'PLAYER', 'WHITE_CELL', 'SUPPORT'].filter((role) => hasRole(role));
+  const roleSections = ['PLANNING', 'PLAYER', 'ANNUAL_TOUR', 'WHITE_CELL', 'SUPPORT'].filter((role) => hasRole(role));
 
   const roleLabels: Record<string, string> = {
     PLAYER: 'Player',
+    ANNUAL_TOUR: 'Player - Annual Tour',
     WHITE_CELL: 'Support Personnel - Execution',
     PLANNING: 'Planning',
     SUPPORT: 'Support-Execution',
   };
 
   const getRoleLabel = (role: string) => {
-    if (isSgAeCabUnit && role === 'PLAYER') return 'Player - Execution';
+    if (isSgAeCabUnit && role === 'PLAYER') return 'Player - Execution (RPA)';
     if (isSgAeCabUnit && role === 'WHITE_CELL') return 'Support Personnel - Execution';
     return roleLabels[role] || role;
   };
@@ -442,6 +444,9 @@ export default function UnitView() {
     if (role === 'PLAYER') {
       return ft === 'RPA' ? unitCalcSafe.playerRpa : unitCalcSafe.playerOm;
     }
+    if (role === 'ANNUAL_TOUR') {
+      return ft === 'RPA' ? (unitCalcSafe.annualTourRpa || emptyCalcGroup) : emptyCalcGroup;
+    }
     if (role === 'SUPPORT') {
       return ft === 'RPA' ? unitCalcSafe.whiteCellRpa : unitCalcSafe.whiteCellOm;
     }
@@ -453,22 +458,26 @@ export default function UnitView() {
     const calc = getCalc(role, ft) || { paxCount: 0, dutyDays: 0, milPay: 0, perDiem: 0, meals: 0, travel: 0, billeting: 0, subtotal: 0 };
     if (!group) return null;
     const isPlayer = role === 'PLAYER';
+    const isAnnualTour = role === 'ANNUAL_TOUR';
+    const isPlayerLike = isPlayer || isAnnualTour;
     const isPlanning = role === 'PLANNING';
     const isWhiteCell = role === 'WHITE_CELL';
     const supportsRentalCars = role === 'WHITE_CELL' || role === 'SUPPORT';
     const usesEntryLevelRental = supportsRentalCars;
-    const isPlayerRpa = isPlayer && ft === 'RPA';
+    const isPlayerRpa = isPlayerLike && ft === 'RPA';
     const isPlayerOm = isPlayer && ft === 'OM';
     const showTravelOnly = ft === 'RPA' && (role === 'PLANNING' || role === 'SUPPORT');
     const fundingNote = role === 'PLANNING'
       ? (ft === 'RPA'
           ? '(Exercise planning, planning meetings, site visits)'
           : '(Planning meetings, site visits)')
+      : role === 'ANNUAL_TOUR'
+        ? '(Calculated using the same formula as RPA player costs)'
       : role === 'SUPPORT'
         ? '(ADVON, REARVON, exercise execution)'
         : '';
     const totalEntryPax = group.personnelEntries.reduce((sum, entry) => sum + entry.count, 0);
-    const nonPlayerTravelEntries = !isPlayer
+    const nonPlayerTravelEntries = !isPlayerLike
       ? (group.personnelEntries.length > 0
         ? group.personnelEntries
         : [{
@@ -817,7 +826,7 @@ export default function UnitView() {
         category: 'Player Meals',
         fundingType: 'RPA',
         amount: unitCalcSafe.playerRpa.meals || 0,
-        notes: 'Auto-populated from Player - Execution meals',
+        notes: 'Auto-populated from Player - Execution (RPA) meals',
         isDerived: true,
       }
     : null;
@@ -1188,7 +1197,7 @@ export default function UnitView() {
           <Col xs={24} lg={12} key={role}>
             <Typography.Title level={5}>{getRoleLabel(role)}</Typography.Title>
             <PersonnelPanel role={role} ft="RPA" />
-            <PersonnelPanel role={role} ft="OM" />
+            {role !== 'ANNUAL_TOUR' ? <PersonnelPanel role={role} ft="OM" /> : null}
           </Col>
         ))}
       </Row>

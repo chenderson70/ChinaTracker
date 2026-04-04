@@ -1,6 +1,6 @@
 // ──────────── Enums ────────────
 export type UnitCode = string;
-export type PersonnelRole = 'PLAYER' | 'WHITE_CELL' | 'PLANNING' | 'SUPPORT';
+export type PersonnelRole = 'PLAYER' | 'WHITE_CELL' | 'PLANNING' | 'SUPPORT' | 'ANNUAL_TOUR';
 export type FundingType = 'RPA' | 'OM';
 export type Location = string;
 export type OmCategory =
@@ -154,6 +154,7 @@ export interface UnitCalc {
   whiteCellOm: GroupCalc;
   playerRpa: GroupCalc;
   playerOm: GroupCalc;
+  annualTourRpa: GroupCalc;
   executionRpa: number;
   executionOm: number;
   unitTotalRpa: number;
@@ -173,6 +174,7 @@ export interface BudgetResult {
   totalPax: number;
   totalPlayers: number;
   totalWhiteCell: number;
+  totalAnnualTour: number;
 }
 
 export interface AuthUser {

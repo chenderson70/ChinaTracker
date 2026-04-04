@@ -193,6 +193,7 @@ type PrintBudgetFieldKey =
   | 'wcExecRpa'
   | 'wcExecOm'
   | 'playerRpa'
+  | 'annualTourRpa'
   | 'playerOm'
   | 'totalRpa'
   | 'totalOm';
@@ -315,11 +316,14 @@ export function ReportsPage({
       wcExecRpa: u.whiteCellRpa.subtotal + u.executionRpa + (u.playerRpa.meals || 0),
       wcExecOm: u.whiteCellOm.subtotal + u.executionOm,
       playerRpa: Math.max(0, u.playerRpa.subtotal - (u.playerRpa.meals || 0)),
+      annualTourRpa: u.annualTourRpa?.subtotal || 0,
       playerOm: u.playerOm.subtotal,
       totalRpa: u.unitTotalRpa,
       totalOm: u.unitTotalOm,
       total: u.unitTotal,
     }));
+  const annualTourRpaTotal = Object.values(budget.units)
+    .reduce((sum, unit) => sum + (unit.annualTourRpa?.subtotal || 0), 0);
 
   const summaryRow = unitData.reduce(
     (totals, row) => ({
@@ -329,6 +333,7 @@ export function ReportsPage({
       wcExecRpa: totals.wcExecRpa + row.wcExecRpa,
       wcExecOm: totals.wcExecOm + row.wcExecOm,
       playerRpa: totals.playerRpa + row.playerRpa,
+      annualTourRpa: totals.annualTourRpa + row.annualTourRpa,
       playerOm: totals.playerOm + row.playerOm,
       totalRpa: totals.totalRpa + row.totalRpa,
       totalOm: totals.totalOm + row.totalOm,
@@ -342,6 +347,7 @@ export function ReportsPage({
       wcExecRpa: 0,
       wcExecOm: 0,
       playerRpa: 0,
+      annualTourRpa: 0,
       playerOm: 0,
       totalRpa: 0,
       totalOm: 0,
@@ -363,6 +369,7 @@ export function ReportsPage({
     { key: 'wcExecRpa', label: 'White Cell + Execution RPA' },
     { key: 'wcExecOm', label: 'White Cell + Execution O&M' },
     { key: 'playerRpa', label: 'Player RPA' },
+    { key: 'annualTourRpa', label: 'Annual Tour RPA' },
     { key: 'playerOm', label: 'Player O&M' },
     { key: 'totalRpa', label: 'Total RPA' },
     { key: 'totalOm', label: 'Total O&M' },
@@ -375,6 +382,7 @@ export function ReportsPage({
     { title: 'White Cell + Execution RPA', dataIndex: 'wcExecRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'White Cell + Execution O&M', dataIndex: 'wcExecOm', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Player RPA', dataIndex: 'playerRpa', render: renderBudgetAmount, align: 'center' as const },
+    { title: 'Annual Tour RPA', dataIndex: 'annualTourRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Player O&M', dataIndex: 'playerOm', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Total RPA', dataIndex: 'totalRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Total O&M', dataIndex: 'totalOm', render: renderBudgetAmount, align: 'center' as const },
@@ -611,7 +619,7 @@ export function ReportsPage({
         <div style={{ marginTop: 16 }}>
           <Typography.Text strong>Estimations include:</Typography.Text>
           <ul style={{ margin: '8px 0 0', paddingLeft: 18, color: '#596577' }}>
-            <li>Location of exercise: Gulfport, MS</li>
+            <li>Location of exercise: Fort Hunter Ligget, CA</li>
             <li>Unit of Action execution costs to be mainly funded by the NAF</li>
             <li>Pay estimations for long tour orders include MAJ&apos;s &amp; SMSGT&apos;s. Site visits and planning conferences used CAPT&apos;s</li>
           </ul>
@@ -656,7 +664,7 @@ export function ReportsPage({
       {/* Full budget table */}
       <Card title="Full Budget Breakdown" className="ct-section-card" style={{ marginBottom: 24 }}>
         <div className="ct-table ct-screen-only">
-            <Table size="small" pagination={false} dataSource={fullBudgetRows} columns={columns} scroll={{ x: 1320 }} />
+            <Table size="small" pagination={false} dataSource={fullBudgetRows} columns={columns} scroll={{ x: 1480 }} />
         </div>
         <div className="ct-print-only ct-print-budget-list">
           {fullBudgetRows.map((row) => (
@@ -745,6 +753,8 @@ export function ReportsPage({
             <Descriptions.Item label="WRM">{fmt(budget.wrm)}</Descriptions.Item>
             <Descriptions.Item label="Total PAX">{displayTotalPax}</Descriptions.Item>
             <Descriptions.Item label="Players">{budget.totalPlayers}</Descriptions.Item>
+            <Descriptions.Item label="Annual Tour">{budget.totalAnnualTour}</Descriptions.Item>
+            <Descriptions.Item label="Annual Tour RPA">{fmt(annualTourRpaTotal)}</Descriptions.Item>
             <Descriptions.Item label="White Cell & Exercise Support">{budget.totalWhiteCell}</Descriptions.Item>
           </Descriptions>
         </Card>

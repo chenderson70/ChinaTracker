@@ -17,6 +17,25 @@ function emptyGroup(pax = 0, days = 0): GroupCalc {
   return { paxCount: pax, dutyDays: days, milPay: 0, perDiem: 0, meals: 0, travel: 0, billeting: 0, subtotal: 0 };
 }
 
+function accumulateGroup(target: GroupCalc, source: GroupCalc): GroupCalc {
+  const existingPax = target.paxCount || 0;
+  const incomingPax = source.paxCount || 0;
+  const totalPax = existingPax + incomingPax;
+
+  target.dutyDays = totalPax > 0
+    ? (((target.dutyDays || 0) * existingPax) + ((source.dutyDays || 0) * incomingPax)) / totalPax
+    : 0;
+  target.paxCount = totalPax;
+  target.milPay += source.milPay || 0;
+  target.perDiem += source.perDiem || 0;
+  target.meals += source.meals || 0;
+  target.travel += source.travel || 0;
+  target.billeting += source.billeting || 0;
+  target.subtotal += source.subtotal || 0;
+
+  return target;
+}
+
 function isLocalFlag(value: any): boolean {
   if (value === true || value === 1 || value === '1') return true;
   if (typeof value === 'string') {
@@ -75,6 +94,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
     totalPax: 0,
     totalPlayers: 0,
     totalWhiteCell: 0,
+    totalAnnualTour: 0,
   };
 
   const mealsPerDay = rates.mealRates.breakfast + rates.mealRates.lunchMre + rates.mealRates.dinner;
@@ -90,6 +110,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
       whiteCellOm: emptyGroup(),
       playerRpa: emptyGroup(),
       playerOm: emptyGroup(),
+      annualTourRpa: emptyGroup(),
       executionRpa: 0,
       executionOm: 0,
       unitTotalRpa: 0,
@@ -113,11 +134,13 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
       const isWhiteCell = pg.role === 'WHITE_CELL' || isSupport;
       const usesWhiteCellStyleRental = pg.role === 'WHITE_CELL' || isSupport;
       const isPlayer = pg.role === 'PLAYER';
+      const isAnnualTour = pg.role === 'ANNUAL_TOUR';
+      const isPlayerLike = isPlayer || isAnnualTour;
       const isPlanningGroup = isPlanning;
       const allowsTravelOnly = isPlanningGroup || isSupport;
-      const isSgAeCabPlayer = isSgAeCab && pg.role === 'PLAYER';
+      const isSgAeCabPlayer = isSgAeCab && isPlayerLike;
       const usesLocationPerDiemRates = isPlanningGroup || isWhiteCell;
-      const usesPlayerPerDiemRates = isPlayer;
+      const usesPlayerPerDiemRates = isPlayerLike;
       const airfarePerPerson = pg.airfarePerPerson ?? travel.airfarePerPerson;
       const rentalDaily = pg.rentalCarDaily ?? travel.rentalCarDailyRate;
       const hasLegacyGroupRental = (pg.rentalCarCount || 0) > 0 || (pg.rentalCarDays || 0) > 0 || pg.rentalCarDaily != null;
@@ -191,7 +214,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
           if (usesEntryLevelRental && entryRentalCarCount > 0) {
             groupTravel += entryRentalCarCount * rentalDaily * entryDays;
           }
-        } else if (isPlayer && pg.fundingType === 'RPA') {
+        } else if (isPlayerLike && pg.fundingType === 'RPA') {
           groupMilPay += calcMilPay(pg, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryDays);
           if (usesPlayerPerDiemRates && !entryIsLocal) {
             groupPerDiem += entryCount * rates.playerPerDiemPerDay * entryDays;
@@ -282,6 +305,16 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
         unitCalc.playerRpa = g;
         result.totalPlayers += pax;
         result.rpaTravel += groupRpaTravel;
+      } else if (isAnnualTour && pg.fundingType === 'RPA') {
+        const g = emptyGroup(pax, avgDays);
+        g.milPay = groupMilPay;
+        g.meals = groupMeals;
+        g.travel = groupTravel;
+        g.perDiem = groupPerDiem;
+        g.subtotal = g.milPay + g.meals + g.travel + g.perDiem;
+        accumulateGroup(unitCalc.annualTourRpa, g);
+        result.totalAnnualTour += pax;
+        result.rpaTravel += groupRpaTravel;
       } else if (isPlayer && pg.fundingType === 'OM') {
         const g = emptyGroup(pax, avgDays);
         g.travel = groupTravel;
@@ -303,7 +336,12 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
       else unitCalc.executionOm += cl.amount;
     }
 
-    unitCalc.unitTotalRpa = unitCalc.planningRpa.subtotal + unitCalc.whiteCellRpa.subtotal + unitCalc.playerRpa.subtotal + unitCalc.executionRpa;
+    unitCalc.unitTotalRpa =
+      unitCalc.planningRpa.subtotal +
+      unitCalc.whiteCellRpa.subtotal +
+      unitCalc.playerRpa.subtotal +
+      unitCalc.annualTourRpa.subtotal +
+      unitCalc.executionRpa;
     unitCalc.unitTotalOm = unitCalc.planningOm.subtotal + unitCalc.whiteCellOm.subtotal + unitCalc.playerOm.subtotal + unitCalc.executionOm;
     unitCalc.unitTotal = unitCalc.unitTotalRpa + unitCalc.unitTotalOm;
 
@@ -320,7 +358,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
   }
   result.totalOm += result.exerciseOmTotal;
   result.grandTotal = result.totalRpa + result.totalOm;
-  result.totalPax = result.totalPlayers + result.totalWhiteCell;
+  result.totalPax = result.totalPlayers + result.totalWhiteCell + result.totalAnnualTour;
 
   return result;
 }
