@@ -598,21 +598,34 @@ export default function UnitView() {
         : `Mil Pay: ${fmt(calc.milPay)} \u2022 Travel Pay Total: ${fmt(nonPlayerTravelTotal)} (Per diem: ${fmt(nonPlayerTravelBreakout.perDiem)}, Lodging: ${fmt(nonPlayerTravelBreakout.lodging)}, Airfare: ${fmt(nonPlayerTravelBreakout.airfare)}, Rental: ${fmt(nonPlayerTravelBreakout.rental)}) \u2022 Total: ${fmt(calc.milPay + nonPlayerTravelTotal)}`;
     const playerTravelBreakout = {
       perDiem: calc.perDiem || 0,
-      lodging: calc.billeting || 0,
+      billeting: calc.billeting || 0,
       airfare: calc.travel || 0,
       rental: 0,
     };
     const playerTravelTotal =
       playerTravelBreakout.perDiem +
-      playerTravelBreakout.lodging +
+      playerTravelBreakout.billeting +
       playerTravelBreakout.airfare +
       playerTravelBreakout.rental;
-    const playerRpaSummary =
-      `Mil Pay: ${fmt(calc.milPay)} \u2022 Travel Pay Total: ${fmt(playerTravelTotal)} ` +
-      `(Per diem: ${fmt(playerTravelBreakout.perDiem)}, Lodging: ${fmt(playerTravelBreakout.lodging)}, Airfare: ${fmt(playerTravelBreakout.airfare)}, Rental: ${fmt(playerTravelBreakout.rental)}) ` +
-      `\u2022 Meals: ${fmt(calc.meals)} \u2022 Total: ${fmt(calc.subtotal)}`;
-    const playerOmSummary =
-      `Airfare: ${fmt(playerTravelBreakout.airfare)} \u2022 Per Diem: ${fmt(playerTravelBreakout.perDiem)} \u2022 Billeting: ${fmt(playerTravelBreakout.lodging)} \u2022 Total: ${fmt(calc.subtotal)}`;
+    const billetingHighlight = (
+      <span className="ct-inline-om-highlight">Billeting (O&amp;M): {fmt(playerTravelBreakout.billeting)}</span>
+    );
+    const playerRpaSummary = (
+      <>
+        {`Mil Pay: ${fmt(calc.milPay)} \u2022 Travel Pay Total: ${fmt(playerTravelTotal)} (`}
+        {`Per diem: ${fmt(playerTravelBreakout.perDiem)}, `}
+        {billetingHighlight}
+        {`, Airfare: ${fmt(playerTravelBreakout.airfare)}, Rental: ${fmt(playerTravelBreakout.rental)}) `}
+        {`\u2022 Meals: ${fmt(calc.meals)} \u2022 Total: ${fmt(calc.subtotal)}`}
+      </>
+    );
+    const playerOmSummary = (
+      <>
+        {`Airfare: ${fmt(playerTravelBreakout.airfare)} \u2022 Per Diem: ${fmt(playerTravelBreakout.perDiem)} \u2022 `}
+        {billetingHighlight}
+        {` \u2022 Total: ${fmt(calc.subtotal)}`}
+      </>
+    );
 
     return (
       <Card

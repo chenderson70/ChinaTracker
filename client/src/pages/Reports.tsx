@@ -418,7 +418,7 @@ export function ReportsPage({
     { key: 'wcExecRpa', label: 'White Cell + Execution RPA' },
     { key: 'wcExecOm', label: 'White Cell + Execution O&M' },
     { key: 'playerRpa', label: 'Player RPA' },
-    { key: 'annualTourRpa', label: 'Annual Tour RPA' },
+    { key: 'annualTourRpa', label: 'Annual Tour' },
     { key: 'playerOm', label: 'Player O&M' },
     { key: 'totalRpa', label: 'Total RPA' },
     { key: 'totalOm', label: 'Total O&M' },
@@ -431,7 +431,7 @@ export function ReportsPage({
     { title: 'White Cell + Execution RPA', dataIndex: 'wcExecRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'White Cell + Execution O&M', dataIndex: 'wcExecOm', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Player RPA', dataIndex: 'playerRpa', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'Annual Tour RPA', dataIndex: 'annualTourRpa', render: renderBudgetAmount, align: 'center' as const },
+    { title: 'Annual Tour', dataIndex: 'annualTourRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Player O&M', dataIndex: 'playerOm', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Total RPA', dataIndex: 'totalRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Total O&M', dataIndex: 'totalOm', render: renderBudgetAmount, align: 'center' as const },
@@ -513,8 +513,8 @@ export function ReportsPage({
     },
     {
       key: 'player-per-diem',
-      label: 'Player Per Diem',
-      value: `${fmtRate(Number(appConfig.PLAYER_PER_DIEM_PER_DAY ?? appConfig.FIELD_CONDITIONS_PER_DIEM ?? 5))}/day`,
+      label: 'Player M&IE',
+      value: `${fmtRate(Number(appConfig.PLAYER_PER_DIEM_PER_DAY ?? appConfig.FIELD_CONDITIONS_PER_DIEM ?? 5))}/day + ${fmtRate(Number(appConfig.DEFAULT_AIRFARE ?? 400))} airfare`,
       detail: 'RPA',
     },
     {
@@ -921,7 +921,7 @@ export function ReportsPage({
             <Descriptions.Item label="Total PAX">{displayTotalPax}</Descriptions.Item>
             <Descriptions.Item label="Players">{budget.totalPlayers}</Descriptions.Item>
             <Descriptions.Item label="Annual Tour">{budget.totalAnnualTour}</Descriptions.Item>
-            <Descriptions.Item label="Annual Tour RPA">{fmt(annualTourRpaTotal)}</Descriptions.Item>
+            <Descriptions.Item label="Annual Tour">{fmt(annualTourRpaTotal)}</Descriptions.Item>
             <Descriptions.Item label="White Cell & Exercise Support">{budget.totalWhiteCell}</Descriptions.Item>
           </Descriptions>
         </Card>

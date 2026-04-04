@@ -445,7 +445,7 @@ router.get('/:id/export', async (req: Request, res: Response) => {
         ['Travel', u.playerRpa.travel],
         ['Subtotal', u.playerRpa.subtotal],
         [''],
-        ['Annual Tour RPA'],
+        ['Annual Tour'],
         ['PAX', u.annualTourRpa.paxCount, 'Days', u.annualTourRpa.dutyDays],
         ['Mil Pay', u.annualTourRpa.milPay],
         ['Per Diem', u.annualTourRpa.perDiem],

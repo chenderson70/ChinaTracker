@@ -150,17 +150,19 @@ function buildRpaBreakdowns(
   options?: {
     includeMeals?: boolean;
     extraItems?: Array<{ label: string; amount: number }>;
+    labelPrefix?: string;
   },
 ): Array<{ label: string; amount: number }> {
   const milPay = group?.milPay || 0;
   const travel = (group?.travel || 0) + (group?.perDiem || 0) + (group?.billeting || 0);
+  const labelPrefix = options?.labelPrefix || 'RPA';
   const breakdowns = [
-    { label: 'RPA Mil Pay', amount: milPay },
-    { label: 'RPA Travel', amount: travel },
+    { label: `${labelPrefix} Mil Pay`, amount: milPay },
+    { label: `${labelPrefix} Travel`, amount: travel },
   ];
 
   if (options?.includeMeals && (group?.meals || 0) > 0) {
-    breakdowns.push({ label: 'RPA Meals', amount: group?.meals || 0 });
+    breakdowns.push({ label: `${labelPrefix} Meals`, amount: group?.meals || 0 });
   }
 
   for (const item of options?.extraItems || []) {
@@ -208,7 +210,7 @@ const projectionSections: Array<{ key: ProjectionFieldKey; label: string }> = [
   { key: 'planningRpa', label: 'Planning RPA' },
   { key: 'planningOm', label: 'Planning O&M' },
   { key: 'playerRpa', label: 'Player RPA' },
-  { key: 'annualTourRpa', label: 'Annual Tour RPA' },
+  { key: 'annualTourRpa', label: 'Annual Tour' },
   { key: 'playerOm', label: 'Player O&M' },
   { key: 'executionRpa', label: 'Execution RPA' },
   { key: 'executionOm', label: 'Execution O&M' },
@@ -277,7 +279,7 @@ function buildProjectionRow(unitBudget: UnitBudget | undefined, unitCalc: UnitCa
       defaultDutyDays,
       [],
       false,
-      buildRpaBreakdowns(unitCalc.annualTourRpa, { includeMeals: true }),
+      buildRpaBreakdowns(unitCalc.annualTourRpa, { includeMeals: true, labelPrefix: 'Annual Tour' }),
     ),
     playerOm: buildProjectionCell(unitCalc.playerOm.subtotal, playerOmGroups, defaultDutyDays),
     executionRpa: buildProjectionCell(
@@ -317,7 +319,7 @@ function Pm27UnitProjectionTables() {
     { title: 'Planning RPA', dataIndex: 'planningRpa', key: 'planningRpa', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Planning O&M', dataIndex: 'planningOm', key: 'planningOm', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Player RPA', dataIndex: 'playerRpa', key: 'playerRpa', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
-    { title: 'Annual Tour RPA', dataIndex: 'annualTourRpa', key: 'annualTourRpa', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
+    { title: 'Annual Tour', dataIndex: 'annualTourRpa', key: 'annualTourRpa', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Player O&M', dataIndex: 'playerOm', key: 'playerOm', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Execution RPA', dataIndex: 'executionRpa', key: 'executionRpa', width: 260, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Execution O&M', dataIndex: 'executionOm', key: 'executionOm', width: 260, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },

@@ -286,23 +286,15 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
           }
         } else if (isPlayerLike && pg.fundingType === 'RPA') {
           groupMilPay += calcMilPay(pg, entry, rates, entryDays);
+          groupMeals += entryCount * playerRpaMealsPerDay * entryDays;
           if (usesPlayerPerDiemRates && !entryIsLocal) {
             groupPerDiem += entryCount * rates.playerPerDiemPerDay * entryDays;
-          }
-          if (isSgAeCabPlayer) {
-            if (!entryIsLocal) {
-              groupTravel += entryCount * airfarePerPerson;
-              if (includeEntryInRpaTravel) {
-                groupRpaTravel += entryCount * airfarePerPerson;
-              }
-              const nights = Math.max(entryDays, 0);
-              groupBilleting += entryCount * rates.playerBilletingPerNight * nights;
+            groupTravel += entryCount * airfarePerPerson;
+            if (includeEntryInRpaTravel) {
+              groupRpaTravel += entryCount * airfarePerPerson;
             }
-            groupMeals += entryCount * playerRpaMealsPerDay * entryDays;
-          } else {
-            groupMeals += entryCount * mealsPerDay * entryDays;
             const nights = Math.max(entryDays, 0);
-            groupBilleting += entryIsLocal ? 0 : (entryCount * rates.playerBilletingPerNight * nights);
+            groupBilleting += entryCount * rates.playerBilletingPerNight * nights;
           }
         } else if (isPlayer && pg.fundingType === 'OM') {
           if (usesPlayerPerDiemRates && !entryIsLocal) {

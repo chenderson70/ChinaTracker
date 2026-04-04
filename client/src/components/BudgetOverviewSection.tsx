@@ -283,7 +283,6 @@ export default function BudgetOverviewSection() {
     {
       label: 'Players - Annual Tour',
       value: totalAnnualTour.toString(),
-      detail: formatFundingPaxBreakdown(totalAnnualTour, 0),
       icon: <UserOutlined />,
     },
     {
