@@ -400,10 +400,31 @@ router.get('/:id/export', async (req: Request, res: Response) => {
     if (!exercise) return res.status(404).json({ error: 'Exercise not found' });
     const rates = await loadRates();
     const budget = calculateBudget(exercise, rates);
+    const planningRpaTotal = Object.values(budget.units)
+      .reduce((sum, unit) => sum + (unit.planningRpa?.subtotal || 0), 0);
+    const playerRpaTotal = Object.values(budget.units)
+      .reduce((sum, unit) => sum + Math.max(0, (unit.playerRpa?.subtotal || 0) - (unit.playerRpa?.meals || 0)), 0);
+    const annualTourTotal = Object.values(budget.units)
+      .reduce((sum, unit) => sum + (unit.annualTourRpa?.subtotal || 0), 0);
+    const executionRpaTotal = Object.values(budget.units)
+      .reduce(
+        (sum, unit) => sum + (unit.whiteCellRpa?.subtotal || 0) + (unit.executionRpa || 0) + (unit.playerRpa?.meals || 0),
+        0,
+      );
 
     const wb = XLSX.utils.book_new();
 
     // Summary sheet
+    const rpaPerDiemTotal = Object.values(budget.units).reduce(
+      (sum, unit) =>
+        sum +
+        (unit.planningRpa.perDiem || 0) +
+        (unit.whiteCellRpa.perDiem || 0) +
+        (unit.playerRpa.perDiem || 0),
+      0,
+    );
+    const rpaTravelAndPerDiemTotal = budget.rpaTravel + rpaPerDiemTotal;
+
     const summaryData = [
       ['China Tracker – Budget Summary'],
       ['Exercise', exercise.name],
@@ -414,13 +435,20 @@ router.get('/:id/export', async (req: Request, res: Response) => {
       ['Total RPA', budget.totalRpa],
       ['Total O&M', budget.totalOm],
       ['Grand Total', budget.grandTotal],
-      ['RPA Travel', budget.rpaTravel],
+      ['RPA Travel & Per Diem', rpaTravelAndPerDiemTotal],
       ['WRM', budget.wrm],
       [''],
       ['Total PAX', budget.totalPax],
       ['Total Players', budget.totalPlayers],
       ['Total White Cell', budget.totalWhiteCell],
       ['Total Annual Tour', budget.totalAnnualTour],
+      [''],
+      ['A7 RPA Funding Responsibility', 'A7 pays the exercise-wide RPA requirement for projection purposes; unit rows still show where costs occur.'],
+      ['A7 Paid RPA Total', budget.totalRpa],
+      ['Planning RPA', planningRpaTotal],
+      ['Player RPA', playerRpaTotal],
+      ['Annual Tour (incl. meals)', annualTourTotal],
+      ['Execution RPA', executionRpaTotal],
       [''],
       ['Unit', 'RPA', 'O&M', 'Total'],
       ...Object.values(budget.units).map((u) => [u.unitCode, u.unitTotalRpa, u.unitTotalOm, u.unitTotal]),

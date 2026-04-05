@@ -610,6 +610,10 @@ export default function UnitView() {
       playerTravelBreakout.billeting +
       playerTravelBreakout.airfare +
       playerTravelBreakout.rental;
+    const annualTourTravelTotal =
+      playerTravelBreakout.perDiem +
+      playerTravelBreakout.airfare +
+      playerTravelBreakout.rental;
     const billetingHighlight = (
       <span className="ct-inline-om-highlight">Billeting (O&amp;M): {fmt(playerTravelBreakout.billeting)}</span>
     );
@@ -620,6 +624,13 @@ export default function UnitView() {
         {billetingHighlight}
         {`, Airfare: ${fmt(playerTravelBreakout.airfare)}, Rental: ${fmt(playerTravelBreakout.rental)}) `}
         {`\u2022 Meals: ${fmt(calc.meals)} \u2022 Total: ${fmt(calc.subtotal)}`}
+      </>
+    );
+    const annualTourRpaSummary = (
+      <>
+        {`Mil Pay: ${fmt(calc.milPay)} \u2022 AT RPA Travel Total: ${fmt(annualTourTravelTotal)} (`}
+        {`Per diem: ${fmt(playerTravelBreakout.perDiem)}, Airfare: ${fmt(playerTravelBreakout.airfare)}, Rental: ${fmt(playerTravelBreakout.rental)}) `}
+        {`\u2022 AT Total: ${fmt(calc.subtotal)}`}
       </>
     );
     const playerOmSummary = (
@@ -674,7 +685,7 @@ export default function UnitView() {
         {/* Cost breakdown */}
         <Typography.Text style={{ color: '#1677ff', fontWeight: 600, display: 'block', marginBottom: 10 }}>
           {isPlayerRpa
-            ? playerRpaSummary
+            ? (isAnnualTour ? annualTourRpaSummary : playerRpaSummary)
               : isPlayerOm
               ? playerOmSummary
                 : nonPlayerSummary}

@@ -379,6 +379,16 @@ export function ReportsPage({
     }));
   const annualTourRpaTotal = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.annualTourRpa?.subtotal || 0), 0);
+  const rpaPerDiemTotal = Object.values(budget.units)
+    .reduce(
+      (sum, unit) =>
+        sum +
+        (unit.planningRpa.perDiem || 0) +
+        (unit.whiteCellRpa.perDiem || 0) +
+        (unit.playerRpa.perDiem || 0),
+      0,
+    );
+  const rpaTravelAndPerDiemTotal = budget.rpaTravel + rpaPerDiemTotal;
 
   const summaryRow = unitData.reduce(
     (totals, row) => ({
@@ -927,7 +937,7 @@ export function ReportsPage({
             <Descriptions.Item label="Total RPA"><Typography.Text strong style={{ color: '#1677ff' }}>{fmt(budget.totalRpa)}</Typography.Text></Descriptions.Item>
             <Descriptions.Item label="Total O&M"><Typography.Text strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm)}</Typography.Text></Descriptions.Item>
             <Descriptions.Item label="Grand Total"><Typography.Title level={4} style={{ margin: 0 }}>{fmt(budget.grandTotal)}</Typography.Title></Descriptions.Item>
-            <Descriptions.Item label="RPA Travel">{fmt(budget.rpaTravel)}</Descriptions.Item>
+            <Descriptions.Item label="RPA Travel & Per Diem">{fmt(rpaTravelAndPerDiemTotal)}</Descriptions.Item>
             <Descriptions.Item label="Exercise O&M">{fmt(budget.exerciseOmTotal)}</Descriptions.Item>
             <Descriptions.Item label="WRM">{fmt(budget.wrm)}</Descriptions.Item>
             <Descriptions.Item label="Total PAX">{displayTotalPax}</Descriptions.Item>

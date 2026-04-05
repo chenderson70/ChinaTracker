@@ -151,14 +151,15 @@ function buildRpaBreakdowns(
     includeMeals?: boolean;
     extraItems?: Array<{ label: string; amount: number }>;
     labelPrefix?: string;
+    excludeBilleting?: boolean;
   },
 ): Array<{ label: string; amount: number }> {
   const milPay = group?.milPay || 0;
-  const travel = (group?.travel || 0) + (group?.perDiem || 0) + (group?.billeting || 0);
+  const travel = (group?.travel || 0) + (group?.perDiem || 0) + (options?.excludeBilleting ? 0 : (group?.billeting || 0));
   const labelPrefix = options?.labelPrefix || 'RPA';
   const breakdowns = [
     { label: `${labelPrefix} Mil Pay`, amount: milPay },
-    { label: `${labelPrefix} Travel`, amount: travel },
+    { label: `${labelPrefix} Travel & Per Diem`, amount: travel },
   ];
 
   if (options?.includeMeals && (group?.meals || 0) > 0) {
@@ -253,6 +254,8 @@ function buildProjectionRow(unitBudget: UnitBudget | undefined, unitCalc: UnitCa
     : [];
   const executionRpaLines = [...derivedExecutionRpaLines, ...findExecutionLines(unitBudget, 'RPA')];
   const executionOmLines = findExecutionLines(unitBudget, 'OM');
+  const playerBilletingOm = unitCalc.playerRpa?.billeting || 0;
+  const annualTourBilletingOm = unitCalc.annualTourRpa?.billeting || 0;
 
   return {
     key: unitCalc.unitCode,
@@ -271,7 +274,7 @@ function buildProjectionRow(unitBudget: UnitBudget | undefined, unitCalc: UnitCa
       defaultDutyDays,
       [],
       false,
-      buildRpaBreakdowns(unitCalc.playerRpa),
+      buildRpaBreakdowns(unitCalc.playerRpa, { excludeBilleting: true }),
     ),
     annualTourRpa: buildProjectionCell(
       unitCalc.annualTourRpa?.subtotal || 0,
@@ -279,9 +282,19 @@ function buildProjectionRow(unitBudget: UnitBudget | undefined, unitCalc: UnitCa
       defaultDutyDays,
       [],
       false,
-      buildRpaBreakdowns(unitCalc.annualTourRpa, { includeMeals: true, labelPrefix: 'AT' }),
+      buildRpaBreakdowns(unitCalc.annualTourRpa, { includeMeals: true, labelPrefix: 'AT', excludeBilleting: true }),
     ),
-    playerOm: buildProjectionCell(unitCalc.playerOm.subtotal, playerOmGroups, defaultDutyDays),
+    playerOm: buildProjectionCell(
+      unitCalc.playerOm.subtotal,
+      playerOmGroups,
+      defaultDutyDays,
+      [],
+      false,
+      [
+        ...(playerBilletingOm > 0 ? [{ label: 'Player Billeting (O&M)', amount: playerBilletingOm }] : []),
+        ...(annualTourBilletingOm > 0 ? [{ label: 'AT Billeting (O&M)', amount: annualTourBilletingOm }] : []),
+      ],
+    ),
     executionRpa: buildProjectionCell(
       (unitCalc.whiteCellRpa?.subtotal || 0) + unitCalc.executionRpa + playerMeals,
       executionRpaGroups,
@@ -303,6 +316,72 @@ function buildProjectionRow(unitBudget: UnitBudget | undefined, unitCalc: UnitCa
       true,
     ),
   };
+}
+
+function A7RpaFundingSummary() {
+  const { budget } = useApp();
+
+  if (!budget) return null;
+
+  const planningRpaTotal = Object.values(budget.units)
+    .reduce((sum, unit) => sum + (unit.planningRpa?.subtotal || 0), 0);
+  const playerRpaTotal = Object.values(budget.units)
+    .reduce((sum, unit) => sum + Math.max(0, (unit.playerRpa?.subtotal || 0) - (unit.playerRpa?.meals || 0)), 0);
+  const annualTourTotal = Object.values(budget.units)
+    .reduce((sum, unit) => sum + (unit.annualTourRpa?.subtotal || 0), 0);
+  const executionRpaTotal = Object.values(budget.units)
+    .reduce(
+      (sum, unit) => sum + (unit.whiteCellRpa?.subtotal || 0) + (unit.executionRpa || 0) + (unit.playerRpa?.meals || 0),
+      0,
+    );
+
+  const summaryItems = [
+    { label: 'Planning RPA', value: planningRpaTotal },
+    { label: 'Player RPA', value: playerRpaTotal },
+    { label: 'Annual Tour (incl. meals)', value: annualTourTotal },
+    { label: 'Execution RPA', value: executionRpaTotal },
+  ];
+
+  return (
+    <Card title="A7 RPA Funding Responsibility" className="ct-section-card" style={{ marginBottom: 16 }}>
+      <div style={{ display: 'grid', gap: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <Typography.Text type="secondary" style={{ display: 'block', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              Exercise-Wide RPA Paid By A7
+            </Typography.Text>
+            <Typography.Title level={2} style={{ margin: '4px 0 0', color: '#1677ff' }}>
+              {fmt(budget.totalRpa)}
+            </Typography.Title>
+          </div>
+          <Typography.Text type="secondary" style={{ maxWidth: 560, textAlign: 'right' }}>
+            Projection note: unit rows still show where costs occur, but A7 is the paying office for the full exercise RPA requirement.
+          </Typography.Text>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          {summaryItems.map((item) => (
+            <div
+              key={item.label}
+              style={{
+                border: '1px solid #e8ecf1',
+                borderRadius: 12,
+                padding: '12px 14px',
+                background: '#fafcff',
+              }}
+            >
+              <Typography.Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
+                {item.label}
+              </Typography.Text>
+              <Typography.Text strong style={{ fontSize: 20, color: '#1a1a2e' }}>
+                {fmt(item.value)}
+              </Typography.Text>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 function Pm27UnitProjectionTables() {
@@ -397,7 +476,12 @@ export default function Pm27CostProjections() {
       showBudgetDetails={false}
       showGrandTotals={false}
       beforeBudgetBreakdownSection={<BudgetOverviewSection />}
-      extraSections={<Pm27UnitProjectionTables />}
+      extraSections={(
+        <>
+          <A7RpaFundingSummary />
+          <Pm27UnitProjectionTables />
+        </>
+      )}
     />
   );
 }

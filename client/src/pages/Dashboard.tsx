@@ -97,20 +97,37 @@ export default function Dashboard() {
         sum +
         (unit.planningRpa.milPay || 0) +
         (unit.whiteCellRpa.milPay || 0) +
-        (unit.playerRpa.milPay || 0) +
-        (unit.annualTourRpa?.milPay || 0),
+        (unit.playerRpa.milPay || 0),
       0,
     );
+  const rpaPerDiemTotal = Object.values(budget.units)
+    .reduce(
+      (sum, unit) =>
+        sum +
+        (unit.planningRpa.perDiem || 0) +
+        (unit.whiteCellRpa.perDiem || 0) +
+        (unit.playerRpa.perDiem || 0),
+      0,
+    );
+  const executionRpaTotal = Object.values(budget.units)
+    .reduce((sum, unit) => sum + (unit.executionRpa || 0), 0);
+  const rpaTravelAndPerDiemTotal = budget.rpaTravel + rpaPerDiemTotal + executionRpaTotal;
 
   const rpaRationsTotal = Object.values(budget.units)
-    .reduce((sum, unit) => sum + (unit.playerRpa.meals || 0) + (unit.annualTourRpa?.meals || 0), 0);
+    .reduce((sum, unit) => sum + (unit.playerRpa.meals || 0), 0);
   const annualTourMilPayTotal = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.annualTourRpa?.milPay || 0), 0);
-  const annualTourTravelTotal = Object.values(budget.units)
-    .reduce((sum, unit) => sum + (unit.annualTourRpa?.travel || 0), 0);
+  const annualTourTravelSupportTotal = Object.values(budget.units)
+    .reduce(
+      (sum, unit) =>
+        sum +
+        (unit.annualTourRpa?.travel || 0) +
+        (unit.annualTourRpa?.perDiem || 0),
+      0,
+    );
   const annualTourRpaTotal = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.annualTourRpa?.subtotal || 0), 0);
-  const a7BudgetPlanningTotal = budget.units.A7?.unitTotal || 0;
+  const a7BudgetPlanningTotal = Math.max(0, budget.grandTotal - annualTourRpaTotal);
 
   const totalPlayers = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.playerRpa.paxCount || 0) + (unit.playerOm.paxCount || 0), 0);
@@ -170,7 +187,8 @@ export default function Dashboard() {
       icon: <RocketOutlined />,
       detailLines: [
         { label: 'RPA Mil Pay', value: fmt(rpaMilPayTotal) },
-        { label: 'Travel RPA Pay', value: fmt(budget.rpaTravel) },
+        { label: 'RPA Travel & Per Diem', value: fmt(rpaTravelAndPerDiemTotal) },
+        { label: 'RPA Meals', value: fmt(rpaRationsTotal) },
       ],
     },
     {
@@ -192,7 +210,7 @@ export default function Dashboard() {
       icon: <UserOutlined />,
       detailLines: [
         { label: 'AT Mil Pay', value: fmt(annualTourMilPayTotal) },
-        { label: 'AT Travel Pay', value: fmt(annualTourTravelTotal) },
+        { label: 'AT Travel & Per Diem', value: fmt(annualTourTravelSupportTotal) },
       ],
     },
   ];
@@ -217,7 +235,8 @@ export default function Dashboard() {
       icon: <RocketOutlined />,
       detailLines: [
         { label: 'RPA Mil Pay', value: fmt(applyPlusUp(rpaMilPayTotal)) },
-        { label: 'Travel RPA Pay', value: fmt(applyPlusUp(budget.rpaTravel)) },
+        { label: 'RPA Travel & Per Diem', value: fmt(applyPlusUp(rpaTravelAndPerDiemTotal)) },
+        { label: 'RPA Meals', value: fmt(applyPlusUp(rpaRationsTotal)) },
       ],
     },
     {
@@ -241,7 +260,7 @@ export default function Dashboard() {
       icon: <UserOutlined />,
       detailLines: [
         { label: 'AT Mil Pay', value: fmt(applyPlusUp(annualTourMilPayTotal)) },
-        { label: 'AT Travel Pay', value: fmt(applyPlusUp(annualTourTravelTotal)) },
+        { label: 'AT Travel & Per Diem', value: fmt(applyPlusUp(annualTourTravelSupportTotal)) },
       ],
     },
   ];
@@ -480,9 +499,8 @@ export default function Dashboard() {
                 </div>
                 <div style={{ marginTop: 10, fontSize: 15, color: '#596577', lineHeight: 1.45 }}>
                   <div>RPA Mil Pay: {fmt(rpaMilPayTotal)}</div>
-                  <div>RPA Travel: {fmt(budget.rpaTravel)}</div>
-                  <div>Player Meals: {fmt(rpaRationsTotal)}</div>
-                  <div>Annual Tour: {fmt(annualTourRpaTotal)}</div>
+                  <div>RPA Travel &amp; Per Diem: {fmt(rpaTravelAndPerDiemTotal)}</div>
+                  <div>RPA Meals: {fmt(rpaRationsTotal)}</div>
                 </div>
               </div>
             </div>

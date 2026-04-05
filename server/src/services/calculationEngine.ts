@@ -118,7 +118,7 @@ function buildPlayerLikeRpaGroup(
   pax: number,
   avgDays: number,
   costs: Pick<GroupCalc, 'milPay' | 'meals' | 'travel' | 'perDiem' | 'billeting'>,
-  isSgAeCabPlayer: boolean,
+  billetingIsOm: boolean,
 ): { group: GroupCalc; billetingToOm: number } {
   const group = emptyGroup(pax, avgDays);
   group.milPay = costs.milPay;
@@ -127,8 +127,8 @@ function buildPlayerLikeRpaGroup(
   group.perDiem = costs.perDiem;
   group.billeting = costs.billeting;
 
-  const billetingToOm = isSgAeCabPlayer ? group.billeting : 0;
-  const rpaBilletingCharge = isSgAeCabPlayer ? 0 : group.billeting;
+  const billetingToOm = billetingIsOm ? group.billeting : 0;
+  const rpaBilletingCharge = billetingIsOm ? 0 : group.billeting;
   group.subtotal = group.milPay + group.meals + group.travel + group.perDiem + rpaBilletingCharge;
 
   return { group, billetingToOm };
@@ -364,7 +364,7 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
             perDiem: groupPerDiem,
             billeting: groupBilleting,
           },
-          isSgAeCabPlayer,
+          true,
         );
         sgAeCabPlayerBilletingToOm += billetingToOm;
         if (isAnnualTour) {
@@ -401,10 +401,9 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
       unitCalc.planningRpa.subtotal +
       unitCalc.whiteCellRpa.subtotal +
       unitCalc.playerRpa.subtotal +
-      unitCalc.annualTourRpa.subtotal +
       unitCalc.executionRpa;
     unitCalc.unitTotalOm = unitCalc.planningOm.subtotal + unitCalc.whiteCellOm.subtotal + unitCalc.playerOm.subtotal + unitCalc.executionOm;
-    unitCalc.unitTotal = unitCalc.unitTotalRpa + unitCalc.unitTotalOm;
+    unitCalc.unitTotal = unitCalc.unitTotalRpa + unitCalc.annualTourRpa.subtotal + unitCalc.unitTotalOm;
 
     result.units[ub.unitCode] = unitCalc;
     result.totalRpa += unitCalc.unitTotalRpa;
@@ -418,8 +417,9 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
     result.exerciseOmTotal += ol.amount;
     if (cat === 'WRM') result.wrm += ol.amount;
   }
+  const annualTourTotal = Object.values(result.units).reduce((sum, unit) => sum + (unit.annualTourRpa?.subtotal || 0), 0);
   result.totalOm += result.exerciseOmTotal;
-  result.grandTotal = result.totalRpa + result.totalOm;
+  result.grandTotal = result.totalRpa + result.totalOm + annualTourTotal;
   result.totalPax = result.totalPlayers + result.totalWhiteCell + result.totalAnnualTour;
 
   return result;
