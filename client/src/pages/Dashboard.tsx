@@ -461,7 +461,7 @@ export default function Dashboard() {
         <Col xs={24} md={12}>
           <Card title="Unit Cost Comparison" className="ct-section-card ct-chart-card">
             <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={barData} barCategoryGap="25%">
+              <BarChart data={barData} barCategoryGap="25%" margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f5" vertical={false} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#596577', fontSize: 12 }} />
                 <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fill: '#596577', fontSize: 12 }} />

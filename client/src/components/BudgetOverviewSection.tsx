@@ -57,7 +57,7 @@ export default function BudgetOverviewSection() {
       unitCode: u.unitCode,
       totalPax: getDisplayedPax(u.totalPax, siteVisitPaxExclusions.excludedByUnit[String(u.unitCode || '').toUpperCase()] || 0),
       rpa: u.unitTotalRpa,
-      annualTour: u.annualTourRpa?.meals || 0,
+      annualTour: (u.annualTourRpa?.milPay || 0) + (u.annualTourRpa?.travel || 0) + (u.annualTourRpa?.perDiem || 0),
       om: u.unitTotalOm,
       total: u.unitTotal,
     }));
@@ -195,7 +195,7 @@ export default function BudgetOverviewSection() {
       render: (value: number) => <span style={{ color: '#1677ff' }}>{fmt(value)}</span>,
     },
     {
-      title: 'AT Meals',
+      title: 'Annual Tour',
       dataIndex: 'annualTour',
       key: 'annualTour',
       width: 170,
@@ -342,9 +342,9 @@ export default function BudgetOverviewSection() {
         a7PlanningTotalLabel={a7PlanningTotalLabel}
       />
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger" justify="center">
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger ct-print-stat-row" justify="center">
         {statCards.map((s) => (
-          <Col xs={24} sm={12} lg={8} key={s.label}>
+          <Col xs={24} sm={12} lg={8} key={s.label} className="ct-print-stat-col">
             <Card size="small" className={`ct-stat-card ${s.accent}`} style={{ padding: '4px 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 8px' }}>
                 <div
@@ -383,10 +383,10 @@ export default function BudgetOverviewSection() {
         ))}
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger">
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger ct-print-plusup-row">
         {plusUpStatCards.map((s) => (
-          <Col xs={24} sm={12} xl={6} key={s.label}>
-            <Card size="small" className={`ct-stat-card ct-stat-plusup-card ${s.accent}`} style={{ padding: '4px 0' }}>
+          <Col xs={24} sm={12} xl={6} key={s.label} className="ct-print-no-break">
+            <Card size="small" className={`ct-stat-card ct-stat-plusup-card ct-print-no-break ${s.accent}`} style={{ padding: '4px 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 8px' }}>
                 <div
                   style={{
@@ -443,9 +443,9 @@ export default function BudgetOverviewSection() {
         ))}
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 28 }} className="ct-stagger">
+      <Row gutter={[16, 16]} style={{ marginBottom: 28 }} className="ct-stagger ct-print-detail-row">
         {detailCards.map((s) => (
-          <Col key={s.label} flex="1 1 0" style={{ minWidth: 220 }}>
+          <Col key={s.label} flex="1 1 0" style={{ minWidth: 220 }} className="ct-print-detail-col">
             <Card size="small" className={`ct-stat-card ${s.accent || ''}`} style={{ padding: '4px 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 8px' }}>
                 <div
@@ -489,7 +489,7 @@ export default function BudgetOverviewSection() {
                 <Table.Summary.Cell index={0} align="center"><strong>Total</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={1} align="center"><strong>{displayTotalPax}</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={2} align="center"><strong style={{ color: '#1677ff' }}>{fmt(budget.totalRpa)}</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={3} align="center"><strong style={{ color: '#0958d9' }}>{fmt(annualTourMealsTotal)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={3} align="center"><strong style={{ color: '#0958d9' }}>{fmt(annualTourBoxTotal)}</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={4} align="center"><strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm - budget.exerciseOmTotal)}</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={5} align="center"><strong>{fmt(unitData.reduce((sum, unit) => sum + unit.total, 0))}</strong></Table.Summary.Cell>
               </Table.Summary.Row>
@@ -501,8 +501,8 @@ export default function BudgetOverviewSection() {
       <Row gutter={[20, 20]} style={{ marginBottom: 28 }}>
         <Col xs={24} md={12}>
           <Card title="Unit Cost Comparison" className="ct-section-card ct-chart-card">
-            <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={barData} barCategoryGap="25%">
+            <ResponsiveContainer width="100%" height={320} className="ct-print-chart-container">
+              <BarChart data={barData} barCategoryGap="25%" margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f5" vertical={false} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#596577', fontSize: 12 }} />
                 <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fill: '#596577', fontSize: 12 }} />

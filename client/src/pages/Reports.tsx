@@ -8,8 +8,8 @@ import dayjs from 'dayjs';
 import { exportElementToPdf } from '../services/pdf';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
-import { ANNUAL_TOUR_BILLETING_LABEL, ANNUAL_TOUR_MEALS_LABEL, getAnnualTourBilletingOmTotal, getAnnualTourRpaMealsTotal } from '../utils/budgetSummary';
-import type { ExerciseDetail } from '../types';
+import { ANNUAL_TOUR_BILLETING_LABEL, ANNUAL_TOUR_MEALS_LABEL, ANNUAL_TOUR_MIL_PAY_LABEL, ANNUAL_TOUR_TRAVEL_PAY_LABEL, getAnnualTourBilletingOmTotal, getAnnualTourRpaMealsTotal, getPlayerOmResponsibilityByUnit, getRpaCategoryTotals, getRpaMealsResponsibilityByUnit, getUnitRpaCategoryTotals } from '../utils/budgetSummary';
+import type { BudgetResult, ExerciseDetail } from '../types';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const DAYS_PER_MONTH = 30;
@@ -216,15 +216,41 @@ interface ReportsPageProps {
 }
 
 type PrintBudgetFieldKey =
-  | 'planningRpa'
+  | 'rpaMilPay'
   | 'planningOm'
-  | 'wcExecRpa'
+  | 'rpaTravelAndPerDiem'
   | 'wcExecOm'
-  | 'playerRpa'
-  | 'annualTourMeals'
+  | 'rpaMeals'
+  | 'annualTourMilPay'
+  | 'annualTourTravelPay'
+  | 'annualTourTotal'
   | 'playerOm'
   | 'totalRpa'
   | 'totalOm';
+
+type PrintBudgetSection = {
+  title: string;
+  totalKey: PrintBudgetFieldKey;
+  fields: Array<{ key: PrintBudgetFieldKey; label: string }>;
+};
+
+type BudgetBreakdownRow = {
+  key: string;
+  unit: string;
+  rpaMilPay: number;
+  planningOm: number;
+  rpaTravelAndPerDiem: number;
+  wcExecOm: number;
+  rpaMeals: number;
+  annualTourMilPay: number;
+  annualTourTravelPay: number;
+  annualTourTotal: number;
+  playerOm: number;
+  totalRpa: number;
+  totalOm: number;
+  total: number;
+  showRpaMeals: boolean;
+};
 
 export function ReportsPage({
   title = 'Reports & Export',
@@ -310,10 +336,31 @@ export function ReportsPage({
     },
   });
 
-  if (!exercise || !budget) return <div className="ct-loading"><Spin size="large" /></div>;
+  const isLoading = !exercise || !budget;
+  const activeExercise = (exercise ?? {
+    name: '',
+    startDate: '',
+    endDate: '',
+    totalBudget: 0,
+    defaultDutyDays: 1,
+    unitBudgets: [],
+    travelConfig: undefined,
+  }) as ExerciseDetail;
+  const activeBudget = (budget ?? {
+    units: {},
+    totalPax: 0,
+    totalRpa: 0,
+    totalOm: 0,
+    grandTotal: 0,
+    exerciseOmTotal: 0,
+    wrm: 0,
+    totalPlayers: 0,
+    totalAnnualTour: 0,
+    totalWhiteCell: 0,
+  }) as BudgetResult;
 
-  const siteVisitPaxExclusions = getPlanningEventPaxExclusions(exercise);
-  const displayTotalPax = getDisplayedPax(budget.totalPax, siteVisitPaxExclusions.totalExcludedPax);
+  const siteVisitPaxExclusions = getPlanningEventPaxExclusions(activeExercise);
+  const displayTotalPax = getDisplayedPax(activeBudget.totalPax, siteVisitPaxExclusions.totalExcludedPax);
 
   const defaultAirfare = Number(appConfig.DEFAULT_AIRFARE ?? 400);
   const defaultRentalCarDailyRate = Number(appConfig.DEFAULT_RENTAL_CAR_DAILY ?? 50);
@@ -323,16 +370,16 @@ export function ReportsPage({
   const handleExportPdf = async () => {
     if (!exportRef.current) return;
     try {
-      await exportElementToPdf(`${exercise.name} ${title}`, exportRef.current);
+      await exportElementToPdf(`${activeExercise.name} ${title}`, exportRef.current);
     } catch (error: any) {
       message.error(error?.message || 'Unable to export reports to PDF');
     }
   };
 
-  const travel = exercise.travelConfig;
-  const currentReportAssumptions = getReportAssumptions(exercise);
+  const travel = activeExercise.travelConfig;
+  const currentReportAssumptions = getReportAssumptions(activeExercise);
   const [currentReportAssumption1, currentReportAssumption2, currentReportAssumption3, currentReportAssumption4] = currentReportAssumptions;
-  const currentReportLimfacs = getReportLimfacs(exercise);
+  const currentReportLimfacs = getReportLimfacs(activeExercise);
   const [currentReportLimfac1, currentReportLimfac2, currentReportLimfac3] = currentReportLimfacs;
 
   useEffect(() => {
@@ -362,44 +409,54 @@ export function ReportsPage({
     };
   }, [defaultAirfare, defaultRentalCarDailyRate, editTravel, travelDraft, travel, travelMut.isPending]);
 
-  const unitData = Object.values(budget.units)
-    .sort((left, right) => compareUnitCodes(left.unitCode, right.unitCode))
-    .map((u) => ({
-      key: u.unitCode,
-      unit: getUnitDisplayLabel(u.unitCode),
-      planningRpa: u.planningRpa.subtotal,
-      planningOm: u.planningOm.subtotal,
-      wcExecRpa: u.whiteCellRpa.subtotal + u.executionRpa + (u.playerRpa.meals || 0),
-      wcExecOm: u.whiteCellOm.subtotal + u.executionOm,
-      playerRpa: Math.max(0, u.playerRpa.subtotal - (u.playerRpa.meals || 0)),
-      annualTourMeals: u.annualTourRpa?.meals || 0,
-      playerOm: u.playerOm.subtotal,
-      totalRpa: u.unitTotalRpa,
-      totalOm: u.unitTotalOm,
-      total: u.unitTotal,
-    }));
-  const annualTourRpaTotal = getAnnualTourRpaMealsTotal(budget);
-  const annualTourBilletingOmTotal = getAnnualTourBilletingOmTotal(budget);
-  const rpaPerDiemTotal = Object.values(budget.units)
-    .reduce(
-      (sum, unit) =>
-        sum +
-        (unit.planningRpa.perDiem || 0) +
-        (unit.whiteCellRpa.perDiem || 0) +
-        (unit.playerRpa.perDiem || 0),
-      0,
-    );
-  const rpaTravelAndPerDiemTotal = budget.rpaTravel + rpaPerDiemTotal;
+  const playerOmResponsibilityByUnit = getPlayerOmResponsibilityByUnit(activeBudget);
+  const rpaMealsResponsibilityByUnit = getRpaMealsResponsibilityByUnit(activeBudget);
 
-  const summaryRow = unitData.reduce(
+  const unitData: BudgetBreakdownRow[] = Object.values(activeBudget.units)
+    .sort((left, right) => compareUnitCodes(left.unitCode, right.unitCode))
+    .map((u) => {
+      const rpaTotals = getUnitRpaCategoryTotals(u);
+      const normalizedUnitCode = String(u.unitCode || '').toUpperCase();
+      const showRpaMeals = normalizedUnitCode === 'A7';
+      const rpaMeals = rpaMealsResponsibilityByUnit[normalizedUnitCode]?.total || 0;
+      const playerOm = playerOmResponsibilityByUnit[normalizedUnitCode]?.total || 0;
+      const annualTourTotal = (u.annualTourRpa?.milPay || 0) + (u.annualTourRpa?.travel || 0) + (u.annualTourRpa?.perDiem || 0);
+      const totalRpa = rpaTotals.milPay + rpaTotals.travelAndPerDiem + rpaMeals;
+      const totalOm = u.planningOm.subtotal + u.whiteCellOm.subtotal + u.executionOm + playerOm;
+      return {
+        key: u.unitCode,
+        unit: getUnitDisplayLabel(u.unitCode),
+        rpaMilPay: rpaTotals.milPay,
+        planningOm: u.planningOm.subtotal,
+        rpaTravelAndPerDiem: rpaTotals.travelAndPerDiem,
+        wcExecOm: u.whiteCellOm.subtotal + u.executionOm,
+        rpaMeals,
+        annualTourMilPay: u.annualTourRpa?.milPay || 0,
+        annualTourTravelPay: (u.annualTourRpa?.travel || 0) + (u.annualTourRpa?.perDiem || 0),
+        annualTourTotal,
+        playerOm,
+        totalRpa,
+        totalOm,
+        total: totalRpa + annualTourTotal + totalOm,
+        showRpaMeals,
+      };
+    });
+  const annualTourRpaTotal = getAnnualTourRpaMealsTotal(activeBudget);
+  const annualTourBilletingOmTotal = getAnnualTourBilletingOmTotal(activeBudget);
+  const rpaCategoryTotals = getRpaCategoryTotals(activeBudget);
+  const rpaTravelAndPerDiemTotal = rpaCategoryTotals.travelAndPerDiem;
+
+  const summaryRow: BudgetBreakdownRow = unitData.reduce(
     (totals, row) => ({
       ...totals,
-      planningRpa: totals.planningRpa + row.planningRpa,
+      rpaMilPay: totals.rpaMilPay + row.rpaMilPay,
       planningOm: totals.planningOm + row.planningOm,
-      wcExecRpa: totals.wcExecRpa + row.wcExecRpa,
+      rpaTravelAndPerDiem: totals.rpaTravelAndPerDiem + row.rpaTravelAndPerDiem,
       wcExecOm: totals.wcExecOm + row.wcExecOm,
-      playerRpa: totals.playerRpa + row.playerRpa,
-      annualTourMeals: totals.annualTourMeals + row.annualTourMeals,
+      rpaMeals: totals.rpaMeals + row.rpaMeals,
+      annualTourMilPay: totals.annualTourMilPay + row.annualTourMilPay,
+      annualTourTravelPay: totals.annualTourTravelPay + row.annualTourTravelPay,
+      annualTourTotal: totals.annualTourTotal + row.annualTourTotal,
       playerOm: totals.playerOm + row.playerOm,
       totalRpa: totals.totalRpa + row.totalRpa,
       totalOm: totals.totalOm + row.totalOm,
@@ -408,16 +465,19 @@ export function ReportsPage({
     {
       key: '__summary__',
       unit: 'Total',
-      planningRpa: 0,
+      rpaMilPay: 0,
       planningOm: 0,
-      wcExecRpa: 0,
+      rpaTravelAndPerDiem: 0,
       wcExecOm: 0,
-      playerRpa: 0,
-      annualTourMeals: 0,
+      rpaMeals: 0,
+      annualTourMilPay: 0,
+      annualTourTravelPay: 0,
+      annualTourTotal: 0,
       playerOm: 0,
       totalRpa: 0,
       totalOm: 0,
       total: 0,
+      showRpaMeals: true,
     },
   );
 
@@ -429,46 +489,63 @@ export function ReportsPage({
   const renderBudgetAmount = (value: number, row: { key: string }) => (
     isSummaryRow(row) ? <strong>{fmt(value)}</strong> : fmt(value)
   );
-  const printBudgetFields: Array<{ key: PrintBudgetFieldKey; label: string }> = [
-    { key: 'planningRpa', label: 'Planning RPA' },
-    { key: 'planningOm', label: 'Planning O&M' },
-    { key: 'wcExecRpa', label: 'Exercise Support RPA' },
-    { key: 'wcExecOm', label: 'White Cell + Execution O&M' },
-    { key: 'playerRpa', label: 'Player RPA' },
-    { key: 'annualTourMeals', label: ANNUAL_TOUR_MEALS_LABEL },
-    { key: 'playerOm', label: 'Player O&M' },
-    { key: 'totalRpa', label: 'Total RPA' },
-    { key: 'totalOm', label: 'Total O&M' },
+  const renderBudgetMealsAmount = (value: number, row: BudgetBreakdownRow) => {
+    if (!row.showRpaMeals && !isSummaryRow(row)) return null;
+    return renderBudgetAmount(value, row);
+  };
+  const printBudgetSections: PrintBudgetSection[] = [
+    {
+      title: 'RPA',
+      totalKey: 'totalRpa',
+      fields: [
+        { key: 'rpaMilPay', label: 'RPA Mil Pay' },
+        { key: 'rpaTravelAndPerDiem', label: 'RPA Travel & Per Diem' },
+        { key: 'rpaMeals', label: 'RPA Meals' },
+      ],
+    },
+    {
+      title: 'Annual Tour',
+      totalKey: 'annualTourTotal',
+      fields: [
+        { key: 'annualTourMilPay', label: ANNUAL_TOUR_MIL_PAY_LABEL },
+        { key: 'annualTourTravelPay', label: ANNUAL_TOUR_TRAVEL_PAY_LABEL },
+      ],
+    },
+    {
+      title: 'O&M',
+      totalKey: 'totalOm',
+      fields: [
+        { key: 'planningOm', label: 'Planning O&M' },
+        { key: 'wcExecOm', label: 'White Cell + Execution O&M' },
+        { key: 'playerOm', label: 'Player O&M' },
+      ],
+    },
   ];
 
   const columns = [
     { title: 'Unit', dataIndex: 'unit', width: 60, render: renderBudgetLabel, align: 'center' as const },
-    { title: 'Planning RPA', dataIndex: 'planningRpa', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'Planning O&M', dataIndex: 'planningOm', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'Exercise Support RPA', dataIndex: 'wcExecRpa', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'White Cell + Execution O&M', dataIndex: 'wcExecOm', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'Player RPA', dataIndex: 'playerRpa', render: renderBudgetAmount, align: 'center' as const },
-    { title: ANNUAL_TOUR_MEALS_LABEL, dataIndex: 'annualTourMeals', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'Player O&M', dataIndex: 'playerOm', render: renderBudgetAmount, align: 'center' as const },
+    { title: 'RPA Mil Pay', dataIndex: 'rpaMilPay', render: renderBudgetAmount, align: 'center' as const },
+    { title: 'RPA Travel & Per Diem', dataIndex: 'rpaTravelAndPerDiem', render: renderBudgetAmount, align: 'center' as const },
+    { title: 'RPA Meals', dataIndex: 'rpaMeals', render: renderBudgetMealsAmount, align: 'center' as const },
     { title: 'Total RPA', dataIndex: 'totalRpa', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'Total O&M', dataIndex: 'totalOm', render: renderBudgetAmount, align: 'center' as const },
+    { title: 'O&M', dataIndex: 'totalOm', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Total', dataIndex: 'total', render: renderBudgetAmount, align: 'center' as const },
   ];
 
-  const totalBudgetLeft = (exercise.totalBudget || 0) - budget.grandTotal;
+  const totalBudgetLeft = (activeExercise.totalBudget || 0) - activeBudget.grandTotal;
   const hasStoredRpaBudgetTarget = appConfig.BUDGET_TARGET_RPA !== undefined && appConfig.BUDGET_TARGET_RPA !== '';
   const hasStoredOmBudgetTarget = appConfig.BUDGET_TARGET_OM !== undefined && appConfig.BUDGET_TARGET_OM !== '';
   const storedRpaBudgetTarget = hasStoredRpaBudgetTarget ? Number(appConfig.BUDGET_TARGET_RPA) : null;
   const storedOmBudgetTarget = hasStoredOmBudgetTarget ? Number(appConfig.BUDGET_TARGET_OM) : null;
   const rpaBudgetTarget = storedRpaBudgetTarget ?? (
     storedOmBudgetTarget !== null
-      ? Math.max(0, Number(exercise.totalBudget || 0) - storedOmBudgetTarget)
-      : Number(budget.totalRpa || 0)
+      ? Math.max(0, Number(activeExercise.totalBudget || 0) - storedOmBudgetTarget)
+      : Number(activeBudget.totalRpa || 0)
   );
   const omBudgetTarget = storedOmBudgetTarget ?? (
     storedRpaBudgetTarget !== null
-      ? Math.max(0, Number(exercise.totalBudget || 0) - storedRpaBudgetTarget)
-      : Number(budget.totalOm || 0)
+      ? Math.max(0, Number(activeExercise.totalBudget || 0) - storedRpaBudgetTarget)
+      : Number(activeBudget.totalOm || 0)
   );
   const hasStoredBudgetTargets = hasStoredRpaBudgetTarget || hasStoredOmBudgetTarget;
   const draftOverallBudget = draftRpaBudgetTarget + draftOmBudgetTarget;
@@ -478,8 +555,8 @@ export function ReportsPage({
   const overallBudgetDisplay =
     hasStoredBudgetTargets || hasBudgetDraftChanges
       ? draftOverallBudget
-      : Number(exercise.totalBudget || draftOverallBudget);
-  const planningSummaryEntries = getPlanningSummaryEntries(exercise);
+        : Number(activeExercise.totalBudget || draftOverallBudget);
+      const planningSummaryEntries = getPlanningSummaryEntries(activeExercise);
   const explicitLongTourPlannerEntries = planningSummaryEntries.filter((entry) => entry.longTermA7Planner);
   const fallbackPlannerEntries = planningSummaryEntries.filter(
     (entry) =>
@@ -551,8 +628,8 @@ export function ReportsPage({
 
   useEffect(() => {
     skipDutyDaysSaveRef.current = true;
-    setDraftDutyDays(exercise.defaultDutyDays);
-  }, [exercise.defaultDutyDays]);
+    setDraftDutyDays(activeExercise.defaultDutyDays);
+  }, [activeExercise.defaultDutyDays]);
 
   useEffect(() => {
     skipReportAssumptionsSaveRef.current = true;
@@ -609,9 +686,9 @@ export function ReportsPage({
     }
     if (!hasStoredBudgetTargets && !hasBudgetDraftChanges) return;
     if (totalBudgetMut.isPending) return;
-    if (draftOverallBudget === exercise.totalBudget) return;
+    if (draftOverallBudget === activeExercise.totalBudget) return;
     totalBudgetMut.mutate(draftOverallBudget);
-  }, [draftOverallBudget, exercise.totalBudget, hasBudgetDraftChanges, hasStoredBudgetTargets, totalBudgetMut]);
+  }, [draftOverallBudget, activeExercise.totalBudget, hasBudgetDraftChanges, hasStoredBudgetTargets, totalBudgetMut]);
 
   useEffect(() => {
     if (skipDutyDaysSaveRef.current) {
@@ -619,7 +696,7 @@ export function ReportsPage({
       return;
     }
     if (exerciseMut.isPending) return;
-    if (draftDutyDays === exercise.defaultDutyDays) return;
+    if (draftDutyDays === activeExercise.defaultDutyDays) return;
 
     if (dutyDaysAutoSaveTimer.current) clearTimeout(dutyDaysAutoSaveTimer.current);
     dutyDaysAutoSaveTimer.current = setTimeout(() => {
@@ -629,7 +706,7 @@ export function ReportsPage({
     return () => {
       if (dutyDaysAutoSaveTimer.current) clearTimeout(dutyDaysAutoSaveTimer.current);
     };
-  }, [draftDutyDays, exercise.defaultDutyDays, exerciseMut]);
+  }, [draftDutyDays, activeExercise.defaultDutyDays, exerciseMut]);
 
   useEffect(() => {
     if (skipReportAssumptionsSaveRef.current) {
@@ -692,6 +769,8 @@ export function ReportsPage({
     draftReportLimfacs,
     reportLimfacsMut,
   ]);
+
+  if (isLoading) return <div className="ct-loading"><Spin size="large" /></div>;
 
   return (
     <div ref={exportRef}>
@@ -774,6 +853,7 @@ export function ReportsPage({
                 >
                   <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
                   <Input
+                    className="ct-report-notes-input"
                     value={line}
                     onChange={(event) => {
                       const next = [...draftReportAssumptions] as ReportAssumptions;
@@ -799,6 +879,7 @@ export function ReportsPage({
                 >
                   <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
                   <Input
+                    className="ct-report-notes-input"
                     value={line}
                     onChange={(event) => {
                       const next = [...draftReportLimfacs] as ReportLimfacs;
@@ -854,7 +935,7 @@ export function ReportsPage({
       {/* Full budget table */}
       <Card title="Full Budget Breakdown" className="ct-section-card" style={{ marginBottom: 24 }}>
         <div className="ct-table ct-screen-only">
-            <Table size="small" pagination={false} dataSource={fullBudgetRows} columns={columns} scroll={{ x: 1480 }} />
+            <Table size="small" pagination={false} dataSource={fullBudgetRows} columns={columns} scroll={{ x: 1080 }} />
         </div>
         <div className="ct-print-only ct-print-budget-list">
           {fullBudgetRows.map((row) => (
@@ -866,11 +947,23 @@ export function ReportsPage({
                 <div className="ct-print-budget-unit-name">{row.unit}</div>
                 <div className="ct-print-budget-unit-total-value">Total: {fmt(row.total)}</div>
               </div>
-              <div className="ct-print-budget-grid">
-                {printBudgetFields.map((field) => (
-                  <div key={field.key} className="ct-print-budget-item">
-                    <div className="ct-print-budget-item-label">{field.label}</div>
-                    <div className="ct-print-budget-item-value">{fmt(row[field.key])}</div>
+              <div className="ct-print-budget-sections">
+                {printBudgetSections.map((section) => (
+                  <div key={section.title} className="ct-print-budget-section">
+                    <div className="ct-print-budget-section-header">
+                      <div className="ct-print-budget-section-title">{section.title}</div>
+                      <div className="ct-print-budget-section-total">{fmt(row[section.totalKey])}</div>
+                    </div>
+                    <div className="ct-print-budget-grid">
+                      {section.fields
+                        .filter((field) => row.showRpaMeals || field.key !== 'rpaMeals')
+                        .map((field) => (
+                        <div key={field.key} className="ct-print-budget-item">
+                          <div className="ct-print-budget-item-label">{field.label}</div>
+                          <div className="ct-print-budget-item-value">{fmt(row[field.key])}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -937,7 +1030,7 @@ export function ReportsPage({
             <Descriptions.Item label="Total Budget Left"><Typography.Text strong>{fmt(totalBudgetLeft)}</Typography.Text></Descriptions.Item>
             <Descriptions.Item label="Total RPA"><Typography.Text strong style={{ color: '#1677ff' }}>{fmt(budget.totalRpa)}</Typography.Text></Descriptions.Item>
             <Descriptions.Item label="Total O&M"><Typography.Text strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm)}</Typography.Text></Descriptions.Item>
-            <Descriptions.Item label="Grand Total"><Typography.Title level={4} style={{ margin: 0 }}>{fmt(budget.grandTotal)}</Typography.Title></Descriptions.Item>
+            <Descriptions.Item label="Grand Total"><Typography.Title level={4} style={{ margin: 0, fontSize: 32, lineHeight: 1.2 }}>{fmt(budget.grandTotal)}</Typography.Title></Descriptions.Item>
             <Descriptions.Item label="RPA Travel & Per Diem">{fmt(rpaTravelAndPerDiemTotal)}</Descriptions.Item>
             <Descriptions.Item label="Exercise O&M">{fmt(budget.exerciseOmTotal)}</Descriptions.Item>
             <Descriptions.Item label="WRM">{fmt(budget.wrm)}</Descriptions.Item>

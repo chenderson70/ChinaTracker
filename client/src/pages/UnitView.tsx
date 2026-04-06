@@ -26,6 +26,7 @@ import { useApp } from '../components/AppLayout';
 import * as api from '../services/api';
 import type { ExerciseDetail, PersonnelGroup, UnitBudget, FundingType, UnitCalc, GroupCalc, PerDiemRate } from '../types';
 import { getUnitDisplayLabel } from '../utils/unitLabels';
+import { getRpaMealsResponsibilityByUnit } from '../utils/budgetSummary';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const formatNumberInput = (value: string | number | null | undefined) => {
@@ -903,14 +904,16 @@ export default function UnitView() {
   const omWrmTotal = wrmLines.reduce((sum, line) => sum + (line.amount || 0), 0);
   const omContractsTotal = titleContractLines.reduce((sum, line) => sum + (line.amount || 0), 0);
   const omGpcPurchasesTotal = gpcPurchaseLines.reduce((sum, line) => sum + (line.amount || 0), 0);
-  const derivedPlayerMealsExecutionLine = (unitCalcSafe.playerRpa?.meals || 0) > 0
+  const rpaMealsResponsibilityByUnit = budget ? getRpaMealsResponsibilityByUnit(budget) : {};
+  const currentUnitRpaMealsResponsibility = rpaMealsResponsibilityByUnit[String(unitCode || '').toUpperCase()]?.total || 0;
+  const derivedPlayerMealsExecutionLine = currentUnitRpaMealsResponsibility > 0
     ? {
         id: '__derived_player_meals__',
         key: '__derived_player_meals__',
-        category: 'Player Meals',
+        category: 'RPA Meals',
         fundingType: 'RPA',
-        amount: unitCalcSafe.playerRpa.meals || 0,
-        notes: 'Auto-populated from Player - Execution (RPA) meals',
+        amount: currentUnitRpaMealsResponsibility,
+        notes: 'Auto-populated from exercise-wide RPA meal responsibility',
         isDerived: true,
       }
     : null;

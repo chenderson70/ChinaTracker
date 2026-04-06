@@ -35,17 +35,16 @@ export function renderCostBarLabel(props: CostBarLabelProps) {
     return null;
   }
 
-  const canFitInsideBar = numericHeight >= 34;
   const labelX = numericX + (numericWidth / 2);
-  const labelY = canFitInsideBar ? numericY + 16 : numericY - 8;
+  const labelY = numericY - 8;
 
   return (
     <text
       x={labelX}
       y={labelY}
       textAnchor="middle"
-      dominantBaseline={canFitInsideBar ? 'middle' : 'auto'}
-      fill={canFitInsideBar ? '#ffffff' : fill}
+      dominantBaseline="auto"
+      fill={fill}
       fontSize={14}
       fontWeight={800}
     >
