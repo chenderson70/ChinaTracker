@@ -8,6 +8,7 @@ import dayjs from 'dayjs';
 import { exportElementToPdf } from '../services/pdf';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
+import { ANNUAL_TOUR_BILLETING_LABEL, ANNUAL_TOUR_MEALS_LABEL, getAnnualTourBilletingOmTotal, getAnnualTourRpaMealsTotal } from '../utils/budgetSummary';
 import type { ExerciseDetail } from '../types';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
@@ -220,7 +221,7 @@ type PrintBudgetFieldKey =
   | 'wcExecRpa'
   | 'wcExecOm'
   | 'playerRpa'
-  | 'annualTourRpa'
+  | 'annualTourMeals'
   | 'playerOm'
   | 'totalRpa'
   | 'totalOm';
@@ -371,14 +372,14 @@ export function ReportsPage({
       wcExecRpa: u.whiteCellRpa.subtotal + u.executionRpa + (u.playerRpa.meals || 0),
       wcExecOm: u.whiteCellOm.subtotal + u.executionOm,
       playerRpa: Math.max(0, u.playerRpa.subtotal - (u.playerRpa.meals || 0)),
-      annualTourRpa: u.annualTourRpa?.subtotal || 0,
+      annualTourMeals: u.annualTourRpa?.meals || 0,
       playerOm: u.playerOm.subtotal,
       totalRpa: u.unitTotalRpa,
       totalOm: u.unitTotalOm,
       total: u.unitTotal,
     }));
-  const annualTourRpaTotal = Object.values(budget.units)
-    .reduce((sum, unit) => sum + (unit.annualTourRpa?.subtotal || 0), 0);
+  const annualTourRpaTotal = getAnnualTourRpaMealsTotal(budget);
+  const annualTourBilletingOmTotal = getAnnualTourBilletingOmTotal(budget);
   const rpaPerDiemTotal = Object.values(budget.units)
     .reduce(
       (sum, unit) =>
@@ -398,7 +399,7 @@ export function ReportsPage({
       wcExecRpa: totals.wcExecRpa + row.wcExecRpa,
       wcExecOm: totals.wcExecOm + row.wcExecOm,
       playerRpa: totals.playerRpa + row.playerRpa,
-      annualTourRpa: totals.annualTourRpa + row.annualTourRpa,
+      annualTourMeals: totals.annualTourMeals + row.annualTourMeals,
       playerOm: totals.playerOm + row.playerOm,
       totalRpa: totals.totalRpa + row.totalRpa,
       totalOm: totals.totalOm + row.totalOm,
@@ -412,7 +413,7 @@ export function ReportsPage({
       wcExecRpa: 0,
       wcExecOm: 0,
       playerRpa: 0,
-      annualTourRpa: 0,
+      annualTourMeals: 0,
       playerOm: 0,
       totalRpa: 0,
       totalOm: 0,
@@ -431,10 +432,10 @@ export function ReportsPage({
   const printBudgetFields: Array<{ key: PrintBudgetFieldKey; label: string }> = [
     { key: 'planningRpa', label: 'Planning RPA' },
     { key: 'planningOm', label: 'Planning O&M' },
-    { key: 'wcExecRpa', label: 'White Cell + Execution RPA' },
+    { key: 'wcExecRpa', label: 'Exercise Support RPA' },
     { key: 'wcExecOm', label: 'White Cell + Execution O&M' },
     { key: 'playerRpa', label: 'Player RPA' },
-    { key: 'annualTourRpa', label: 'Annual Tour' },
+    { key: 'annualTourMeals', label: ANNUAL_TOUR_MEALS_LABEL },
     { key: 'playerOm', label: 'Player O&M' },
     { key: 'totalRpa', label: 'Total RPA' },
     { key: 'totalOm', label: 'Total O&M' },
@@ -444,10 +445,10 @@ export function ReportsPage({
     { title: 'Unit', dataIndex: 'unit', width: 60, render: renderBudgetLabel, align: 'center' as const },
     { title: 'Planning RPA', dataIndex: 'planningRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Planning O&M', dataIndex: 'planningOm', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'White Cell + Execution RPA', dataIndex: 'wcExecRpa', render: renderBudgetAmount, align: 'center' as const },
+    { title: 'Exercise Support RPA', dataIndex: 'wcExecRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'White Cell + Execution O&M', dataIndex: 'wcExecOm', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Player RPA', dataIndex: 'playerRpa', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'Annual Tour', dataIndex: 'annualTourRpa', render: renderBudgetAmount, align: 'center' as const },
+    { title: ANNUAL_TOUR_MEALS_LABEL, dataIndex: 'annualTourMeals', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Player O&M', dataIndex: 'playerOm', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Total RPA', dataIndex: 'totalRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Total O&M', dataIndex: 'totalOm', render: renderBudgetAmount, align: 'center' as const },
@@ -942,8 +943,9 @@ export function ReportsPage({
             <Descriptions.Item label="WRM">{fmt(budget.wrm)}</Descriptions.Item>
             <Descriptions.Item label="Total PAX">{displayTotalPax}</Descriptions.Item>
             <Descriptions.Item label="Players">{budget.totalPlayers}</Descriptions.Item>
-            <Descriptions.Item label="Annual Tour">{budget.totalAnnualTour}</Descriptions.Item>
-            <Descriptions.Item label="Annual Tour">{fmt(annualTourRpaTotal)}</Descriptions.Item>
+            <Descriptions.Item label="Annual Tour PAX">{budget.totalAnnualTour}</Descriptions.Item>
+            <Descriptions.Item label={ANNUAL_TOUR_MEALS_LABEL}>{fmt(annualTourRpaTotal)}</Descriptions.Item>
+            <Descriptions.Item label={ANNUAL_TOUR_BILLETING_LABEL}>{fmt(annualTourBilletingOmTotal)}</Descriptions.Item>
             <Descriptions.Item label="White Cell & Exercise Support">{budget.totalWhiteCell}</Descriptions.Item>
           </Descriptions>
         </Card>

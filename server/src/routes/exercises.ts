@@ -405,7 +405,7 @@ router.get('/:id/export', async (req: Request, res: Response) => {
     const playerRpaTotal = Object.values(budget.units)
       .reduce((sum, unit) => sum + Math.max(0, (unit.playerRpa?.subtotal || 0) - (unit.playerRpa?.meals || 0)), 0);
     const annualTourTotal = Object.values(budget.units)
-      .reduce((sum, unit) => sum + (unit.annualTourRpa?.subtotal || 0), 0);
+      .reduce((sum, unit) => sum + (unit.annualTourRpa?.meals || 0), 0);
     const executionRpaTotal = Object.values(budget.units)
       .reduce(
         (sum, unit) => sum + (unit.whiteCellRpa?.subtotal || 0) + (unit.executionRpa || 0) + (unit.playerRpa?.meals || 0),
@@ -423,7 +423,7 @@ router.get('/:id/export', async (req: Request, res: Response) => {
         (unit.playerRpa.perDiem || 0),
       0,
     );
-    const rpaTravelAndPerDiemTotal = budget.rpaTravel + rpaPerDiemTotal;
+    const rpaTravelAndPerDiemTotal = budget.rpaTravel + rpaPerDiemTotal + Object.values(budget.units).reduce((sum, unit) => sum + (unit.executionRpa || 0), 0);
 
     const summaryData = [
       ['China Tracker – Budget Summary'],
@@ -447,8 +447,8 @@ router.get('/:id/export', async (req: Request, res: Response) => {
       ['A7 Paid RPA Total', budget.totalRpa],
       ['Planning RPA', planningRpaTotal],
       ['Player RPA', playerRpaTotal],
-      ['Annual Tour (incl. meals)', annualTourTotal],
-      ['Execution RPA', executionRpaTotal],
+      ['AT Meals', annualTourTotal],
+      ['Exercise Support RPA', executionRpaTotal],
       [''],
       ['Unit', 'RPA', 'O&M', 'Total'],
       ...Object.values(budget.units).map((u) => [u.unitCode, u.unitTotalRpa, u.unitTotalOm, u.unitTotal]),
@@ -494,7 +494,7 @@ router.get('/:id/export', async (req: Request, res: Response) => {
         ['Billeting', u.playerOm.billeting],
         ['Subtotal', u.playerOm.subtotal],
         [''],
-        ['Execution RPA', u.executionRpa],
+        ['Other RPA Costs', u.executionRpa],
         ['Execution O&M', u.executionOm],
         [''],
         ['Unit Total RPA', u.unitTotalRpa],

@@ -1,4 +1,5 @@
 import { Card, Col, Row, Table } from 'antd';
+import type { ReactNode } from 'react';
 import {
   BarChart,
   Bar,
@@ -15,10 +16,31 @@ import { useApp } from './AppLayout';
 import BudgetHeroSummary from './BudgetHeroSummary';
 import { renderCostBarLabel } from './charts/CostBarLabel';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
-import { formatFundingPaxBreakdown, getDisplayedPax, getPlanningEventPaxExclusions, getSupportOmPaxExclusions } from '../utils/paxDisplay';
+import { formatFundingPaxBreakdown, getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
+import {
+  A7_RPA_OM_TOTAL_LABEL,
+  ANNUAL_TOUR_MIL_PAY_LABEL,
+  ANNUAL_TOUR_TRAVEL_PAY_LABEL,
+  getA7RpaOmTotal,
+  getAnnualTourBoxTotal,
+  getAnnualTourMilPayTotal,
+  getAnnualTourRpaMealsTotal,
+  getAnnualTourTravelPayTotal,
+  OVERALL_EXERCISE_TOTAL_LABEL,
+} from '../utils/budgetSummary';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const applyPlusUp = (n: number) => Number(n || 0) * 1.1;
+
+type DetailCard = {
+  label: string;
+  value: string;
+  icon: ReactNode;
+  color?: string;
+  accent?: string;
+  detail?: string;
+  note?: string;
+};
 
 export default function BudgetOverviewSection() {
   const { exercise, budget } = useApp();
@@ -26,14 +48,7 @@ export default function BudgetOverviewSection() {
   if (!exercise || !budget) return null;
 
   const siteVisitPaxExclusions = getPlanningEventPaxExclusions(exercise);
-  const supportOmPaxExclusions = getSupportOmPaxExclusions(exercise);
   const displayTotalPax = getDisplayedPax(budget.totalPax, siteVisitPaxExclusions.totalExcludedPax);
-  const supportOmExclusionEntries = Object.entries(supportOmPaxExclusions.excludedByUnit).filter(([, count]) => count > 0);
-  const supportOmExclusionNote = supportOmExclusionEntries.length === 1
-    ? `Includes ${supportOmExclusionEntries[0][1]} ${getUnitDisplayLabel(supportOmExclusionEntries[0][0])} Support O&M excluded from Total PAX`
-    : supportOmPaxExclusions.totalExcludedPax > 0
-      ? `Includes ${supportOmPaxExclusions.totalExcludedPax} Support O&M excluded from Total PAX`
-      : '';
 
   const unitData = Object.values(budget.units)
     .sort((left, right) => compareUnitCodes(left.unitCode, right.unitCode))
@@ -42,7 +57,7 @@ export default function BudgetOverviewSection() {
       unitCode: u.unitCode,
       totalPax: getDisplayedPax(u.totalPax, siteVisitPaxExclusions.excludedByUnit[String(u.unitCode || '').toUpperCase()] || 0),
       rpa: u.unitTotalRpa,
-      annualTour: u.annualTourRpa?.subtotal || 0,
+      annualTour: u.annualTourRpa?.meals || 0,
       om: u.unitTotalOm,
       total: u.unitTotal,
     }));
@@ -114,23 +129,15 @@ export default function BudgetOverviewSection() {
     .reduce((sum, unit) => sum + (unit.executionRpa || 0), 0);
   const rpaTravelAndPerDiemTotal = budget.rpaTravel + rpaPerDiemTotal + executionRpaTotal;
 
+  const annualTourMealsTotal = getAnnualTourRpaMealsTotal(budget);
   const rpaRationsTotal = Object.values(budget.units)
-    .reduce((sum, unit) => sum + (unit.playerRpa.meals || 0), 0);
-  const annualTourMilPayTotal = Object.values(budget.units)
-    .reduce((sum, unit) => sum + (unit.annualTourRpa?.milPay || 0), 0);
-  const annualTourTravelSupportTotal = Object.values(budget.units)
-    .reduce(
-      (sum, unit) =>
-        sum +
-        (unit.annualTourRpa?.travel || 0) +
-        (unit.annualTourRpa?.perDiem || 0),
-      0,
-    );
-  const annualTourRpaTotal = Object.values(budget.units)
-    .reduce((sum, unit) => sum + (unit.annualTourRpa?.subtotal || 0), 0);
-  const a7BudgetPlanningTotal = Math.max(0, budget.grandTotal - annualTourRpaTotal);
-  const overallExerciseTotalLabel = 'Overall Exercise Total (AT + RPA + O&M)';
-  const a7PlanningTotalLabel = 'A7 RPA & O&M Total';
+    .reduce((sum, unit) => sum + (unit.playerRpa.meals || 0), 0) + annualTourMealsTotal;
+  const annualTourMilPayTotal = getAnnualTourMilPayTotal(budget);
+  const annualTourTravelPayTotal = getAnnualTourTravelPayTotal(budget);
+  const annualTourBoxTotal = getAnnualTourBoxTotal(budget);
+  const a7BudgetPlanningTotal = getA7RpaOmTotal(budget);
+  const overallExerciseTotalLabel = OVERALL_EXERCISE_TOTAL_LABEL;
+  const a7PlanningTotalLabel = A7_RPA_OM_TOTAL_LABEL;
 
   const totalPlayers = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.playerRpa.paxCount || 0) + (unit.playerOm.paxCount || 0), 0);
@@ -188,7 +195,7 @@ export default function BudgetOverviewSection() {
       render: (value: number) => <span style={{ color: '#1677ff' }}>{fmt(value)}</span>,
     },
     {
-      title: 'Annual Tour',
+      title: 'AT Meals',
       dataIndex: 'annualTour',
       key: 'annualTour',
       width: 170,
@@ -239,13 +246,13 @@ export default function BudgetOverviewSection() {
     },
     {
       label: 'Annual Tour',
-      value: fmt(annualTourRpaTotal),
+      value: fmt(annualTourBoxTotal),
       color: '#0958d9',
       accent: 'ct-stat-blue',
       icon: <UserOutlined />,
       detailLines: [
-        { label: 'AT Mil Pay', value: fmt(annualTourMilPayTotal) },
-        { label: 'AT Travel & Per Diem', value: fmt(annualTourTravelSupportTotal) },
+        { label: ANNUAL_TOUR_MIL_PAY_LABEL, value: fmt(annualTourMilPayTotal) },
+        { label: ANNUAL_TOUR_TRAVEL_PAY_LABEL, value: fmt(annualTourTravelPayTotal) },
       ],
     },
   ];
@@ -289,18 +296,18 @@ export default function BudgetOverviewSection() {
     {
       label: 'Annual Tour',
       badge: '10% Plus-Up',
-      value: fmt(applyPlusUp(annualTourRpaTotal)),
+      value: fmt(applyPlusUp(annualTourBoxTotal)),
       color: '#0958d9',
       accent: 'ct-stat-blue',
       icon: <UserOutlined />,
       detailLines: [
-        { label: 'AT Mil Pay', value: fmt(applyPlusUp(annualTourMilPayTotal)) },
-        { label: 'AT Travel & Per Diem', value: fmt(applyPlusUp(annualTourTravelSupportTotal)) },
+        { label: ANNUAL_TOUR_MIL_PAY_LABEL, value: fmt(applyPlusUp(annualTourMilPayTotal)) },
+        { label: ANNUAL_TOUR_TRAVEL_PAY_LABEL, value: fmt(applyPlusUp(annualTourTravelPayTotal)) },
       ],
     },
   ];
 
-  const detailCards = [
+  const detailCards: DetailCard[] = [
     { label: 'Total PAX', value: displayTotalPax.toString(), icon: <TeamOutlined />, color: '#722ed1', accent: 'ct-stat-purple' },
     {
       label: 'Planners (Only long tour A7/ Unit of Action personnel)',
@@ -309,7 +316,7 @@ export default function BudgetOverviewSection() {
       icon: <UserOutlined />,
     },
     {
-      label: 'Players - Annual Tour',
+      label: 'Annual Tour Players',
       value: totalAnnualTour.toString(),
       icon: <UserOutlined />,
     },
@@ -322,7 +329,6 @@ export default function BudgetOverviewSection() {
       label: 'White Cell & Exercise Support',
       value: totalWhiteCell.toString(),
       detail: formatFundingPaxBreakdown(totalWhiteCellRpa, totalWhiteCellOm),
-      note: supportOmExclusionNote,
       icon: <UserOutlined />,
     },
   ];
@@ -483,7 +489,7 @@ export default function BudgetOverviewSection() {
                 <Table.Summary.Cell index={0} align="center"><strong>Total</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={1} align="center"><strong>{displayTotalPax}</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={2} align="center"><strong style={{ color: '#1677ff' }}>{fmt(budget.totalRpa)}</strong></Table.Summary.Cell>
-                <Table.Summary.Cell index={3} align="center"><strong style={{ color: '#0958d9' }}>{fmt(annualTourRpaTotal)}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={3} align="center"><strong style={{ color: '#0958d9' }}>{fmt(annualTourMealsTotal)}</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={4} align="center"><strong style={{ color: '#52c41a' }}>{fmt(budget.totalOm - budget.exerciseOmTotal)}</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={5} align="center"><strong>{fmt(unitData.reduce((sum, unit) => sum + unit.total, 0))}</strong></Table.Summary.Cell>
               </Table.Summary.Row>

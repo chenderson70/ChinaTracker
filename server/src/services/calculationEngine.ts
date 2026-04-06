@@ -373,8 +373,8 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
         } else {
           unitCalc.playerRpa = g;
           result.totalPlayers += pax;
+          result.rpaTravel += groupRpaTravel;
         }
-        result.rpaTravel += groupRpaTravel;
       } else if (isPlayer && pg.fundingType === 'OM') {
         const g = emptyGroup(pax, avgDays);
         g.travel = groupTravel;
@@ -397,13 +397,20 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
       else unitCalc.executionOm += cl.amount;
     }
 
+    const annualTourMeals = unitCalc.annualTourRpa.meals || 0;
+    const annualTourOperationalTotal =
+      (unitCalc.annualTourRpa.milPay || 0) +
+      (unitCalc.annualTourRpa.travel || 0) +
+      (unitCalc.annualTourRpa.perDiem || 0);
+
     unitCalc.unitTotalRpa =
       unitCalc.planningRpa.subtotal +
       unitCalc.whiteCellRpa.subtotal +
       unitCalc.playerRpa.subtotal +
-      unitCalc.executionRpa;
+      unitCalc.executionRpa +
+      annualTourMeals;
     unitCalc.unitTotalOm = unitCalc.planningOm.subtotal + unitCalc.whiteCellOm.subtotal + unitCalc.playerOm.subtotal + unitCalc.executionOm;
-    unitCalc.unitTotal = unitCalc.unitTotalRpa + unitCalc.annualTourRpa.subtotal + unitCalc.unitTotalOm;
+    unitCalc.unitTotal = unitCalc.unitTotalRpa + annualTourOperationalTotal + unitCalc.unitTotalOm;
 
     result.units[ub.unitCode] = unitCalc;
     result.totalRpa += unitCalc.unitTotalRpa;
@@ -417,7 +424,15 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
     result.exerciseOmTotal += ol.amount;
     if (cat === 'WRM') result.wrm += ol.amount;
   }
-  const annualTourTotal = Object.values(result.units).reduce((sum, unit) => sum + (unit.annualTourRpa?.subtotal || 0), 0);
+  const annualTourTotal = Object.values(result.units)
+    .reduce(
+      (sum, unit) =>
+        sum +
+        (unit.annualTourRpa?.milPay || 0) +
+        (unit.annualTourRpa?.travel || 0) +
+        (unit.annualTourRpa?.perDiem || 0),
+      0,
+    );
   result.totalOm += result.exerciseOmTotal;
   result.grandTotal = result.totalRpa + result.totalOm + annualTourTotal;
   result.totalPax = result.totalPlayers + result.totalWhiteCell + result.totalAnnualTour;

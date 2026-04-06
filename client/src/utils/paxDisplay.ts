@@ -62,18 +62,12 @@ export function getPlanningEventPaxExclusions(exercise: ExerciseDetail | null | 
     (acc, unitBudget) => {
       const unitCode = String(unitBudget.unitCode || '').toUpperCase();
       const excludedForUnit = (unitBudget.personnelGroups || []).reduce((sum, group) => {
-        const planningEventPax = String(group.role || '').toUpperCase() === 'PLANNING'
+        return sum + (String(group.role || '').toUpperCase() === 'PLANNING'
           ? (group.personnelEntries || []).reduce(
             (entrySum, entry) => entrySum + (isExcludedPlanningPaxNote(entry.note) ? Number(entry.count || 0) : 0),
             0,
           )
-          : 0;
-
-        const supportOmPax = isExcludedSupportOmGroup(group.role, group.fundingType)
-          ? ((group.personnelEntries || []).reduce((entrySum, entry) => entrySum + Number(entry.count || 0), 0) || Number(group.paxCount || 0))
-          : 0;
-
-        return sum + planningEventPax + supportOmPax;
+          : 0);
       }, 0);
 
       if (excludedForUnit > 0) {

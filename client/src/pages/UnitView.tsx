@@ -484,7 +484,7 @@ export default function UnitView() {
 
   const roleLabels: Record<string, string> = {
     PLAYER: 'Player',
-    ANNUAL_TOUR: 'Player - Annual Tour',
+    ANNUAL_TOUR: 'Annual Tour Players',
     WHITE_CELL: 'Support Personnel - Execution',
     PLANNING: 'Planning',
     SUPPORT: 'Support-Execution',
@@ -536,7 +536,7 @@ export default function UnitView() {
           ? '(Exercise planning, planning meetings, site visits)'
           : '(Planning meetings, site visits)')
       : role === 'ANNUAL_TOUR'
-        ? '(Calculated using the same formula as player costs)'
+        ? '(AT box totals Mil Pay + Travel Pay; meals are separate and billeting rolls to O&M)'
       : role === 'SUPPORT'
         ? '(ADVON, REARVON, exercise execution)'
         : '';
@@ -610,10 +610,6 @@ export default function UnitView() {
       playerTravelBreakout.billeting +
       playerTravelBreakout.airfare +
       playerTravelBreakout.rental;
-    const annualTourTravelTotal =
-      playerTravelBreakout.perDiem +
-      playerTravelBreakout.airfare +
-      playerTravelBreakout.rental;
     const billetingHighlight = (
       <span className="ct-inline-om-highlight">Billeting (O&amp;M): {fmt(playerTravelBreakout.billeting)}</span>
     );
@@ -628,9 +624,9 @@ export default function UnitView() {
     );
     const annualTourRpaSummary = (
       <>
-        {`Mil Pay: ${fmt(calc.milPay)} \u2022 AT RPA Travel Total: ${fmt(annualTourTravelTotal)} (`}
-        {`Per diem: ${fmt(playerTravelBreakout.perDiem)}, Airfare: ${fmt(playerTravelBreakout.airfare)}, Rental: ${fmt(playerTravelBreakout.rental)}) `}
-        {`\u2022 AT Total: ${fmt(calc.subtotal)}`}
+        {`Mil Pay: ${fmt(calc.milPay)} \u2022 AT Travel Pay: ${fmt((calc.perDiem || 0) + (calc.travel || 0))} \u2022 Meals: ${fmt(calc.meals)} \u2022 `}
+        {billetingHighlight}
+        {` \u2022 AT Total: ${fmt(calc.subtotal)}`}
       </>
     );
     const playerOmSummary = (
@@ -702,7 +698,7 @@ export default function UnitView() {
                 title: 'Rank',
                 dataIndex: 'rankCode',
                 width: 110,
-                render: (value, row) => (
+                render: (value: string, row: { id: string }) => (
                   <Select
                     size="small"
                     value={value}
@@ -773,7 +769,7 @@ export default function UnitView() {
                 title: 'Location',
                 dataIndex: 'location',
                 width: 160,
-                render: (value, row) => (
+                render: (value: string | null, row: { id: string }) => (
                   <Select
                     size="small"
                     value={value || 'GULFPORT'}
