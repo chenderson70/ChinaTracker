@@ -137,8 +137,8 @@ function getPlanningSummaryEntries(exercise: ExerciseDetail): PlanningSummaryEnt
     .filter((entry) => entry.count > 0);
 }
 
-function buildPlannerSummary(entries: PlanningSummaryEntry[]): string {
-  if (entries.length === 0) return 'No long-tour planners configured';
+function buildPlannerSummary(entries: PlanningSummaryEntry[]): { count: string; detail: string } {
+  if (entries.length === 0) return { count: '0', detail: 'No long-tour planners configured' };
 
   const totalPlanners = entries.reduce((sum, entry) => sum + entry.count, 0);
   const localPlanners = entries.reduce((sum, entry) => sum + (entry.isLocal ? entry.count : 0), 0);
@@ -160,11 +160,14 @@ function buildPlannerSummary(entries: PlanningSummaryEntry[]): string {
     ? formatPlannerDuration(uniqueDutyDays[0])
     : 'mixed durations';
 
-  return `${totalPlanners} total planners: ${unitBreakdown} - ${durationText} (${localPlanners} local / ${nonLocalPlanners} not local)`;
+  return {
+    count: totalPlanners.toString(),
+    detail: `${unitBreakdown} - ${durationText} (${localPlanners} local / ${nonLocalPlanners} not local)`,
+  };
 }
 
-function buildPlanningEventSummary(entries: PlanningSummaryEntry[], singular: string, plural: string): string {
-  if (entries.length === 0) return `No ${plural} configured`;
+function buildPlanningEventSummary(entries: PlanningSummaryEntry[], singular: string, plural: string): { count: string; detail: string } {
+  if (entries.length === 0) return { count: '0', detail: `No ${plural} configured` };
 
   const groupedEvents = Array.from(
     entries.reduce((acc, entry) => {
@@ -193,18 +196,18 @@ function buildPlanningEventSummary(entries: PlanningSummaryEntry[], singular: st
     const rpaPaxEach = nonZeroRpaPax[0];
     const omPaxEach = nonZeroOmPax[0];
     const totalPaxEach = rpaPaxEach + omPaxEach;
-    return `${eventCount} - ${totalPaxEach} PAX each (${rpaPaxEach} RPA/${omPaxEach} O&M) - ${dutyText}`;
+    return { count: eventCount.toString(), detail: `${totalPaxEach} PAX each (${rpaPaxEach} RPA/${omPaxEach} O&M) - ${dutyText}` };
   }
 
   if (eventCount === 1 || (uniqueTotalPax.length === 1 && uniqueRpaPax.length === 1 && uniqueOmPax.length === 1)) {
     const sampleEvent = groupedEvents[0];
     const paxText = `${sampleEvent.totalPax} PAX${eventCount > 1 ? ' each' : ''}`;
-    return `${eventCount} - ${paxText} (${sampleEvent.rpaPax} RPA/${sampleEvent.omPax} O&M) - ${dutyText}`;
+    return { count: eventCount.toString(), detail: `${paxText} (${sampleEvent.rpaPax} RPA/${sampleEvent.omPax} O&M) - ${dutyText}` };
   }
 
   const totalRpaPax = groupedEvents.reduce((sum, event) => sum + event.rpaPax, 0);
   const totalOmPax = groupedEvents.reduce((sum, event) => sum + event.omPax, 0);
-  return `${eventCount} - mixed PAX (${totalRpaPax} RPA/${totalOmPax} O&M across events) - ${dutyText}`;
+  return { count: eventCount.toString(), detail: `mixed PAX (${totalRpaPax} RPA/${totalOmPax} O&M across events) - ${dutyText}` };
 }
 
 interface ReportsPageProps {
@@ -579,17 +582,17 @@ export function ReportsPage({
     {
       key: 'planners',
       label: 'Long-Tour Planners',
-      text: buildPlannerSummary(plannerSummaryEntries),
+      ...buildPlannerSummary(plannerSummaryEntries),
     },
     {
       key: 'site-visits',
       label: 'Site Visit(s)',
-      text: buildPlanningEventSummary(siteVisitEntries, 'site visit', 'site visits'),
+      ...buildPlanningEventSummary(siteVisitEntries, 'site visit', 'site visits'),
     },
     {
       key: 'planning-conferences',
       label: 'Planning Conferences',
-      text: buildPlanningEventSummary(planningConferenceEntries, 'planning conference', 'planning conferences'),
+      ...buildPlanningEventSummary(planningConferenceEntries, 'planning conference', 'planning conferences'),
     },
   ];
   const quickPlanningRateItems = [
@@ -907,8 +910,11 @@ export function ReportsPage({
         <div className="ct-quick-summary-grid">
           {quickPlanningSummaryItems.map((item) => (
             <div key={item.key} className="ct-quick-summary-item">
-              <div className="ct-quick-summary-label">{item.label}</div>
-              <div className="ct-quick-summary-text">{item.text}</div>
+              <div className="ct-quick-summary-item-header">
+                <div className="ct-quick-summary-label">{item.label}</div>
+                <div className="ct-quick-summary-count">{item.count}</div>
+              </div>
+              <div className="ct-quick-summary-text">{item.detail}</div>
             </div>
           ))}
         </div>

@@ -462,13 +462,26 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
-.ct-quick-summary-label {
+.ct-quick-summary-item-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   margin-bottom: 8px;
+}
+
+.ct-quick-summary-label {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #596577;
+}
+
+.ct-quick-summary-count {
+  font-size: 22px;
+  font-weight: 700;
+  color: #102039;
+  line-height: 1;
 }
 
 .ct-quick-summary-text {
