@@ -852,9 +852,10 @@ export function ReportsPage({
                   className="ct-report-notes-row"
                 >
                   <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
-                  <Input
+                  <Input.TextArea
                     className="ct-report-notes-input ct-screen-only"
                     value={line}
+                    autoSize
                     onChange={(event) => {
                       const next = [...draftReportAssumptions] as ReportAssumptions;
                       next[index] = event.target.value;
@@ -862,7 +863,7 @@ export function ReportsPage({
                     }}
                     placeholder={`Estimation line ${index + 1}`}
                     bordered={false}
-                    style={{ color: '#596577', paddingInline: 0, background: 'transparent' }}
+                    style={{ color: '#596577', paddingInline: 0, background: 'transparent', resize: 'none' }}
                   />
                   <span className="ct-report-notes-text ct-print-only">{line}</span>
                 </div>
@@ -879,9 +880,10 @@ export function ReportsPage({
                   className="ct-report-notes-row"
                 >
                   <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
-                  <Input
+                  <Input.TextArea
                     className="ct-report-notes-input ct-screen-only"
                     value={line}
+                    autoSize
                     onChange={(event) => {
                       const next = [...draftReportLimfacs] as ReportLimfacs;
                       next[index] = event.target.value;
@@ -889,7 +891,7 @@ export function ReportsPage({
                     }}
                     placeholder={`LIMFAC line ${index + 1}`}
                     bordered={false}
-                    style={{ color: '#596577', paddingInline: 0, background: 'transparent' }}
+                    style={{ color: '#596577', paddingInline: 0, background: 'transparent', resize: 'none' }}
                   />
                   <span className="ct-report-notes-text ct-print-only">{line}</span>
                 </div>
