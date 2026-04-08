@@ -316,7 +316,7 @@ export default function BudgetOverviewSection() {
       icon: <UserOutlined />,
     },
     {
-      label: 'Annual Tour Players',
+      label: 'Players - Annual Tour',
       value: totalAnnualTour.toString(),
       icon: <UserOutlined />,
     },

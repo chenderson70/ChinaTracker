@@ -186,7 +186,7 @@ function buildPlanningEventSummary(entries: PlanningSummaryEntry[], singular: st
   const nonZeroOmPax = [...new Set(groupedEvents.map((event) => event.omPax).filter((value) => value > 0))];
   const uniqueDutyDays = [...new Set(groupedEvents.map((event) => event.dutyDays).filter((value) => value > 0))];
   const dutyText = uniqueDutyDays.length === 1
-    ? `${formatDutyDayDuration(uniqueDutyDays[0])}${eventCount > 1 ? ' each' : ''}`
+    ? `${formatDutyDayDuration(uniqueDutyDays[0])} each`
     : 'mixed duty days';
 
   if (eventCount > 1 && nonZeroRpaPax.length === 1 && nonZeroOmPax.length === 1) {
@@ -583,7 +583,7 @@ export function ReportsPage({
     },
     {
       key: 'site-visits',
-      label: 'Site Visits',
+      label: 'Site Visit(s)',
       text: buildPlanningEventSummary(siteVisitEntries, 'site visit', 'site visits'),
     },
     {

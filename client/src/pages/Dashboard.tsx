@@ -281,7 +281,7 @@ export default function Dashboard() {
       icon: <UserOutlined />,
     },
     {
-      label: 'Annual Tour Players',
+      label: 'Players - Annual Tour',
       value: totalAnnualTour.toString(),
       icon: <UserOutlined />,
     },

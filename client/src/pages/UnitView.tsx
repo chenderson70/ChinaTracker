@@ -485,7 +485,7 @@ export default function UnitView() {
 
   const roleLabels: Record<string, string> = {
     PLAYER: 'Player',
-    ANNUAL_TOUR: 'Annual Tour Players',
+    ANNUAL_TOUR: 'Players - Annual Tour',
     WHITE_CELL: 'Support Personnel - Execution',
     PLANNING: 'Planning',
     SUPPORT: 'Support-Execution',
