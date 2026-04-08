@@ -853,7 +853,7 @@ export function ReportsPage({
                 >
                   <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
                   <Input
-                    className="ct-report-notes-input"
+                    className="ct-report-notes-input ct-screen-only"
                     value={line}
                     onChange={(event) => {
                       const next = [...draftReportAssumptions] as ReportAssumptions;
@@ -864,6 +864,7 @@ export function ReportsPage({
                     bordered={false}
                     style={{ color: '#596577', paddingInline: 0, background: 'transparent' }}
                   />
+                  <span className="ct-report-notes-text ct-print-only">{line}</span>
                 </div>
               ))}
             </div>
@@ -879,7 +880,7 @@ export function ReportsPage({
                 >
                   <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
                   <Input
-                    className="ct-report-notes-input"
+                    className="ct-report-notes-input ct-screen-only"
                     value={line}
                     onChange={(event) => {
                       const next = [...draftReportLimfacs] as ReportLimfacs;
@@ -890,6 +891,7 @@ export function ReportsPage({
                     bordered={false}
                     style={{ color: '#596577', paddingInline: 0, background: 'transparent' }}
                   />
+                  <span className="ct-report-notes-text ct-print-only">{line}</span>
                 </div>
               ))}
             </div>

@@ -574,6 +574,14 @@ body {
   line-height: 1.3;
 }
 
+.ct-report-notes-text {
+  color: #596577;
+  font-size: 14px;
+  line-height: 1.3;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
 .ct-screen-only {
   display: block;
 }
