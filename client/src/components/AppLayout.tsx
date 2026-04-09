@@ -165,7 +165,6 @@ export default function AppLayout() {
     form.validateFields().then((vals) => {
       createMut.mutate({
         name: vals.name,
-        totalBudget: vals.totalBudget,
         startDate: vals.dates[0].format('YYYY-MM-DD'),
         endDate: vals.dates[1].format('YYYY-MM-DD'),
         defaultDutyDays: vals.defaultDutyDays,
@@ -592,14 +591,6 @@ export default function AppLayout() {
           </Form.Item>
           <Form.Item name="defaultDutyDays" label="Default Duty Days" initialValue={14}>
             <InputNumber min={1} max={365} style={{ width: '100%' }} size="large" />
-          </Form.Item>
-          <Form.Item
-            name="totalBudget"
-            label="Total Exercise Budget ($)"
-            initialValue={5000000}
-            rules={[{ required: true, message: 'Enter total exercise budget' }]}
-          >
-            <InputNumber min={0} style={{ width: '100%' }} size="large" />
           </Form.Item>
         </Form>
       </Modal>

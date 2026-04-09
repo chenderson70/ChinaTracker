@@ -201,7 +201,7 @@ export async function getExercise(id: string): Promise<ExerciseDetail> {
 
 export async function createExercise(data: {
   name: string;
-  totalBudget: number;
+  totalBudget?: number;
   startDate: string;
   endDate: string;
   defaultDutyDays: number;
