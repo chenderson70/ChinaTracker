@@ -693,6 +693,7 @@ export default function UnitView() {
           <Table
             size="small"
             pagination={false}
+            scroll={{ x: 'max-content' }}
             dataSource={group.personnelEntries.map((e) => ({ ...e, key: e.id }))}
             columns={[
               {
@@ -1279,9 +1280,9 @@ export default function UnitView() {
       <Divider />
 
       {/* Personnel panels */}
-      <Row gutter={16}>
+      <Row gutter={[16, 16]}>
         {roleSections.map((role) => (
-          <Col xs={24} lg={12} key={role}>
+          <Col xs={24} xl={12} key={role}>
             <Typography.Title level={5}>{getRoleLabel(role)}</Typography.Title>
             <PersonnelPanel role={role} ft="RPA" />
             {role !== 'ANNUAL_TOUR' ? <PersonnelPanel role={role} ft="OM" /> : null}

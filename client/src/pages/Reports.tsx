@@ -1056,7 +1056,3 @@ export function ReportsPage({
     </div>
   );
 }
-
-export default function Reports() {
-  return <ReportsPage />;
-}

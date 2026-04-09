@@ -19,7 +19,6 @@ import {
   DashboardOutlined,
   TeamOutlined,
   SettingOutlined,
-  DollarOutlined,
   FileExcelOutlined,
   PlusOutlined,
   CloudDownloadOutlined,
@@ -371,14 +370,13 @@ export default function AppLayout() {
       children: unitChildren,
     },
     { key: '/rates', icon: <SettingOutlined />, label: 'Rate Config' },
-    { key: '/om-costs', icon: <DollarOutlined />, label: 'O&M Costs' },
     {
       key: 'reports',
       icon: <FileExcelOutlined />,
       label: 'Reports',
       children: [
-        { key: '/reports', label: 'Reports & Export' },
         { key: '/reports/pm-27-cost-projections', label: 'PM 27 Cost Projections' },
+        { key: '/reports/balance', label: 'Balance' },
       ],
     },
   ];

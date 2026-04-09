@@ -5,9 +5,8 @@ import AppLayout from './components/AppLayout';
 import Dashboard from './pages/Dashboard';
 import UnitView from './pages/UnitView';
 import RateConfig from './pages/RateConfig';
-import OmCostCenter from './pages/OmCostCenter';
-import Reports from './pages/Reports';
 import Pm27CostProjections from './pages/Pm27CostProjections';
+import Balance from './pages/Balance';
 import AuthPage from './pages/AuthPage';
 import * as api from './services/api';
 import { clearAuthSession, getAuthChangedEventName, getAuthToken } from './services/auth';
@@ -62,9 +61,8 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/units/:unitCode" element={<UnitView />} />
         <Route path="/rates" element={<RateConfig />} />
-        <Route path="/om-costs" element={<OmCostCenter />} />
-        <Route path="/reports" element={<Reports />} />
         <Route path="/reports/pm-27-cost-projections" element={<Pm27CostProjections />} />
+        <Route path="/reports/balance" element={<Balance />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
