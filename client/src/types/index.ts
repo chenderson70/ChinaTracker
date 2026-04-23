@@ -49,6 +49,16 @@ export interface ExerciseDetail extends Exercise {
   omCostLines: OmCostLine[];
 }
 
+export interface ExerciseUndoBudgetTargets {
+  rpaBudgetTarget: string;
+  omBudgetTarget: string;
+}
+
+export interface ExerciseUndoSnapshot {
+  exercise: ExerciseDetail;
+  budgetTargets: ExerciseUndoBudgetTargets;
+}
+
 export interface UnitBudget {
   id: string;
   exerciseId: string;

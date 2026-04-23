@@ -263,7 +263,7 @@ export function ReportsPage({
   beforeBudgetBreakdownSection,
   extraSections,
 }: ReportsPageProps) {
-  const { exercise, budget, exerciseId } = useApp();
+  const { exercise, budget, exerciseId, pushUndoSnapshot } = useApp();
   const queryClient = useQueryClient();
   const [editTravel, setEditTravel] = useState(false);
   const [travelForm] = Form.useForm();
@@ -291,7 +291,10 @@ export function ReportsPage({
   const skipReportPreparedBySaveRef = useRef(true);
 
   const travelMut = useMutation({
-    mutationFn: (data: any) => api.updateTravelConfig(exerciseId!, data),
+    mutationFn: async (data: any) => {
+      await pushUndoSnapshot('Travel Settings');
+      return api.updateTravelConfig(exerciseId!, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
       queryClient.invalidateQueries({ queryKey: ['budget', exerciseId] });
@@ -299,7 +302,10 @@ export function ReportsPage({
   });
 
   const exerciseMut = useMutation({
-    mutationFn: (data: any) => api.updateExercise(exerciseId!, data),
+    mutationFn: async (data: any) => {
+      await pushUndoSnapshot('Exercise');
+      return api.updateExercise(exerciseId!, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
@@ -309,8 +315,10 @@ export function ReportsPage({
   });
 
   const reportAssumptionsMut = useMutation({
-    mutationFn: (data: Pick<ExerciseDetail, 'reportAssumption1' | 'reportAssumption2' | 'reportAssumption3' | 'reportAssumption4'>) =>
-      api.updateExercise(exerciseId!, data),
+    mutationFn: async (data: Pick<ExerciseDetail, 'reportAssumption1' | 'reportAssumption2' | 'reportAssumption3' | 'reportAssumption4'>) => {
+      await pushUndoSnapshot('Report Assumptions');
+      return api.updateExercise(exerciseId!, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
@@ -318,8 +326,10 @@ export function ReportsPage({
   });
 
   const reportLimfacsMut = useMutation({
-    mutationFn: (data: Pick<ExerciseDetail, 'reportLimfac1' | 'reportLimfac2' | 'reportLimfac3'>) =>
-      api.updateExercise(exerciseId!, data),
+    mutationFn: async (data: Pick<ExerciseDetail, 'reportLimfac1' | 'reportLimfac2' | 'reportLimfac3'>) => {
+      await pushUndoSnapshot('Report Limfacs');
+      return api.updateExercise(exerciseId!, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
@@ -327,7 +337,10 @@ export function ReportsPage({
   });
 
   const reportPreparedByMut = useMutation({
-    mutationFn: (data: Pick<ExerciseDetail, 'reportPreparedBy'>) => api.updateExercise(exerciseId!, data),
+    mutationFn: async (data: Pick<ExerciseDetail, 'reportPreparedBy'>) => {
+      await pushUndoSnapshot('Prepared By');
+      return api.updateExercise(exerciseId!, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
@@ -335,7 +348,10 @@ export function ReportsPage({
   });
 
   const totalBudgetMut = useMutation({
-    mutationFn: (totalBudget: number) => api.updateExercise(exerciseId!, { totalBudget }),
+    mutationFn: async (totalBudget: number) => {
+      await pushUndoSnapshot('Total Budget');
+      return api.updateExercise(exerciseId!, { totalBudget });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
@@ -344,7 +360,10 @@ export function ReportsPage({
   });
 
   const appConfigMut = useMutation({
-    mutationFn: (config: Record<string, string>) => api.updateAppConfig(config),
+    mutationFn: async (config: Record<string, string>) => {
+      await pushUndoSnapshot('Budget Targets');
+      return api.updateAppConfig(config);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appConfig'] });
       queryClient.invalidateQueries({ queryKey: ['budget', exerciseId] });

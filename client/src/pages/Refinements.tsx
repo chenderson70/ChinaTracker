@@ -49,7 +49,7 @@ function getSavableRefinements(items: RefinementItem[]): RefinementItem[] {
 }
 
 export default function Refinements() {
-  const { exercise, exerciseId } = useApp();
+  const { exercise, exerciseId, pushUndoSnapshot } = useApp();
   const queryClient = useQueryClient();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipAutoSaveRef = useRef(true);
@@ -59,7 +59,10 @@ export default function Refinements() {
   const savedRefinementsJson = JSON.stringify(savedRefinements);
 
   const refinementsMut = useMutation({
-    mutationFn: (data: Pick<Exercise, 'refinements'>) => api.updateExercise(exerciseId!, data),
+    mutationFn: async (data: Pick<Exercise, 'refinements'>) => {
+      await pushUndoSnapshot('Refinements');
+      return api.updateExercise(exerciseId!, data);
+    },
     onSuccess: (updatedExercise) => {
       const nextRefinements = normalizeRefinements(updatedExercise.refinements);
       queryClient.setQueryData<ExerciseDetail | null>(['exercise', exerciseId], (current) =>

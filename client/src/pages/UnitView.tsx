@@ -244,7 +244,7 @@ function DraftTextInput({
 
 export default function UnitView() {
   const { unitCode } = useParams<{ unitCode: string }>();
-  const { exercise, budget, exerciseId } = useApp();
+  const { exercise, budget, exerciseId, pushUndoSnapshot } = useApp();
   const queryClient = useQueryClient();
   const { data: appConfig = {} } = useQuery({ queryKey: ['appConfig'], queryFn: api.getAppConfig });
   const { data: perDiemRates = [] } = useQuery({
@@ -333,12 +333,18 @@ export default function UnitView() {
   }, [unitCode]);
 
   const updateGroupMut = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => api.updatePersonnelGroup(id, data),
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      await pushUndoSnapshot('Update Section');
+      return api.updatePersonnelGroup(id, data);
+    },
     onSuccess: refreshExerciseAndBudget,
   });
 
   const clearGroupMut = useMutation({
-    mutationFn: (groupId: string) => api.clearPersonnelGroup(groupId),
+    mutationFn: async (groupId: string) => {
+      await pushUndoSnapshot('Clear Section');
+      return api.clearPersonnelGroup(groupId);
+    },
     onSuccess: async () => {
       message.success('Section cleared');
       await refreshExerciseAndBudget();
@@ -359,6 +365,7 @@ export default function UnitView() {
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
 
+      await pushUndoSnapshot('Clear Unit');
       return api.clearUnitBudget(unitId);
     },
     onSuccess: async () => {
@@ -383,7 +390,10 @@ export default function UnitView() {
   });
 
   const addEntryMut = useMutation({
-    mutationFn: ({ groupId, data }: { groupId: string; data: any }) => api.addPersonnelEntry(groupId, data),
+    mutationFn: async ({ groupId, data }: { groupId: string; data: any }) => {
+      await pushUndoSnapshot('Add Personnel Entry');
+      return api.addPersonnelEntry(groupId, data);
+    },
     onSuccess: async () => {
       await refreshExerciseAndBudget();
       setEntryModal(null);
@@ -397,6 +407,7 @@ export default function UnitView() {
   const deleteEntryMut = useMutation({
     mutationFn: (id: string) => api.deletePersonnelEntry(id),
     onMutate: async (entryId: string) => {
+      await pushUndoSnapshot('Remove Personnel Entry');
       await queryClient.cancelQueries({ queryKey: ['exercise', exerciseId] });
 
       const previousExercise = queryClient.getQueryData<ExerciseDetail>(['exercise', exerciseId]);
@@ -423,22 +434,34 @@ export default function UnitView() {
   });
 
   const updateEntryMut = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => api.updatePersonnelEntry(id, data),
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      await pushUndoSnapshot('Update Personnel Entry');
+      return api.updatePersonnelEntry(id, data);
+    },
     onSuccess: refreshExerciseAndBudget,
   });
 
   const addExecMut = useMutation({
-    mutationFn: ({ unitId, data }: { unitId: string; data: any }) => api.addExecutionCost(unitId, data),
+    mutationFn: async ({ unitId, data }: { unitId: string; data: any }) => {
+      await pushUndoSnapshot('Add Execution Cost');
+      return api.addExecutionCost(unitId, data);
+    },
     onSuccess: () => { invalidate(); setExecModal(false); execForm.resetFields(); },
   });
 
   const deleteExecMut = useMutation({
-    mutationFn: (id: string) => api.deleteExecutionCost(id),
+    mutationFn: async (id: string) => {
+      await pushUndoSnapshot('Remove Execution Cost');
+      return api.deleteExecutionCost(id);
+    },
     onSuccess: invalidate,
   });
 
   const updateExecMut = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => api.updateExecutionCost(id, data),
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      await pushUndoSnapshot('Update Execution Cost');
+      return api.updateExecutionCost(id, data);
+    },
     onSuccess: invalidate,
   });
 
@@ -1041,6 +1064,25 @@ export default function UnitView() {
   const omPlayerTravelTotal = (playerOm.travel || 0) + (playerOm.perDiem || 0);
   const omTravelTotal = omPlanningTravelTotal + omSupportExecutionTravelTotal + omPlayerTravelTotal;
   const ufrCost = Math.round(((Number(wrmCost) || 0) * 0.1) * 100) / 100;
+  const hasAnyUnitPageData =
+    executionCostLines.length > 0 ||
+    personnelGroups.some((group) => {
+      const normalizedLocation = String(group.location || '').trim().toUpperCase();
+      return (
+        group.personnelEntries.length > 0 ||
+        (group.paxCount || 0) > 0 ||
+        group.dutyDays !== null ||
+        (normalizedLocation.length > 0 && normalizedLocation !== 'GULFPORT') ||
+        group.isLocal ||
+        group.isLongTour ||
+        group.airfarePerPerson !== null ||
+        (group.rentalCarCount || 0) > 0 ||
+        group.rentalCarDaily !== null ||
+        (group.rentalCarDays || 0) > 0 ||
+        group.avgCpdOverride !== null
+      );
+    }) ||
+    (isA7Unit && Math.abs((Number(wrmCost) || 0) - persistedOverallEquipmentCost) > 0.001);
 
   const saveWrmCost = useCallback(async () => {
     if (!ub) return;
@@ -1114,7 +1156,31 @@ export default function UnitView() {
 
   return (
     <div>
-      <Typography.Title level={4} className="ct-page-title">{getUnitDisplayLabel(unitCode)} — Unit Budget</Typography.Title>
+      <div className="ct-page-header">
+        <Typography.Title level={4} className="ct-page-title">{getUnitDisplayLabel(unitCode)} — Unit Budget</Typography.Title>
+        <div className="ct-screen-only ct-unit-clear-banner">
+          <div className="ct-unit-clear-banner-copy">
+            <Typography.Text className="ct-unit-clear-banner-title">
+              Need to start fresh for this unit?
+            </Typography.Text>
+            <Typography.Text type="secondary">
+              Clear all entered data on this page without removing the unit itself.
+            </Typography.Text>
+          </div>
+          <Popconfirm
+            title="Clear all data for this unit?"
+            description="This removes the entered rows, execution costs, and unit-specific settings on this page."
+            okText="Clear All Data"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => clearUnitMut.mutate(ub.id)}
+          >
+            <Button danger disabled={!hasAnyUnitPageData} loading={clearUnitMut.isPending}>
+              Clear All Data
+            </Button>
+          </Popconfirm>
+        </div>
+      </div>
 
       {/* Summary */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger">

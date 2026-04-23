@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createContext, useContext } from 'react';
+import { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Layout,
@@ -30,11 +30,12 @@ import {
   ArrowRightOutlined,
   LogoutOutlined,
   EditOutlined,
+  RollbackOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import * as api from '../services/api';
-import type { Exercise, ExerciseDetail, BudgetResult } from '../types';
+import type { Exercise, ExerciseDetail, BudgetResult, ExerciseUndoSnapshot } from '../types';
 import { getStoredUser } from '../services/auth';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
@@ -48,6 +49,7 @@ interface AppCtx {
   setExerciseId: (id: string | null) => void;
   refetchBudget: () => void;
   refetchExercise: () => void;
+  pushUndoSnapshot: (label?: string) => Promise<void>;
 }
 export const AppContext = createContext<AppCtx>({
   exercise: null,
@@ -56,8 +58,28 @@ export const AppContext = createContext<AppCtx>({
   setExerciseId: () => {},
   refetchBudget: () => {},
   refetchExercise: () => {},
+  pushUndoSnapshot: async () => {},
 });
 export const useApp = () => useContext(AppContext);
+
+const MAX_UNDO_STEPS = 10;
+
+type UndoEntry = {
+  createdAt: number;
+  label: string;
+  serialized: string;
+  snapshot: ExerciseUndoSnapshot;
+};
+
+function cloneUndoSnapshot(exercise: ExerciseDetail, appConfig: Record<string, string>): ExerciseUndoSnapshot {
+  return JSON.parse(JSON.stringify({
+    exercise,
+    budgetTargets: {
+      rpaBudgetTarget: String(appConfig.BUDGET_TARGET_RPA ?? ''),
+      omBudgetTarget: String(appConfig.BUDGET_TARGET_OM ?? ''),
+    },
+  })) as ExerciseUndoSnapshot;
+}
 
 export default function AppLayout() {
   const navigate = useNavigate();
@@ -66,6 +88,7 @@ export default function AppLayout() {
   const currentUser = getStoredUser();
   const apiErrorNotifiedRef = useRef(false);
   const [exerciseId, setExerciseId] = useState<string | null>(localStorage.getItem('exerciseId'));
+  const [undoStacks, setUndoStacks] = useState<Record<string, UndoEntry[]>>({});
   const [createOpen, setCreateOpen] = useState(false);
   const [addUnitOpen, setAddUnitOpen] = useState(false);
   const [removeUnitOpen, setRemoveUnitOpen] = useState(false);
@@ -107,6 +130,37 @@ export default function AppLayout() {
   const displayTotalPax = budget
     ? getDisplayedPax(budget.totalPax, siteVisitPaxExclusions.totalExcludedPax)
     : 0;
+  const currentUndoStack = exerciseId ? (undoStacks[exerciseId] || []) : [];
+  const currentUndoEntry = currentUndoStack[currentUndoStack.length - 1];
+
+  const pushUndoSnapshot = useCallback(async (label = 'Change') => {
+    if (!exerciseId || !exercise) return;
+
+    const snapshot = cloneUndoSnapshot(exercise, appConfig);
+    const serialized = JSON.stringify(snapshot);
+
+    setUndoStacks((current) => {
+      const stack = current[exerciseId] || [];
+      if (stack[stack.length - 1]?.serialized === serialized) {
+        return current;
+      }
+
+      const nextStack = [
+        ...stack,
+        {
+          createdAt: Date.now(),
+          label,
+          serialized,
+          snapshot,
+        },
+      ].slice(-MAX_UNDO_STEPS);
+
+      return {
+        ...current,
+        [exerciseId]: nextStack,
+      };
+    });
+  }, [appConfig, exercise, exerciseId]);
 
   // Auto-select first exercise
   useEffect(() => {
@@ -173,12 +227,15 @@ export default function AppLayout() {
   };
 
   const editExerciseMut = useMutation({
-    mutationFn: (data: {
+    mutationFn: async (data: {
       name: string;
       startDate: string;
       endDate: string;
       defaultDutyDays: number;
-    }) => api.updateExercise(exerciseId!, data),
+    }) => {
+      await pushUndoSnapshot('Edit Exercise');
+      return api.updateExercise(exerciseId!, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
@@ -203,8 +260,10 @@ export default function AppLayout() {
   };
 
   const addUnitMut = useMutation({
-    mutationFn: ({ unitCode, template }: { unitCode: string; template: 'STANDARD' | 'A7' }) =>
-      api.addUnitBudget(exerciseId!, { unitCode, template }),
+    mutationFn: async ({ unitCode, template }: { unitCode: string; template: 'STANDARD' | 'A7' }) => {
+      await pushUndoSnapshot('Add Unit');
+      return api.addUnitBudget(exerciseId!, { unitCode, template });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
       queryClient.invalidateQueries({ queryKey: ['budget', exerciseId] });
@@ -227,7 +286,10 @@ export default function AppLayout() {
   };
 
   const removeUnitMut = useMutation({
-    mutationFn: ({ unitCode }: { unitCode: string }) => api.deleteUnitBudget(exerciseId!, unitCode),
+    mutationFn: async ({ unitCode }: { unitCode: string }) => {
+      await pushUndoSnapshot('Remove Unit');
+      return api.deleteUnitBudget(exerciseId!, unitCode);
+    },
     onSuccess: (_exercise, vars) => {
       const normalized = vars.unitCode.trim().toUpperCase();
       queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
@@ -254,6 +316,7 @@ export default function AppLayout() {
 
   const editBudgetMut = useMutation({
     mutationFn: async ({ rpaBudgetTarget, omBudgetTarget }: { rpaBudgetTarget: number; omBudgetTarget: number }) => {
+      await pushUndoSnapshot('Edit Budget');
       const nextRpaBudgetTarget = Number(rpaBudgetTarget || 0);
       const nextOmBudgetTarget = Number(omBudgetTarget || 0);
       const totalBudget = nextRpaBudgetTarget + nextOmBudgetTarget;
@@ -278,12 +341,40 @@ export default function AppLayout() {
     },
   });
 
+  const undoMut = useMutation({
+    mutationFn: ({ targetExerciseId, snapshot }: { targetExerciseId: string; snapshot: ExerciseUndoSnapshot }) =>
+      api.restoreExerciseSnapshot(targetExerciseId, snapshot),
+    onSuccess: (restoredExercise, vars) => {
+      queryClient.setQueryData(['exercise', vars.targetExerciseId], restoredExercise);
+      queryClient.invalidateQueries({ queryKey: ['exercise', vars.targetExerciseId] });
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      queryClient.invalidateQueries({ queryKey: ['budget', vars.targetExerciseId] });
+      queryClient.invalidateQueries({ queryKey: ['appConfig'] });
+      setUndoStacks((current) => ({
+        ...current,
+        [vars.targetExerciseId]: (current[vars.targetExerciseId] || []).slice(0, -1),
+      }));
+      message.success('Last change undone');
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Unable to undo the last change');
+    },
+  });
+
   const handleEditBudget = () => {
     editBudgetForm.validateFields().then((values) => {
       editBudgetMut.mutate({
         rpaBudgetTarget: values.rpaBudgetTarget,
         omBudgetTarget: values.omBudgetTarget,
       });
+    });
+  };
+
+  const handleUndo = () => {
+    if (!exerciseId || !currentUndoEntry) return;
+    undoMut.mutate({
+      targetExerciseId: exerciseId,
+      snapshot: currentUndoEntry.snapshot,
     });
   };
 
@@ -312,7 +403,12 @@ export default function AppLayout() {
       setExerciseId(context.previousExerciseId);
       message.error('Failed to delete exercise');
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      setUndoStacks((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
       message.success('Exercise deleted');
     },
     onSettled: () => {
@@ -357,6 +453,7 @@ export default function AppLayout() {
       const json = await file.text();
       await api.importAllData(json);
       queryClient.invalidateQueries();
+      setUndoStacks({});
       setExerciseId(null);
       localStorage.removeItem('exerciseId');
       message.success('Data restored from backup');
@@ -411,6 +508,7 @@ export default function AppLayout() {
   const handleLogout = async () => {
     await api.logoutAccount();
     queryClient.clear();
+    setUndoStacks({});
     setExerciseId(null);
     navigate('/auth');
     message.success('Signed out');
@@ -438,7 +536,7 @@ export default function AppLayout() {
     Number(editBudgetDraft?.omBudgetTarget ?? Number(appConfig.BUDGET_TARGET_OM || 0));
 
   return (
-    <AppContext.Provider value={{ exercise, budget, exerciseId, setExerciseId, refetchBudget, refetchExercise }}>
+    <AppContext.Provider value={{ exercise, budget, exerciseId, setExerciseId, refetchBudget, refetchExercise, pushUndoSnapshot }}>
       <Layout style={{ minHeight: '100vh' }}>
         <Sider width={240} className="ct-sider" breakpoint="lg" collapsedWidth={60}>
           {/* Logo */}
@@ -544,6 +642,18 @@ export default function AppLayout() {
                 <Tooltip title="Remove a unit from this exercise">
                   <Button danger onClick={() => setRemoveUnitOpen(true)}>
                     Remove Unit
+                  </Button>
+                </Tooltip>
+              )}
+              {exerciseId && (
+                <Tooltip title={currentUndoEntry ? `Undo last saved change: ${currentUndoEntry.label}` : `Undo last saved exercise change (${MAX_UNDO_STEPS} saved steps max)`}>
+                  <Button
+                    icon={<RollbackOutlined />}
+                    onClick={handleUndo}
+                    disabled={!currentUndoEntry}
+                    loading={undoMut.isPending}
+                  >
+                    Undo{currentUndoStack.length > 0 ? ` (${currentUndoStack.length})` : ''}
                   </Button>
                 </Tooltip>
               )}

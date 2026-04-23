@@ -20,7 +20,7 @@ const OM_CATEGORIES: { value: OmCategory; label: string }[] = [
 ];
 
 export default function OmCostCenter() {
-  const { exercise, budget, exerciseId } = useApp();
+  const { exercise, budget, exerciseId, pushUndoSnapshot } = useApp();
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [form] = Form.useForm();
@@ -31,12 +31,18 @@ export default function OmCostCenter() {
   };
 
   const addMut = useMutation({
-    mutationFn: (data: any) => api.addOmCost(exerciseId!, data),
+    mutationFn: async (data: any) => {
+      await pushUndoSnapshot('Add O&M Cost');
+      return api.addOmCost(exerciseId!, data);
+    },
     onSuccess: () => { invalidate(); setModalOpen(false); form.resetFields(); message.success('O&M cost line added'); },
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: string) => api.deleteOmCost(id),
+    mutationFn: async (id: string) => {
+      await pushUndoSnapshot('Remove O&M Cost');
+      return api.deleteOmCost(id);
+    },
     onSuccess: () => { invalidate(); message.success('Removed'); },
   });
 

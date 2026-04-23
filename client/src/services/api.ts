@@ -14,6 +14,7 @@ import type {
   PerDiemMasterRecord,
   AuthUser,
   RefinementItem,
+  ExerciseUndoSnapshot,
 } from '../types';
 import { clearAuthSession, getAuthToken, getRefreshToken, setAuthSession } from './auth';
 
@@ -225,6 +226,10 @@ export async function updateExercise(id: string, data: Partial<Exercise>): Promi
 
 export async function deleteExercise(id: string): Promise<void> {
   await apiRequest<{ success: boolean }>(`/exercises/${id}`, { method: 'DELETE' });
+}
+
+export async function restoreExerciseSnapshot(id: string, snapshot: ExerciseUndoSnapshot): Promise<ExerciseDetail> {
+  return apiRequest<ExerciseDetail>(`/exercises/${id}/restore`, { method: 'PUT', body: snapshot });
 }
 
 export async function addUnitBudget(

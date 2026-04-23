@@ -422,6 +422,172 @@ router.delete('/:id', async (req: Request, res: Response) => {
 });
 
 // ─── UPDATE TRAVEL CONFIG ───
+router.put('/:id/restore', async (req: Request, res: Response) => {
+  try {
+    const userId = getRequestUserId(req);
+    const existing = await prisma.exercise.findFirst({ where: { id: req.params.id, ownerUserId: userId } });
+    if (!existing) return res.status(404).json({ error: 'Exercise not found' });
+
+    const snapshot = req.body as {
+      exercise?: Record<string, unknown>;
+      budgetTargets?: Record<string, unknown>;
+    };
+    const sourceExercise = snapshot?.exercise;
+    if (!sourceExercise || typeof sourceExercise !== 'object') {
+      return res.status(400).json({ error: 'Exercise snapshot is required' });
+    }
+
+    const sourceUnitBudgets = Array.isArray(sourceExercise.unitBudgets) ? sourceExercise.unitBudgets as Array<Record<string, unknown>> : [];
+    const sourceOmCostLines = Array.isArray(sourceExercise.omCostLines) ? sourceExercise.omCostLines as Array<Record<string, unknown>> : [];
+    const sourceTravelConfig = sourceExercise.travelConfig && typeof sourceExercise.travelConfig === 'object'
+      ? sourceExercise.travelConfig as Record<string, unknown>
+      : null;
+    const budgetTargets = snapshot?.budgetTargets && typeof snapshot.budgetTargets === 'object'
+      ? snapshot.budgetTargets
+      : null;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.exercise.update({
+        where: { id: req.params.id },
+        data: {
+          name: String(sourceExercise.name || existing.name),
+          totalBudget: Number.isFinite(Number(sourceExercise.totalBudget)) ? Number(sourceExercise.totalBudget) : 0,
+          startDate: new Date(String(sourceExercise.startDate || existing.startDate)),
+          endDate: new Date(String(sourceExercise.endDate || existing.endDate)),
+          defaultDutyDays: Math.max(1, Number(sourceExercise.defaultDutyDays || existing.defaultDutyDays || 1)),
+          reportAssumption1: String(sourceExercise.reportAssumption1 ?? ''),
+          reportAssumption2: String(sourceExercise.reportAssumption2 ?? ''),
+          reportAssumption3: String(sourceExercise.reportAssumption3 ?? ''),
+          reportAssumption4: String(sourceExercise.reportAssumption4 ?? ''),
+          reportLimfac1: String(sourceExercise.reportLimfac1 ?? ''),
+          reportLimfac2: String(sourceExercise.reportLimfac2 ?? ''),
+          reportLimfac3: String(sourceExercise.reportLimfac3 ?? ''),
+          reportPreparedBy: String(sourceExercise.reportPreparedBy ?? ''),
+          refinementsJson: JSON.stringify(normalizeRefinementsInput(sourceExercise.refinements)),
+        },
+      });
+
+      await tx.omCostLine.deleteMany({ where: { exerciseId: req.params.id } });
+      await tx.travelConfig.deleteMany({ where: { exerciseId: req.params.id } });
+      await tx.unitBudget.deleteMany({ where: { exerciseId: req.params.id } });
+
+      for (const sourceUnitBudget of sourceUnitBudgets) {
+        const createdUnitBudget = await tx.unitBudget.create({
+          data: {
+            exerciseId: req.params.id,
+            unitCode: String(sourceUnitBudget.unitCode || '').trim().toUpperCase(),
+          },
+        });
+
+        const sourcePersonnelGroups = Array.isArray(sourceUnitBudget.personnelGroups)
+          ? sourceUnitBudget.personnelGroups as Array<Record<string, unknown>>
+          : [];
+        const sourceExecutionCostLines = Array.isArray(sourceUnitBudget.executionCostLines)
+          ? sourceUnitBudget.executionCostLines as Array<Record<string, unknown>>
+          : [];
+
+        for (const sourcePersonnelGroup of sourcePersonnelGroups) {
+          const createdPersonnelGroup = await tx.personnelGroup.create({
+            data: {
+              unitBudgetId: createdUnitBudget.id,
+              role: String(sourcePersonnelGroup.role || ''),
+              fundingType: String(sourcePersonnelGroup.fundingType || ''),
+              paxCount: Math.max(0, Number(sourcePersonnelGroup.paxCount || 0)),
+              dutyDays: sourcePersonnelGroup.dutyDays == null ? null : Math.max(0, Number(sourcePersonnelGroup.dutyDays || 0)),
+              location: sourcePersonnelGroup.location == null ? null : String(sourcePersonnelGroup.location || ''),
+              isLongTour: !!sourcePersonnelGroup.isLongTour,
+              isLocal: !!sourcePersonnelGroup.isLocal,
+              airfarePerPerson: sourcePersonnelGroup.airfarePerPerson == null ? null : Number(sourcePersonnelGroup.airfarePerPerson),
+              rentalCarCount: Math.max(0, Number(sourcePersonnelGroup.rentalCarCount || 0)),
+              rentalCarDaily: sourcePersonnelGroup.rentalCarDaily == null ? null : Number(sourcePersonnelGroup.rentalCarDaily),
+              rentalCarDays: Math.max(0, Number(sourcePersonnelGroup.rentalCarDays || 0)),
+              avgCpdOverride: sourcePersonnelGroup.avgCpdOverride == null ? null : Number(sourcePersonnelGroup.avgCpdOverride),
+            },
+          });
+
+          const sourcePersonnelEntries = Array.isArray(sourcePersonnelGroup.personnelEntries)
+            ? sourcePersonnelGroup.personnelEntries as Array<Record<string, unknown>>
+            : [];
+
+          for (const sourcePersonnelEntry of sourcePersonnelEntries) {
+            await tx.personnelEntry.create({
+              data: {
+                personnelGroupId: createdPersonnelGroup.id,
+                rankCode: String(sourcePersonnelEntry.rankCode || ''),
+                count: Math.max(0, Number(sourcePersonnelEntry.count || 0)),
+                dutyDays: sourcePersonnelEntry.dutyDays == null ? null : Math.max(0, Number(sourcePersonnelEntry.dutyDays || 0)),
+                rentalCarCount: Math.max(0, Number(sourcePersonnelEntry.rentalCarCount || 0)),
+                location: sourcePersonnelEntry.location == null ? null : String(sourcePersonnelEntry.location || ''),
+                isLocal: !!sourcePersonnelEntry.isLocal,
+                note: sourcePersonnelEntry.note == null ? null : String(sourcePersonnelEntry.note || ''),
+                travelOnly: !!sourcePersonnelEntry.travelOnly,
+                longTermA7Planner: !!sourcePersonnelEntry.longTermA7Planner,
+              },
+            });
+          }
+        }
+
+        for (const sourceExecutionCostLine of sourceExecutionCostLines) {
+          await tx.executionCostLine.create({
+            data: {
+              unitBudgetId: createdUnitBudget.id,
+              fundingType: String(sourceExecutionCostLine.fundingType || ''),
+              category: String(sourceExecutionCostLine.category || ''),
+              amount: Number(sourceExecutionCostLine.amount || 0),
+              notes: sourceExecutionCostLine.notes == null ? null : String(sourceExecutionCostLine.notes || ''),
+            },
+          });
+        }
+      }
+
+      if (sourceTravelConfig) {
+        await tx.travelConfig.create({
+          data: {
+            exerciseId: req.params.id,
+            airfarePerPerson: Number(sourceTravelConfig.airfarePerPerson || 0),
+            rentalCarDailyRate: Number(sourceTravelConfig.rentalCarDailyRate || 0),
+            rentalCarCount: Math.max(0, Number(sourceTravelConfig.rentalCarCount || 0)),
+            rentalCarDays: Math.max(0, Number(sourceTravelConfig.rentalCarDays || 0)),
+          },
+        });
+      }
+
+      for (const sourceOmCostLine of sourceOmCostLines) {
+        await tx.omCostLine.create({
+          data: {
+            exerciseId: req.params.id,
+            category: String(sourceOmCostLine.category || ''),
+            label: String(sourceOmCostLine.label || ''),
+            amount: Number(sourceOmCostLine.amount || 0),
+            notes: sourceOmCostLine.notes == null ? null : String(sourceOmCostLine.notes || ''),
+          },
+        });
+      }
+
+      if (budgetTargets) {
+        const pairs: Array<[string, unknown]> = [
+          ['BUDGET_TARGET_RPA', budgetTargets.rpaBudgetTarget],
+          ['BUDGET_TARGET_OM', budgetTargets.omBudgetTarget],
+        ];
+
+        for (const [key, value] of pairs) {
+          if (value === undefined) continue;
+          await tx.appConfig.upsert({
+            where: { key },
+            update: { value: String(value) },
+            create: { key, value: String(value) },
+          });
+        }
+      }
+    });
+
+    const full = await loadFullExercise(req.params.id);
+    return res.json(serializeExercise(full));
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 router.put('/:id/travel', async (req: Request, res: Response) => {
   try {
     const userId = getRequestUserId(req);
