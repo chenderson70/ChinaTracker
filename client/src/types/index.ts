@@ -12,6 +12,14 @@ export type OmCategory =
   | 'CONSUMABLES'
   | 'WRM'
   | 'OTHER';
+export type RefinementStatus = 'IN_PROGRESS' | 'COMPLETE';
+
+export interface RefinementItem {
+  id: string;
+  improvementNote: string;
+  status: RefinementStatus;
+  statusNote: string;
+}
 
 // ──────────── Models ────────────
 export interface Exercise {
@@ -30,6 +38,7 @@ export interface Exercise {
   reportLimfac2?: string;
   reportLimfac3?: string;
   reportPreparedBy?: string;
+  refinements?: RefinementItem[];
   createdAt: string;
   updatedAt: string;
 }

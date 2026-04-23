@@ -45,6 +45,54 @@ router.post('/units/:unitId/execution-costs', async (req: Request, res: Response
   }
 });
 
+router.post('/units/:unitId/clear', async (req: Request, res: Response) => {
+  try {
+    const userId = getRequestUserId(req);
+    const unit = await prisma.unitBudget.findUnique({
+      where: { id: req.params.unitId },
+      include: {
+        exercise: true,
+        personnelGroups: {
+          select: { id: true },
+        },
+      },
+    });
+    if (!unit || unit.exercise.ownerUserId !== userId) {
+      return res.status(404).json({ error: 'Unit not found' });
+    }
+
+    const groupIds = unit.personnelGroups.map((group) => group.id);
+
+    await prisma.$transaction([
+      prisma.personnelEntry.deleteMany({
+        where: { personnelGroupId: { in: groupIds } },
+      }),
+      prisma.executionCostLine.deleteMany({
+        where: { unitBudgetId: req.params.unitId },
+      }),
+      prisma.personnelGroup.updateMany({
+        where: { unitBudgetId: req.params.unitId },
+        data: {
+          paxCount: 0,
+          dutyDays: null,
+          location: 'GULFPORT',
+          isLongTour: false,
+          isLocal: false,
+          airfarePerPerson: null,
+          rentalCarCount: 0,
+          rentalCarDaily: null,
+          rentalCarDays: 0,
+          avgCpdOverride: null,
+        },
+      }),
+    ]);
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 router.put('/execution-costs/:lineId', async (req: Request, res: Response) => {
   try {
     const userId = getRequestUserId(req);

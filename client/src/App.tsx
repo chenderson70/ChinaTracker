@@ -7,6 +7,7 @@ import UnitView from './pages/UnitView';
 import RateConfig from './pages/RateConfig';
 import Pm27CostProjections from './pages/Pm27CostProjections';
 import Balance from './pages/Balance';
+import Refinements from './pages/Refinements';
 import AuthPage from './pages/AuthPage';
 import * as api from './services/api';
 import { clearAuthSession, getAuthChangedEventName, getAuthToken } from './services/auth';
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="/rates" element={<RateConfig />} />
         <Route path="/reports/pm-27-cost-projections" element={<Pm27CostProjections />} />
         <Route path="/reports/balance" element={<Balance />} />
+        <Route path="/reports/refinements" element={<Refinements />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

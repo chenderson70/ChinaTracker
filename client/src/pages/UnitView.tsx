@@ -337,6 +337,51 @@ export default function UnitView() {
     onSuccess: refreshExerciseAndBudget,
   });
 
+  const clearGroupMut = useMutation({
+    mutationFn: (groupId: string) => api.clearPersonnelGroup(groupId),
+    onSuccess: async () => {
+      message.success('Section cleared');
+      await refreshExerciseAndBudget();
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to clear section');
+    },
+  });
+
+  const clearUnitMut = useMutation({
+    mutationFn: async (unitId: string) => {
+      if (wrmAutoSaveTimer.current) {
+        clearTimeout(wrmAutoSaveTimer.current);
+        wrmAutoSaveTimer.current = null;
+      }
+
+      while (isWrmAutoSaving.current) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
+      return api.clearUnitBudget(unitId);
+    },
+    onSuccess: async () => {
+      setEntryModal(null);
+      setEntryModalNoteDraft('');
+      setEntryModalTravelOnlyDraft(false);
+      setEntryModalLongTermA7PlannerDraft(false);
+      setContractModalOpen(false);
+      setGpcModalOpen(false);
+      setExecModal(false);
+      setWrmCost(0);
+      entryForm.resetFields();
+      contractForm.resetFields();
+      gpcForm.resetFields();
+      execForm.resetFields();
+      message.success('Unit data cleared');
+      await refreshExerciseAndBudget();
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to clear unit data');
+    },
+  });
+
   const addEntryMut = useMutation({
     mutationFn: ({ groupId, data }: { groupId: string; data: any }) => api.addPersonnelEntry(groupId, data),
     onSuccess: async () => {
@@ -532,6 +577,18 @@ export default function UnitView() {
     const fundingBadgeLabel = isAnnualTour && ft === 'RPA' ? 'AT' : (ft === 'OM' ? 'O&M' : ft);
     const fundingBadgeClass = isAnnualTour && ft === 'RPA' ? 'ct-badge-at' : (ft === 'RPA' ? 'ct-badge-rpa' : 'ct-badge-om');
     const subtotalColor = isAnnualTour && ft === 'RPA' ? '#0958d9' : (ft === 'RPA' ? '#1677ff' : '#52c41a');
+    const isClearingGroup = clearGroupMut.isPending && clearGroupMut.variables === group.id;
+    const hasSectionData =
+      group.personnelEntries.length > 0 ||
+      (group.paxCount || 0) > 0 ||
+      group.dutyDays !== null ||
+      group.isLocal ||
+      group.isLongTour ||
+      group.airfarePerPerson !== null ||
+      (group.rentalCarCount || 0) > 0 ||
+      group.rentalCarDaily !== null ||
+      (group.rentalCarDays || 0) > 0 ||
+      group.avgCpdOverride !== null;
     const fundingNote = role === 'PLANNING'
       ? (ft === 'RPA'
           ? '(Exercise planning, planning meetings, site visits)'
@@ -650,7 +707,24 @@ export default function UnitView() {
         }
         size="small"
         className="ct-personnel-card"
-        extra={<Space><strong>PAX: {group.paxCount || totalEntryPax}</strong><span style={{ fontSize: 16, fontWeight: 700, color: subtotalColor }}>{fmt(calc.subtotal)}</span></Space>}
+        extra={
+          <Space wrap size={10}>
+            <Popconfirm
+              title="Clear this section?"
+              description="This removes all rows and resets the section-specific settings."
+              okText="Clear Section"
+              cancelText="Cancel"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => clearGroupMut.mutate(group.id)}
+            >
+              <Button size="small" danger type="text" disabled={!hasSectionData} loading={isClearingGroup}>
+                Clear All Data
+              </Button>
+            </Popconfirm>
+            <strong>PAX: {group.paxCount || totalEntryPax}</strong>
+            <span style={{ fontSize: 16, fontWeight: 700, color: subtotalColor }}>{fmt(calc.subtotal)}</span>
+          </Space>
+        }
       >
         <Row gutter={16} style={{ marginBottom: 12 }}>
           {!isPlayerRpa && (

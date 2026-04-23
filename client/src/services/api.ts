@@ -13,6 +13,7 @@ import type {
   PerDiemMasterData,
   PerDiemMasterRecord,
   AuthUser,
+  RefinementItem,
 } from '../types';
 import { clearAuthSession, getAuthToken, getRefreshToken, setAuthSession } from './auth';
 
@@ -213,6 +214,7 @@ export async function createExercise(data: {
   reportLimfac2?: string;
   reportLimfac3?: string;
   reportPreparedBy?: string;
+  refinements?: RefinementItem[];
 }): Promise<ExerciseDetail> {
   return apiRequest<ExerciseDetail>('/exercises', { method: 'POST', body: data });
 }
@@ -239,6 +241,10 @@ export async function deleteUnitBudget(exerciseId: string, unitCode: string): Pr
 }
 
 // ── Travel Config ──
+export async function clearUnitBudget(unitId: string): Promise<void> {
+  await apiRequest<{ success: boolean }>(`/units/${unitId}/clear`, { method: 'POST' });
+}
+
 export async function updateTravelConfig(exerciseId: string, data: Partial<TravelConfig>): Promise<TravelConfig> {
   return apiRequest<TravelConfig>(`/exercises/${exerciseId}/travel`, { method: 'PUT', body: data });
 }
@@ -251,6 +257,10 @@ export async function calculateBudget(exerciseId: string): Promise<BudgetResult>
 // ── Personnel Groups ──
 export async function updatePersonnelGroup(groupId: string, data: Partial<PersonnelGroup>): Promise<PersonnelGroup> {
   return apiRequest<PersonnelGroup>(`/personnel-groups/${groupId}`, { method: 'PUT', body: data });
+}
+
+export async function clearPersonnelGroup(groupId: string): Promise<PersonnelGroup> {
+  return apiRequest<PersonnelGroup>(`/personnel-groups/${groupId}/clear`, { method: 'POST' });
 }
 
 // ── Personnel Entries ──
@@ -600,6 +610,7 @@ export async function importAllData(json: string): Promise<void> {
       reportLimfac2: sourceExercise.reportLimfac2,
       reportLimfac3: sourceExercise.reportLimfac3,
       reportPreparedBy: sourceExercise.reportPreparedBy,
+      refinements: sourceExercise.refinements,
     });
 
     const sourceExerciseUnits = sourceUnits.filter((unit) => unit.exerciseId === sourceExercise.id);

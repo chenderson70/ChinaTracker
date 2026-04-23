@@ -397,6 +397,7 @@ export default function AppLayout() {
         { key: '/reports/balance', label: 'Balance' },
       ],
     },
+    { key: '/reports/refinements', icon: <EditOutlined />, label: 'Refinements' },
   ];
 
   const menuItems = baseMenuItems.map((item) => ({

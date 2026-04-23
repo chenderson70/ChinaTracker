@@ -6,6 +6,59 @@ import * as XLSX from 'xlsx';
 
 const router = Router();
 
+type RefinementStatus = 'IN_PROGRESS' | 'COMPLETE';
+
+type RefinementItem = {
+  id: string;
+  improvementNote: string;
+  status: RefinementStatus;
+  statusNote: string;
+};
+
+function createFallbackRefinementId(index: number): string {
+  return `refinement-${Date.now()}-${index}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+function normalizeRefinementsInput(value: unknown): RefinementItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item, index) => {
+      const candidate = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+      const improvementNote = String(candidate.improvementNote || '').trim();
+      const statusNote = String(candidate.statusNote || '').trim();
+
+      const rawId = String(candidate.id || '').trim();
+      return {
+        id: rawId || createFallbackRefinementId(index),
+        improvementNote,
+        status: String(candidate.status || '').toUpperCase() === 'COMPLETE' ? 'COMPLETE' : 'IN_PROGRESS',
+        statusNote,
+      } satisfies RefinementItem;
+    })
+    .filter((item): item is RefinementItem => item !== null);
+}
+
+function parseRefinementsJson(value: unknown): RefinementItem[] {
+  if (typeof value !== 'string' || value.trim().length === 0) return [];
+
+  try {
+    return normalizeRefinementsInput(JSON.parse(value));
+  } catch {
+    return [];
+  }
+}
+
+function serializeExercise<T extends { refinementsJson?: string | null }>(exercise: T | null) {
+  if (!exercise) return exercise;
+
+  const { refinementsJson, ...rest } = exercise as T & { refinementsJson?: string | null };
+  return {
+    ...rest,
+    refinements: parseRefinementsJson(refinementsJson),
+  };
+}
+
 // Helper: load rates from DB
 async function loadRates(): Promise<RateInputs> {
   const cpdRows = await prisma.rankCpdRate.findMany();
@@ -238,7 +291,7 @@ router.get('/', async (_req: Request, res: Response) => {
       where: { ownerUserId: userId },
       orderBy: { createdAt: 'desc' },
     });
-    res.json(exercises);
+    res.json(exercises.map((exercise) => serializeExercise(exercise)));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -262,6 +315,7 @@ router.post('/', async (req: Request, res: Response) => {
       reportLimfac2,
       reportLimfac3,
       reportPreparedBy,
+      refinements,
     } = req.body;
     const parsedTotalBudget = Number(totalBudget);
     const exercise = await prisma.exercise.create({
@@ -280,11 +334,12 @@ router.post('/', async (req: Request, res: Response) => {
         ...(reportLimfac2 !== undefined ? { reportLimfac2: String(reportLimfac2) } : {}),
         ...(reportLimfac3 !== undefined ? { reportLimfac3: String(reportLimfac3) } : {}),
         ...(reportPreparedBy !== undefined ? { reportPreparedBy: String(reportPreparedBy) } : {}),
+        ...(refinements !== undefined ? { refinementsJson: JSON.stringify(normalizeRefinementsInput(refinements)) } : {}),
       },
     });
     await seedExerciseDefaults(exercise.id);
     const full = await loadFullExercise(exercise.id);
-    res.status(201).json(full);
+    res.status(201).json(serializeExercise(full));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -296,7 +351,7 @@ router.get('/:id', async (req: Request, res: Response) => {
     const userId = getRequestUserId(req);
     const exercise = await loadOwnedExercise(req.params.id, userId);
     if (!exercise) return res.status(404).json({ error: 'Exercise not found' });
-    res.json(exercise);
+    res.json(serializeExercise(exercise));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -323,6 +378,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       reportLimfac2,
       reportLimfac3,
       reportPreparedBy,
+      refinements,
     } = req.body;
     const data: any = {};
     if (name !== undefined) data.name = name;
@@ -337,6 +393,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (reportLimfac2 !== undefined) data.reportLimfac2 = String(reportLimfac2);
     if (reportLimfac3 !== undefined) data.reportLimfac3 = String(reportLimfac3);
     if (reportPreparedBy !== undefined) data.reportPreparedBy = String(reportPreparedBy);
+    if (refinements !== undefined) data.refinementsJson = JSON.stringify(normalizeRefinementsInput(refinements));
     if (totalBudget !== undefined) {
       const parsedTotalBudget = Number(totalBudget);
       if (!Number.isFinite(parsedTotalBudget)) {
@@ -345,7 +402,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       data.totalBudget = parsedTotalBudget;
     }
     const exercise = await prisma.exercise.update({ where: { id: req.params.id }, data });
-    res.json(exercise);
+    res.json(serializeExercise(exercise));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -569,7 +626,7 @@ router.post('/:id/units', async (req: Request, res: Response) => {
     }
 
     const full = await loadFullExercise(req.params.id);
-    res.status(201).json(full);
+    res.status(201).json(serializeExercise(full));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -589,7 +646,7 @@ router.delete('/:id/units/:unitCode', async (req: Request, res: Response) => {
 
     await prisma.unitBudget.delete({ where: { id: ub.id } });
     const full = await loadFullExercise(req.params.id);
-    res.json(full);
+    res.json(serializeExercise(full));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
