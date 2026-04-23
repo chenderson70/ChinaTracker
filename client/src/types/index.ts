@@ -29,6 +29,7 @@ export interface Exercise {
   reportLimfac1?: string;
   reportLimfac2?: string;
   reportLimfac3?: string;
+  reportPreparedBy?: string;
   createdAt: string;
   updatedAt: string;
 }

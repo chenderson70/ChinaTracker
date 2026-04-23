@@ -3,24 +3,25 @@ import fs from 'fs';
 import path from 'path';
 
 const SERVER_ROOT = path.resolve(__dirname, '..');
+const PRISMA_SCHEMA_ROOT = path.resolve(SERVER_ROOT, 'prisma');
 
 function resolveSqlitePath(databaseUrl: string | undefined): string | null {
 	if (!databaseUrl || !databaseUrl.startsWith('file:')) return null;
 	const rawPath = databaseUrl.slice(5);
 	if (!rawPath) return null;
 	if (path.isAbsolute(rawPath)) return rawPath;
-	return path.resolve(SERVER_ROOT, rawPath);
+	return path.resolve(PRISMA_SCHEMA_ROOT, rawPath);
 }
 
 function bootstrapSqliteFileIfMissing(): void {
 	const targetDbPath = resolveSqlitePath(process.env.DATABASE_URL);
 	if (!targetDbPath) return;
 
-	const seededDbPath = path.resolve(SERVER_ROOT, 'prisma', 'prod.db');
+	const seededDbPath = resolveSqlitePath('file:./prisma/prod.db');
 	const targetDir = path.dirname(targetDbPath);
 	fs.mkdirSync(targetDir, { recursive: true });
 
-	if (!fs.existsSync(seededDbPath)) return;
+	if (!seededDbPath || !fs.existsSync(seededDbPath)) return;
 
 	const samePath = path.resolve(targetDbPath) === path.resolve(seededDbPath);
 	if (samePath) return;
@@ -49,6 +50,21 @@ async function hasSqliteTable(tableName: string): Promise<boolean> {
 	return Array.isArray(tableCheck) && tableCheck.length > 0;
 }
 
+async function hasSqliteColumn(tableName: string, columnName: string): Promise<boolean> {
+	const columns = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+		`PRAGMA table_info("${tableName}")`,
+	);
+	return Array.isArray(columns) && columns.some((column) => column.name === columnName);
+}
+
+async function ensureSqliteColumn(tableName: string, columnName: string, columnDefinition: string): Promise<void> {
+	if (!await hasSqliteTable(tableName)) return;
+	if (await hasSqliteColumn(tableName, columnName)) return;
+	await prisma.$executeRawUnsafe(
+		`ALTER TABLE "${tableName}" ADD COLUMN "${columnName}" ${columnDefinition}`,
+	);
+}
+
 async function ensureAuthSessionsTable(): Promise<void> {
 	await prisma.$executeRawUnsafe(`
 		CREATE TABLE IF NOT EXISTS "auth_sessions" (
@@ -74,65 +90,86 @@ async function ensureAuthSessionsTable(): Promise<void> {
 	);
 }
 
+async function ensureSqliteCompatibilityColumns(): Promise<void> {
+	await ensureSqliteColumn('personnel_entries', 'note', 'TEXT');
+	await ensureSqliteColumn('personnel_entries', 'travel_only', 'BOOLEAN NOT NULL DEFAULT false');
+	await ensureSqliteColumn('personnel_entries', 'rental_car_count', 'INTEGER NOT NULL DEFAULT 0');
+	await ensureSqliteColumn('personnel_entries', 'long_term_a7_planner', 'BOOLEAN NOT NULL DEFAULT false');
+
+	await ensureSqliteColumn(
+		'exercises',
+		'report_assumption_1',
+		`TEXT NOT NULL DEFAULT 'Location of exercise: Fort Hunter Liggett, CA'`,
+	);
+	await ensureSqliteColumn(
+		'exercises',
+		'report_assumption_2',
+		`TEXT NOT NULL DEFAULT 'Unit of Action execution costs to be mainly funded by the NAF'`,
+	);
+	await ensureSqliteColumn(
+		'exercises',
+		'report_assumption_3',
+		`TEXT NOT NULL DEFAULT 'Pay estimations for long tour orders include MAJ''s & SMSGT''s. Site visits and planning conferences used CAPT''s'`,
+	);
+	await ensureSqliteColumn('exercises', 'report_assumption_4', `TEXT NOT NULL DEFAULT ''`);
+	await ensureSqliteColumn('exercises', 'report_limfac_1', `TEXT NOT NULL DEFAULT ''`);
+	await ensureSqliteColumn('exercises', 'report_limfac_2', `TEXT NOT NULL DEFAULT ''`);
+	await ensureSqliteColumn('exercises', 'report_limfac_3', `TEXT NOT NULL DEFAULT ''`);
+	await ensureSqliteColumn('exercises', 'report_prepared_by', `TEXT NOT NULL DEFAULT ''`);
+}
+
 async function ensureSqliteSchema(): Promise<void> {
 	const hasRankCpdRates = await hasSqliteTable('rank_cpd_rates');
 	const hasAuthSessions = await hasSqliteTable('auth_sessions');
 
-	if (hasRankCpdRates && hasAuthSessions) {
-		return;
-	}
+	if (!hasRankCpdRates) {
+		const migrationsRoot = path.resolve(SERVER_ROOT, 'prisma', 'migrations');
+		if (!fs.existsSync(migrationsRoot)) return;
 
-	if (hasRankCpdRates && !hasAuthSessions) {
-		await ensureAuthSessionsTable();
-		return;
-	}
+		const migrationDirs = fs
+			.readdirSync(migrationsRoot)
+			.map((entry) => path.join(migrationsRoot, entry))
+			.filter((entryPath) => fs.statSync(entryPath).isDirectory())
+			.sort((a, b) => a.localeCompare(b));
 
-	const migrationsRoot = path.resolve(SERVER_ROOT, 'prisma', 'migrations');
-	if (!fs.existsSync(migrationsRoot)) return;
+		for (const migrationDir of migrationDirs) {
+			const sqlPath = path.join(migrationDir, 'migration.sql');
+			if (!fs.existsSync(sqlPath)) continue;
 
-	const migrationDirs = fs
-		.readdirSync(migrationsRoot)
-		.map((entry) => path.join(migrationsRoot, entry))
-		.filter((entryPath) => fs.statSync(entryPath).isDirectory())
-		.sort((a, b) => a.localeCompare(b));
+			const sql = fs.readFileSync(sqlPath, 'utf8');
+			const statements = sql
+				.split(';')
+				.map((statement) => statement.trim())
+				.filter(Boolean);
 
-	for (const migrationDir of migrationDirs) {
-		const sqlPath = path.join(migrationDir, 'migration.sql');
-		if (!fs.existsSync(sqlPath)) continue;
+			for (const statement of statements) {
+				try {
+					await prisma.$executeRawUnsafe(statement);
+				} catch (error: any) {
+					const message = String(error?.message || '').toLowerCase();
+					const ignorable =
+						message.includes('already exists') ||
+						message.includes('duplicate column name') ||
+						message.includes('unique constraint failed');
 
-		const sql = fs.readFileSync(sqlPath, 'utf8');
-		const statements = sql
-			.split(';')
-			.map((statement) => statement.trim())
-			.filter(Boolean);
-
-		for (const statement of statements) {
-			try {
-				await prisma.$executeRawUnsafe(statement);
-			} catch (error: any) {
-				const message = String(error?.message || '').toLowerCase();
-				const ignorable =
-					message.includes('already exists') ||
-					message.includes('duplicate column name') ||
-					message.includes('unique constraint failed');
-
-				if (!ignorable) {
-					throw error;
+					if (!ignorable) {
+						throw error;
+					}
 				}
 			}
+		}
 
+		const verifyHasRankCpdRates = await hasSqliteTable('rank_cpd_rates');
+		if (!verifyHasRankCpdRates) {
+			throw new Error('Unable to initialize SQLite schema');
 		}
 	}
 
-	const verifyHasRankCpdRates = await hasSqliteTable('rank_cpd_rates');
-	if (!verifyHasRankCpdRates) {
-		throw new Error('Unable to initialize SQLite schema');
-	}
-
-	const verifyHasAuthSessions = await hasSqliteTable('auth_sessions');
-	if (!verifyHasAuthSessions) {
+	if (!hasAuthSessions) {
 		await ensureAuthSessionsTable();
 	}
+
+	await ensureSqliteCompatibilityColumns();
 }
 
 const BASE_CPD_RATES = [
@@ -177,11 +214,7 @@ const BASE_CONFIG: Array<{ key: string; value: string }> = [
 ];
 
 export async function ensureBaselineData(): Promise<void> {
-	try {
-		await prisma.rankCpdRate.count();
-	} catch {
-		await ensureSqliteSchema();
-	}
+	await ensureSqliteSchema();
 
 	for (const rate of BASE_CPD_RATES) {
 		await prisma.rankCpdRate.upsert({

@@ -261,6 +261,7 @@ router.post('/', async (req: Request, res: Response) => {
       reportLimfac1,
       reportLimfac2,
       reportLimfac3,
+      reportPreparedBy,
     } = req.body;
     const parsedTotalBudget = Number(totalBudget);
     const exercise = await prisma.exercise.create({
@@ -278,6 +279,7 @@ router.post('/', async (req: Request, res: Response) => {
         ...(reportLimfac1 !== undefined ? { reportLimfac1: String(reportLimfac1) } : {}),
         ...(reportLimfac2 !== undefined ? { reportLimfac2: String(reportLimfac2) } : {}),
         ...(reportLimfac3 !== undefined ? { reportLimfac3: String(reportLimfac3) } : {}),
+        ...(reportPreparedBy !== undefined ? { reportPreparedBy: String(reportPreparedBy) } : {}),
       },
     });
     await seedExerciseDefaults(exercise.id);
@@ -320,6 +322,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       reportLimfac1,
       reportLimfac2,
       reportLimfac3,
+      reportPreparedBy,
     } = req.body;
     const data: any = {};
     if (name !== undefined) data.name = name;
@@ -333,6 +336,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (reportLimfac1 !== undefined) data.reportLimfac1 = String(reportLimfac1);
     if (reportLimfac2 !== undefined) data.reportLimfac2 = String(reportLimfac2);
     if (reportLimfac3 !== undefined) data.reportLimfac3 = String(reportLimfac3);
+    if (reportPreparedBy !== undefined) data.reportPreparedBy = String(reportPreparedBy);
     if (totalBudget !== undefined) {
       const parsedTotalBudget = Number(totalBudget);
       if (!Number.isFinite(parsedTotalBudget)) {

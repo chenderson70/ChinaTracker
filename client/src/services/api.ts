@@ -212,6 +212,7 @@ export async function createExercise(data: {
   reportLimfac1?: string;
   reportLimfac2?: string;
   reportLimfac3?: string;
+  reportPreparedBy?: string;
 }): Promise<ExerciseDetail> {
   return apiRequest<ExerciseDetail>('/exercises', { method: 'POST', body: data });
 }
@@ -598,6 +599,7 @@ export async function importAllData(json: string): Promise<void> {
       reportLimfac1: sourceExercise.reportLimfac1,
       reportLimfac2: sourceExercise.reportLimfac2,
       reportLimfac3: sourceExercise.reportLimfac3,
+      reportPreparedBy: sourceExercise.reportPreparedBy,
     });
 
     const sourceExerciseUnits = sourceUnits.filter((unit) => unit.exerciseId === sourceExercise.id);

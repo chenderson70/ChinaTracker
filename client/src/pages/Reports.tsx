@@ -2,6 +2,7 @@ import { Card, Typography, Button, Row, Col, Table, Descriptions, Space, Spin, I
 import { FileExcelOutlined, PrinterOutlined, EditOutlined, SaveOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { useApp } from '../components/AppLayout';
 import * as api from '../services/api';
 import dayjs from 'dayjs';
@@ -273,17 +274,21 @@ export function ReportsPage({
   const dutyDaysAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reportAssumptionsAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reportLimfacsAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reportPreparedByAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const travelDraft = Form.useWatch([], travelForm);
   const [draftRpaBudgetTarget, setDraftRpaBudgetTarget] = useState(0);
   const [draftOmBudgetTarget, setDraftOmBudgetTarget] = useState(0);
   const [draftDutyDays, setDraftDutyDays] = useState(1);
   const [draftReportAssumptions, setDraftReportAssumptions] = useState<ReportAssumptions>(DEFAULT_REPORT_ASSUMPTIONS);
   const [draftReportLimfacs, setDraftReportLimfacs] = useState<ReportLimfacs>(DEFAULT_REPORT_LIMFACS);
+  const [draftReportPreparedBy, setDraftReportPreparedBy] = useState('');
+  const [reportGeneratedOn, setReportGeneratedOn] = useState('');
   const skipBudgetTargetsSaveRef = useRef(true);
   const skipTotalBudgetSaveRef = useRef(true);
   const skipDutyDaysSaveRef = useRef(true);
   const skipReportAssumptionsSaveRef = useRef(true);
   const skipReportLimfacsSaveRef = useRef(true);
+  const skipReportPreparedBySaveRef = useRef(true);
 
   const travelMut = useMutation({
     mutationFn: (data: any) => api.updateTravelConfig(exerciseId!, data),
@@ -315,6 +320,14 @@ export function ReportsPage({
   const reportLimfacsMut = useMutation({
     mutationFn: (data: Pick<ExerciseDetail, 'reportLimfac1' | 'reportLimfac2' | 'reportLimfac3'>) =>
       api.updateExercise(exerciseId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+    },
+  });
+
+  const reportPreparedByMut = useMutation({
+    mutationFn: (data: Pick<ExerciseDetail, 'reportPreparedBy'>) => api.updateExercise(exerciseId!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
@@ -368,11 +381,35 @@ export function ReportsPage({
   const defaultAirfare = Number(appConfig.DEFAULT_AIRFARE ?? 400);
   const defaultRentalCarDailyRate = Number(appConfig.DEFAULT_RENTAL_CAR_DAILY ?? 50);
 
-  const handleExport = () => api.exportExcel(exerciseId!);
-  const handlePrint = () => window.print();
+  const stampReportGenerated = () => {
+    const timestamp = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZoneName: 'short',
+    }).format(new Date());
+
+    flushSync(() => {
+      setReportGeneratedOn(timestamp);
+    });
+  };
+
+  const handleExport = async () => {
+    stampReportGenerated();
+    await api.exportExcel(exerciseId!);
+  };
+  const handlePrint = () => {
+    stampReportGenerated();
+    window.print();
+  };
   const handleExportPdf = async () => {
     if (!exportRef.current) return;
     try {
+      stampReportGenerated();
       await exportElementToPdf(`${activeExercise.name} ${title}`, exportRef.current);
     } catch (error: any) {
       message.error(error?.message || 'Unable to export reports to PDF');
@@ -384,6 +421,17 @@ export function ReportsPage({
   const [currentReportAssumption1, currentReportAssumption2, currentReportAssumption3, currentReportAssumption4] = currentReportAssumptions;
   const currentReportLimfacs = getReportLimfacs(activeExercise);
   const [currentReportLimfac1, currentReportLimfac2, currentReportLimfac3] = currentReportLimfacs;
+  const currentReportPreparedBy = String(activeExercise.reportPreparedBy ?? '');
+  const reportPreparedByDraftStorageKey = exerciseId ? `chinaTracker.reportPreparedByDraft.${exerciseId}` : null;
+
+  const persistPreparedBy = (value: string) => {
+    const nextPreparedBy = value.trim();
+    const savedPreparedBy = currentReportPreparedBy.trim();
+    if (nextPreparedBy === savedPreparedBy || reportPreparedByMut.isPending) return;
+
+    if (reportPreparedByAutoSaveTimer.current) clearTimeout(reportPreparedByAutoSaveTimer.current);
+    reportPreparedByMut.mutate({ reportPreparedBy: nextPreparedBy });
+  };
 
   useEffect(() => {
     if (!editTravel || !travelDraft || travelMut.isPending) return;
@@ -654,6 +702,31 @@ export function ReportsPage({
   ]);
 
   useEffect(() => {
+    skipReportPreparedBySaveRef.current = true;
+    if (!reportPreparedByDraftStorageKey) {
+      setDraftReportPreparedBy(currentReportPreparedBy);
+      return;
+    }
+
+    const storedDraft = localStorage.getItem(reportPreparedByDraftStorageKey);
+    setDraftReportPreparedBy(storedDraft ?? currentReportPreparedBy);
+  }, [currentReportPreparedBy, reportPreparedByDraftStorageKey]);
+
+  useEffect(() => {
+    if (!reportPreparedByDraftStorageKey) return;
+
+    const savedPreparedBy = currentReportPreparedBy.trim();
+    const draftPreparedBy = draftReportPreparedBy.trim();
+
+    if (draftPreparedBy === savedPreparedBy) {
+      localStorage.removeItem(reportPreparedByDraftStorageKey);
+      return;
+    }
+
+    localStorage.setItem(reportPreparedByDraftStorageKey, draftReportPreparedBy);
+  }, [currentReportPreparedBy, draftReportPreparedBy, reportPreparedByDraftStorageKey]);
+
+  useEffect(() => {
     if (skipBudgetTargetsSaveRef.current) {
       skipBudgetTargetsSaveRef.current = false;
       return;
@@ -773,7 +846,41 @@ export function ReportsPage({
     reportLimfacsMut,
   ]);
 
+  useEffect(() => {
+    if (skipReportPreparedBySaveRef.current) {
+      skipReportPreparedBySaveRef.current = false;
+      return;
+    }
+    if (reportPreparedByMut.isPending) return;
+
+    const nextPreparedBy = draftReportPreparedBy.trim();
+    const savedPreparedBy = currentReportPreparedBy.trim();
+    if (nextPreparedBy === savedPreparedBy) return;
+
+    if (reportPreparedByAutoSaveTimer.current) clearTimeout(reportPreparedByAutoSaveTimer.current);
+    reportPreparedByAutoSaveTimer.current = setTimeout(() => {
+      reportPreparedByMut.mutate({ reportPreparedBy: nextPreparedBy });
+    }, 300);
+
+    return () => {
+      if (reportPreparedByAutoSaveTimer.current) clearTimeout(reportPreparedByAutoSaveTimer.current);
+    };
+  }, [
+    currentReportPreparedBy,
+    draftReportPreparedBy,
+    reportPreparedByMut,
+  ]);
+
   if (isLoading) return <div className="ct-loading"><Spin size="large" /></div>;
+
+  const isReportSettingsSaving = (
+    appConfigMut.isPending
+    || totalBudgetMut.isPending
+    || exerciseMut.isPending
+    || reportAssumptionsMut.isPending
+    || reportLimfacsMut.isPending
+    || reportPreparedByMut.isPending
+  );
 
   return (
     <div ref={exportRef}>
@@ -786,6 +893,41 @@ export function ReportsPage({
             <Button icon={<PrinterOutlined />} onClick={handlePrint}>Print</Button>
           </Space>
         </div>
+        <div className="ct-report-header-meta">
+          <div className="ct-report-header-meta-row">
+            <Typography.Text className="ct-report-header-meta-label">
+              Report Generated:
+            </Typography.Text>
+            <Typography.Text className="ct-report-header-meta-value">
+              {reportGeneratedOn}
+            </Typography.Text>
+          </div>
+          <div className="ct-report-header-meta-row ct-report-header-prepared-by-row">
+            <Typography.Text className="ct-report-header-meta-label">
+              Prepared By
+            </Typography.Text>
+            <input
+              className="ct-screen-only ct-report-header-name-input"
+              type="text"
+              value={draftReportPreparedBy}
+              onChange={(event) => setDraftReportPreparedBy(event.target.value)}
+              onBlur={(event) => persistPreparedBy(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  persistPreparedBy((event.target as HTMLInputElement).value);
+                  (event.target as HTMLInputElement).blur();
+                }
+              }}
+              aria-label="Prepared By"
+              placeholder="Enter your name"
+              maxLength={120}
+              autoComplete="name"
+            />
+            <Typography.Text className="ct-print-only ct-report-header-meta-value">
+              {draftReportPreparedBy.trim() || '________________'}
+            </Typography.Text>
+          </div>
+        </div>
       </div>
 
       {/* Exercise info */}
@@ -795,7 +937,7 @@ export function ReportsPage({
         style={{ marginBottom: 24 }}
         extra={
           <Typography.Text type="secondary">
-            {appConfigMut.isPending || totalBudgetMut.isPending || exerciseMut.isPending || reportAssumptionsMut.isPending || reportLimfacsMut.isPending ? 'Autosaving...' : 'Changes auto-save'}
+            {isReportSettingsSaving ? 'Autosaving...' : 'Changes auto-save'}
           </Typography.Text>
         }
       >

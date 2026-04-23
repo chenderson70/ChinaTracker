@@ -320,6 +320,20 @@ export default function AppLayout() {
     },
   });
 
+  const confirmDeleteExercise = (targetId: string) => {
+    const targetExercise = exercises.find((item) => item.id === targetId);
+    if (!targetExercise) return;
+
+    Modal.confirm({
+      title: `Delete "${targetExercise.name}"?`,
+      content: 'This will permanently remove all data for this exercise. This action cannot be undone.',
+      okText: 'Delete Exercise',
+      cancelText: 'Keep Exercise',
+      okButtonProps: { danger: true },
+      onOk: () => deleteMut.mutate(targetId),
+    });
+  };
+
   // JSON export all data
   const handleBackup = async () => {
     const json = await api.exportAllData();
@@ -354,6 +368,11 @@ export default function AppLayout() {
 
   const fmt = (n: number | undefined) => '$' + (n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   const hasAnyExercise = exercises.length > 0;
+  const exerciseOptions = exercises.map((item) => ({
+    value: item.id,
+    label: item.name,
+    exerciseName: item.name,
+  }));
 
   const unitChildren = (exercise?.unitBudgets || [])
     .map((unit) => unit.unitCode)
@@ -449,7 +468,44 @@ export default function AppLayout() {
                 placeholder="Select exercise"
                 value={exerciseId}
                 onChange={setExerciseId}
-                options={exercises.map((e) => ({ value: e.id, label: e.name }))}
+                options={exerciseOptions}
+                optionRender={(option) => {
+                  const targetId = String(option.data.value);
+                  const targetName = String(option.data.exerciseName ?? option.data.label ?? option.label ?? targetId);
+
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <span
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {targetName}
+                      </span>
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        aria-label={`Delete ${targetName}`}
+                        loading={deleteMut.isPending && deleteMut.variables === targetId}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          confirmDeleteExercise(targetId);
+                        }}
+                      />
+                    </div>
+                  );
+                }}
                 suffixIcon={<ThunderboltOutlined style={{ color: '#1677ff' }} />}
               />
               <Tooltip title={hasAnyExercise ? 'Create new exercise' : 'Start here to create your exercise'}>
@@ -500,12 +556,7 @@ export default function AppLayout() {
                   <Button
                     icon={<DeleteOutlined />}
                     danger
-                    onClick={() => Modal.confirm({
-                      title: 'Delete this exercise?',
-                      content: 'This will permanently remove all data for this exercise.',
-                      okButtonProps: { danger: true },
-                      onOk: () => deleteMut.mutate(exerciseId),
-                    })}
+                    onClick={() => confirmDeleteExercise(exerciseId)}
                   />
                 </Tooltip>
               )}
