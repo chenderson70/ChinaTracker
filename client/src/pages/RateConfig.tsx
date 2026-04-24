@@ -67,6 +67,18 @@ export default function RateConfig() {
   const pdAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cfgAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const clearPdAutosave = () => {
+    if (pdAutoSaveTimer.current) {
+      clearTimeout(pdAutoSaveTimer.current);
+      pdAutoSaveTimer.current = null;
+    }
+  };
+
+  const syncPerDiemRates = (rates: PerDiemRate[]) => {
+    queryClient.setQueryData(['perDiemRates'], rates);
+    if (exerciseId) queryClient.invalidateQueries({ queryKey: ['budget', exerciseId] });
+  };
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['cpdRates'] });
     queryClient.invalidateQueries({ queryKey: ['perDiemRates'] });
@@ -97,16 +109,20 @@ export default function RateConfig() {
   });
 
   const savePdMut = useMutation({
+    scope: { id: 'per-diem-rates' },
     mutationFn: (submittedEdits: Record<string, { lodging?: number; mie?: number }>) => {
-      const rates = perDiemRates.map((r: PerDiemRate) => ({
-        location: r.location,
-        lodgingRate: submittedEdits[r.id]?.lodging ?? r.lodgingRate,
-        mieRate: submittedEdits[r.id]?.mie ?? r.mieRate,
-      }));
-      return api.updatePerDiemRates(rates);
+      const currentRates = queryClient.getQueryData<PerDiemRate[]>(['perDiemRates']) ?? perDiemRates;
+      const rates = currentRates
+        .filter((r: PerDiemRate) => submittedEdits[r.id])
+        .map((r: PerDiemRate) => ({
+          location: r.location,
+          lodgingRate: submittedEdits[r.id]?.lodging ?? r.lodgingRate,
+          mieRate: submittedEdits[r.id]?.mie ?? r.mieRate,
+        }));
+      return api.upsertPerDiemRates(rates);
     },
-    onSuccess: (_data, submittedEdits) => {
-      invalidate();
+    onSuccess: (data, submittedEdits) => {
+      syncPerDiemRates(data);
       setPdEdits((current) => {
         const next = { ...current };
         Object.entries(submittedEdits).forEach(([key, value]) => {
@@ -121,24 +137,44 @@ export default function RateConfig() {
   });
 
   const addPdMut = useMutation({
+    scope: { id: 'per-diem-rates' },
     mutationFn: (data: { location: string; lodging: number; mie: number }) =>
       api.addPerDiemRate(data.location, data.lodging, data.mie),
-    onSuccess: () => { invalidate(); message.success('Location added'); },
+    onSuccess: (data) => {
+      syncPerDiemRates(data);
+      message.success('Location added');
+    },
   });
 
   const deletePdMut = useMutation({
+    scope: { id: 'per-diem-rates' },
     mutationFn: (id: string) => api.deletePerDiemRate(id),
-    onSuccess: () => { invalidate(); message.success('Location removed'); },
+    onMutate: (id) => {
+      clearPdAutosave();
+      setPdEdits((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+    },
+    onSuccess: (data) => {
+      syncPerDiemRates(data);
+      message.success('Location removed');
+    },
   });
 
   const importMasterRateMut = useMutation({
+    scope: { id: 'per-diem-rates' },
     mutationFn: (row: PerDiemMasterRecord) =>
       api.addOrUpdatePerDiemRate(
         row.destination,
         row.fy26LodgingRate,
         row.fy26Mie,
       ),
-    onSuccess: () => { invalidate(); message.success('Rate added to system locations'); },
+    onSuccess: (data) => {
+      syncPerDiemRates(data);
+      message.success('Rate added to system locations');
+    },
   });
 
   const [addLocOpen, setAddLocOpen] = useState(false);
@@ -405,6 +441,9 @@ export default function RateConfig() {
             columns={masterPdColumns}
           />
         </div>
+        <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
+          Default Locations
+        </Typography.Title>
         <div className="ct-table">
           <Table
             size="small"

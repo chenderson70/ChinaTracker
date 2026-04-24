@@ -1,9 +1,16 @@
 import { PrismaClient } from '@prisma/client';
+import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 
 const SERVER_ROOT = path.resolve(__dirname, '..');
 const PRISMA_SCHEMA_ROOT = path.resolve(SERVER_ROOT, 'prisma');
+
+dotenv.config({ path: path.resolve(SERVER_ROOT, '.env') });
+
+if (!process.env.DATABASE_URL) {
+	process.env.DATABASE_URL = 'file:./prisma/prod.db';
+}
 
 function resolveSqlitePath(databaseUrl: string | undefined): string | null {
 	if (!databaseUrl || !databaseUrl.startsWith('file:')) return null;
@@ -116,6 +123,7 @@ async function ensureSqliteCompatibilityColumns(): Promise<void> {
 	await ensureSqliteColumn('exercises', 'report_limfac_2', `TEXT NOT NULL DEFAULT ''`);
 	await ensureSqliteColumn('exercises', 'report_limfac_3', `TEXT NOT NULL DEFAULT ''`);
 	await ensureSqliteColumn('exercises', 'report_prepared_by', `TEXT NOT NULL DEFAULT ''`);
+	await ensureSqliteColumn('exercises', 'refinements_json', `TEXT NOT NULL DEFAULT '[]'`);
 }
 
 async function ensureSqliteSchema(): Promise<void> {
@@ -194,8 +202,7 @@ const BASE_CPD_RATES = [
 ];
 
 const BASE_PER_DIEM = [
-	{ location: 'GULFPORT', lodgingRate: 98, mieRate: 64 },
-	{ location: 'CAMP_SHELBY', lodgingRate: 96, mieRate: 59 },
+	{ location: 'FORT_HUNTER_LIGGETT', lodgingRate: 209, mieRate: 92 },
 	{ location: 'WARNER_ROBINS', lodgingRate: 110, mieRate: 68 },
 	{ location: 'MARIETTA', lodgingRate: 126, mieRate: 74 },
 ];

@@ -57,6 +57,56 @@ router.put('/personnel-groups/:groupId', async (req: Request, res: Response) => 
   }
 });
 
+router.post('/personnel-groups/:groupId/clear', async (req: Request, res: Response) => {
+  try {
+    const userId = getRequestUserId(req);
+    const existing = await prisma.personnelGroup.findUnique({
+      where: { id: req.params.groupId },
+      include: {
+        unitBudget: {
+          include: {
+            exercise: true,
+          },
+        },
+      },
+    });
+    if (!existing || (existing.unitBudget.exercise as any).ownerUserId !== userId) {
+      return res.status(404).json({ error: 'Personnel group not found' });
+    }
+
+    const clearedGroup = await prisma.$transaction(async (tx) => {
+      await tx.personnelEntry.deleteMany({
+        where: { personnelGroupId: req.params.groupId },
+      });
+
+      await tx.personnelGroup.update({
+        where: { id: req.params.groupId },
+        data: {
+          paxCount: 0,
+          dutyDays: null,
+          location: 'GULFPORT',
+          isLongTour: false,
+          isLocal: false,
+          airfarePerPerson: null,
+          rentalCarCount: 0,
+          rentalCarDaily: null,
+          rentalCarDays: 0,
+          avgCpdOverride: null,
+        },
+      });
+
+      return tx.personnelGroup.findUnique({
+        where: { id: req.params.groupId },
+        include: { personnelEntries: true },
+      });
+    });
+
+    res.json(clearedGroup);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── ADD RANK ENTRY ───
 router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Response) => {
   try {

@@ -33,19 +33,14 @@ function normalizeRefinements(items: RefinementItem[] | undefined | null): Refin
 
   return items.map((item) => ({
     id: String(item?.id || createRefinementId()),
-    improvementNote: String(item?.improvementNote || ''),
+    improvementNote: String(item?.improvementNote ?? ''),
     status: item?.status === 'COMPLETE' ? 'COMPLETE' : 'IN_PROGRESS',
-    statusNote: String(item?.statusNote || ''),
+    statusNote: String(item?.statusNote ?? ''),
   }));
 }
 
 function getSavableRefinements(items: RefinementItem[]): RefinementItem[] {
-  return normalizeRefinements(items)
-    .map((item) => ({
-      ...item,
-      improvementNote: item.improvementNote.trim(),
-      statusNote: item.statusNote.trim(),
-    }));
+  return normalizeRefinements(items);
 }
 
 export default function Refinements() {

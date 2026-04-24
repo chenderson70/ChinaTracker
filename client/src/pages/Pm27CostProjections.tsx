@@ -10,6 +10,7 @@ const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigi
 const DAYS_PER_MONTH = 30;
 
 const LOCATION_LABELS: Record<string, string> = {
+  FORT_HUNTER_LIGGETT: 'Fort Hunter Liggett',
   GULFPORT: 'Gulfport',
   CAMP_SHELBY: 'Camp Shelby',
   WARNER_ROBINS: 'Robins AFB',

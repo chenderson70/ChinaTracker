@@ -332,14 +332,6 @@ export default function UnitView() {
     };
   }, [unitCode]);
 
-  const updateGroupMut = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      await pushUndoSnapshot('Update Section');
-      return api.updatePersonnelGroup(id, data);
-    },
-    onSuccess: refreshExerciseAndBudget,
-  });
-
   const clearGroupMut = useMutation({
     mutationFn: async (groupId: string) => {
       await pushUndoSnapshot('Clear Section');
@@ -490,7 +482,9 @@ export default function UnitView() {
   const entryModalGroup = entryModal ? personnelGroups.find((group) => group.id === entryModal.groupId) : null;
   const entryModalIsPlanning = entryModalGroup?.role === 'PLANNING';
   const entryModalIsWhiteCell = entryModalGroup?.role === 'WHITE_CELL';
-  const entryModalSupportsRentalCars = entryModalGroup?.role === 'WHITE_CELL' || entryModalGroup?.role === 'SUPPORT';
+  const entryModalSupportsRentalCars =
+    entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'WHITE_CELL' || entryModalGroup?.role === 'SUPPORT';
+  const entryModalUsesBinaryRentalCar = entryModalGroup?.role === 'PLANNING';
   const entryModalAllowsTravelOnly = entryModalGroup?.fundingType === 'RPA'
     && (entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'SUPPORT');
 
@@ -539,9 +533,10 @@ export default function UnitView() {
       rankCode: undefined,
       count: 1,
       dutyDays: exercise?.defaultDutyDays ?? 1,
+      hasRentalCar: false,
       rentalCarCount: 0,
       months: undefined,
-      location: entryModalGroup?.location || perDiemLocations[0] || 'GULFPORT',
+      location: entryModalGroup?.location || perDiemLocations[0] || 'FORT_HUNTER_LIGGETT',
       isLocal: entryModalGroup?.isLocal ?? false,
     });
     setEntryModalNoteDraft('');
@@ -592,7 +587,8 @@ export default function UnitView() {
     const isPlayerLike = isPlayer || isAnnualTour;
     const isPlanning = role === 'PLANNING';
     const isWhiteCell = role === 'WHITE_CELL';
-    const supportsRentalCars = role === 'WHITE_CELL' || role === 'SUPPORT';
+    const supportsRentalCars = role === 'PLANNING' || role === 'WHITE_CELL' || role === 'SUPPORT';
+    const usesBinaryRentalCar = role === 'PLANNING';
     const usesEntryLevelRental = supportsRentalCars;
     const isPlayerRpa = isPlayerLike && ft === 'RPA';
     const isPlayerOm = isPlayer && ft === 'OM';
@@ -607,9 +603,7 @@ export default function UnitView() {
       group.dutyDays !== null ||
       group.isLocal ||
       group.isLongTour ||
-      group.airfarePerPerson !== null ||
       (group.rentalCarCount || 0) > 0 ||
-      group.rentalCarDaily !== null ||
       (group.rentalCarDays || 0) > 0 ||
       group.avgCpdOverride !== null;
     const fundingNote = role === 'PLANNING'
@@ -628,7 +622,7 @@ export default function UnitView() {
         : [{
             count: group.paxCount || 0,
             dutyDays: group.dutyDays ?? exercise?.defaultDutyDays ?? 1,
-            location: group.location || 'GULFPORT',
+            location: group.location || 'FORT_HUNTER_LIGGETT',
             isLocal: group.isLocal,
           }])
       : [];
@@ -639,20 +633,23 @@ export default function UnitView() {
       rentalCarCount: 0,
       rentalCarDays: 0,
     };
-    const airfarePerPerson = group.airfarePerPerson ?? defaultTravel.airfarePerPerson;
-    const rentalDaily = group.rentalCarDaily ?? defaultTravel.rentalCarDailyRate;
-    const hasGroupRental = (group.rentalCarCount || 0) > 0 || (group.rentalCarDays || 0) > 0 || group.rentalCarDaily != null;
+    const airfarePerPerson = defaultTravel.airfarePerPerson;
+    const rentalDaily = defaultTravel.rentalCarDailyRate;
+    const hasGroupRental = (group.rentalCarCount || 0) > 0 || (group.rentalCarDays || 0) > 0;
     const sharedRentalCost = ((defaultTravel.rentalCarCount || 0) * (defaultTravel.rentalCarDailyRate || 0) * (defaultTravel.rentalCarDays || 0)) / unitCount;
     const configuredRentalCost = (group.rentalCarCount || 0) * rentalDaily * (group.rentalCarDays || 0);
     const nonPlayerTravelBreakout = nonPlayerTravelEntries.reduce(
       (acc, entry) => {
         const entryCount = entry.count || 0;
         const entryDays = entry.dutyDays || group.dutyDays || exercise?.defaultDutyDays || 1;
-        const entryLoc = entry.location || group.location || 'GULFPORT';
+        const entryLoc = entry.location || group.location || 'FORT_HUNTER_LIGGETT';
         const entryIsLocal = !!(entry.isLocal ?? group.isLocal);
+        const entryRentalCarCount = usesBinaryRentalCar
+          ? ((Number((entry as any).rentalCarCount || 0) > 0) ? 1 : 0)
+          : (Number((entry as any).rentalCarCount || 0) || 0);
         if (entryIsLocal) {
           if (usesEntryLevelRental) {
-            acc.rental += (Number((entry as any).rentalCarCount || 0) || 0) * rentalDaily * entryDays;
+            acc.rental += entryRentalCarCount * rentalDaily * entryDays;
           }
           return acc;
         }
@@ -661,7 +658,7 @@ export default function UnitView() {
         acc.lodging += entryCount * rates.lodging * entryDays;
         acc.airfare += entryCount * airfarePerPerson;
         if (usesEntryLevelRental) {
-          acc.rental += (Number((entry as any).rentalCarCount || 0) || 0) * rentalDaily * entryDays;
+          acc.rental += entryRentalCarCount * rentalDaily * entryDays;
         }
         acc.hasNonLocal = true;
         return acc;
@@ -749,33 +746,6 @@ export default function UnitView() {
           </Space>
         }
       >
-        <Row gutter={16} style={{ marginBottom: 12 }}>
-          {!isPlayerRpa && (
-            <Col span={6} className="ct-field-stack">
-              <Typography.Text type="secondary" className="ct-field-label">Airfare/POV ($/person)</Typography.Text>
-              <DraftNumberInput
-                size="middle"
-                min={0}
-                value={group.airfarePerPerson ?? defaultTravel.airfarePerPerson}
-                style={{ width: '100%' }}
-                onSave={(nextValue) => updateGroupMut.mutate({ id: group.id, data: { airfarePerPerson: nextValue } })}
-              />
-            </Col>
-          )}
-          {(role === 'WHITE_CELL' || role === 'SUPPORT') && (
-            <Col span={6} className="ct-field-stack">
-              <Typography.Text type="secondary" className="ct-field-label">Rental Rate ($/day)</Typography.Text>
-              <DraftNumberInput
-                size="middle"
-                min={0}
-                value={group.rentalCarDaily ?? defaultTravel.rentalCarDailyRate}
-                style={{ width: '100%' }}
-                onSave={(nextValue) => updateGroupMut.mutate({ id: group.id, data: { rentalCarDaily: nextValue } })}
-              />
-            </Col>
-          )}
-        </Row>
-
         {/* Cost breakdown */}
         <Typography.Text style={{ color: '#1677ff', fontWeight: 600, display: 'block', marginBottom: 10 }}>
           {isPlayerRpa
@@ -855,13 +825,23 @@ export default function UnitView() {
                 dataIndex: 'rentalCarCount',
                 width: 110,
                 render: (value: number, row: { id: string }) => (
-                  <DraftNumberInput
-                    min={0}
-                    precision={0}
-                    value={value || 0}
-                    style={{ width: '100%' }}
-                    onSave={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { rentalCarCount: nextValue || 0 } })}
-                  />
+                  usesBinaryRentalCar ? (
+                    <Switch
+                      size="small"
+                      checked={Number(value || 0) > 0}
+                      checkedChildren="Yes"
+                      unCheckedChildren="No"
+                      onChange={(checked) => updateEntryMut.mutate({ id: row.id, data: { rentalCarCount: checked ? 1 : 0 } })}
+                    />
+                  ) : (
+                    <DraftNumberInput
+                      min={0}
+                      precision={0}
+                      value={value || 0}
+                      style={{ width: '100%' }}
+                      onSave={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { rentalCarCount: nextValue || 0 } })}
+                    />
+                  )
                 ),
               }] : []),
               {
@@ -871,7 +851,7 @@ export default function UnitView() {
                 render: (value: string | null, row: { id: string }) => (
                   <Select
                     size="small"
-                    value={value || 'GULFPORT'}
+                    value={value || 'FORT_HUNTER_LIGGETT'}
                     style={{ width: '100%' }}
                     options={perDiemLocations.map((loc) => ({ value: loc, label: loc }))}
                     onChange={(v) => updateEntryMut.mutate({ id: row.id, data: { location: v } })}
@@ -1072,12 +1052,10 @@ export default function UnitView() {
         group.personnelEntries.length > 0 ||
         (group.paxCount || 0) > 0 ||
         group.dutyDays !== null ||
-        (normalizedLocation.length > 0 && normalizedLocation !== 'GULFPORT') ||
+        (normalizedLocation.length > 0 && normalizedLocation !== 'FORT_HUNTER_LIGGETT') ||
         group.isLocal ||
         group.isLongTour ||
-        group.airfarePerPerson !== null ||
         (group.rentalCarCount || 0) > 0 ||
-        group.rentalCarDaily !== null ||
         (group.rentalCarDays || 0) > 0 ||
         group.avgCpdOverride !== null
       );
@@ -1462,7 +1440,11 @@ export default function UnitView() {
             rankCode: values.rankCode,
             count: values.count,
             dutyDays: calculatedDutyDays,
-            rentalCarCount: entryModalSupportsRentalCars ? (values.rentalCarCount || 0) : 0,
+            rentalCarCount: entryModalUsesBinaryRentalCar
+              ? (values.hasRentalCar ? 1 : 0)
+              : entryModalSupportsRentalCars
+                ? (values.rentalCarCount || 0)
+                : 0,
             location: values.location,
             note: (entryModalIsPlanning || entryModalIsWhiteCell) ? (entryModalNoteDraft.trim() || null) : null,
             travelOnly: entryModalAllowsTravelOnly ? entryModalTravelOnlyDraft : false,
@@ -1503,12 +1485,23 @@ export default function UnitView() {
           <Form.Item name="dutyDays" label="Duty Days" initialValue={exercise.defaultDutyDays} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
-          {entryModalSupportsRentalCars && (
+          {entryModalUsesBinaryRentalCar && (
+            <Form.Item
+              name="hasRentalCar"
+              label="Rental Car"
+              valuePropName="checked"
+              initialValue={false}
+              extra="Uses the default rental car rate from Rate Config."
+            >
+              <Switch checkedChildren="Yes" unCheckedChildren="No" />
+            </Form.Item>
+          )}
+          {!entryModalUsesBinaryRentalCar && entryModalSupportsRentalCars && (
             <Form.Item name="rentalCarCount" label="Rental Car" initialValue={0}>
               <InputNumber min={0} precision={0} style={{ width: '100%' }} />
             </Form.Item>
           )}
-          <Form.Item name="location" label="Location" initialValue={perDiemLocations[0] || 'GULFPORT'} rules={[{ required: true }]}>
+          <Form.Item name="location" label="Location" initialValue={perDiemLocations[0] || 'FORT_HUNTER_LIGGETT'} rules={[{ required: true }]}>
             <Select options={perDiemLocations.map((loc) => ({ value: loc, label: loc }))} />
           </Form.Item>
           {(entryModalIsPlanning || entryModalIsWhiteCell) && (
@@ -1649,4 +1642,3 @@ export default function UnitView() {
     </div>
   );
 }
-

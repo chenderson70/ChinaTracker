@@ -3,6 +3,18 @@ import { prisma } from '../db';
 
 const router = Router();
 
+function normalizePerDiemRates(input: unknown): Array<{ location: string; lodgingRate: number; mieRate: number }> {
+  return Array.isArray(input)
+    ? input
+      .map((rate) => ({
+        location: String((rate as any)?.location || '').trim(),
+        lodgingRate: Number((rate as any)?.lodgingRate || 0),
+        mieRate: Number((rate as any)?.mieRate || 0),
+      }))
+      .filter((rate) => rate.location.length > 0)
+    : [];
+}
+
 // ─── CPD RATES ───
 
 router.get('/cpd', async (_req: Request, res: Response) => {
@@ -45,15 +57,7 @@ router.get('/per-diem', async (_req: Request, res: Response) => {
 router.put('/per-diem', async (req: Request, res: Response) => {
   try {
     const { rates } = req.body; // Array of { location, lodgingRate, mieRate }
-    const normalizedRates = Array.isArray(rates)
-      ? rates
-        .map((rate) => ({
-          location: String(rate.location || '').trim(),
-          lodgingRate: Number(rate.lodgingRate || 0),
-          mieRate: Number(rate.mieRate || 0),
-        }))
-        .filter((rate) => rate.location.length > 0)
-      : [];
+    const normalizedRates = normalizePerDiemRates(rates);
 
     const all = await prisma.$transaction(async (tx) => {
       const locationsToKeep = normalizedRates.map((rate) => rate.location);
@@ -77,6 +81,48 @@ router.put('/per-diem', async (req: Request, res: Response) => {
         });
       }
 
+      return tx.perDiemRate.findMany({ orderBy: { location: 'asc' } });
+    });
+
+    res.json(all);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/per-diem', async (req: Request, res: Response) => {
+  try {
+    const normalizedRates = normalizePerDiemRates(req.body?.rates);
+
+    const all = await prisma.$transaction(async (tx) => {
+      for (const rate of normalizedRates) {
+        await tx.perDiemRate.upsert({
+          where: { location: rate.location },
+          update: { lodgingRate: rate.lodgingRate, mieRate: rate.mieRate },
+          create: {
+            location: rate.location,
+            lodgingRate: rate.lodgingRate,
+            mieRate: rate.mieRate,
+            effectiveDate: new Date(),
+          },
+        });
+      }
+
+      return tx.perDiemRate.findMany({ orderBy: { location: 'asc' } });
+    });
+
+    res.json(all);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/per-diem/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const all = await prisma.$transaction(async (tx) => {
+      await tx.perDiemRate.deleteMany({ where: { id } });
       return tx.perDiemRate.findMany({ orderBy: { location: 'asc' } });
     });
 

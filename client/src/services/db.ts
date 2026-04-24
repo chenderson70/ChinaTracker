@@ -181,8 +181,9 @@ export async function seedIfEmpty(): Promise<void> {
   const pdCount = await db.perDiemRates.count();
   if (pdCount === 0) {
     await db.perDiemRates.bulkAdd([
-      { id: crypto.randomUUID(), location: 'GULFPORT', lodgingRate: 98, mieRate: 64, effectiveDate: '2025-10-01' },
-      { id: crypto.randomUUID(), location: 'CAMP_SHELBY', lodgingRate: 96, mieRate: 59, effectiveDate: '2025-10-01' },
+      { id: crypto.randomUUID(), location: 'FORT_HUNTER_LIGGETT', lodgingRate: 209, mieRate: 92, effectiveDate: '2025-10-01' },
+      { id: crypto.randomUUID(), location: 'MARIETTA', lodgingRate: 126, mieRate: 74, effectiveDate: '2025-10-01' },
+      { id: crypto.randomUUID(), location: 'WARNER_ROBINS', lodgingRate: 110, mieRate: 68, effectiveDate: '2025-10-01' },
     ]);
   }
 

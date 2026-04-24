@@ -32,7 +32,7 @@ const API_BASE = isLocalBrowser ? '/api/v1' : configuredApiBase;
 let perDiemMasterCache: PerDiemMasterRecord[] | null = null;
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   includeAuth?: boolean;
   retryOnAuthFail?: boolean;
@@ -357,6 +357,10 @@ export async function updatePerDiemRates(rates: { location: string; lodgingRate:
   return apiRequest<PerDiemRate[]>('/rates/per-diem', { method: 'PUT', body: { rates } });
 }
 
+export async function upsertPerDiemRates(rates: { location: string; lodgingRate: number; mieRate: number }[]): Promise<PerDiemRate[]> {
+  return apiRequest<PerDiemRate[]>('/rates/per-diem', { method: 'PATCH', body: { rates } });
+}
+
 export function normalizePerDiemLocation(value: string): string {
   return value
     .trim()
@@ -369,24 +373,11 @@ export async function addPerDiemRate(location: string, lodgingRate: number, mieR
   const normalizedLocation = normalizePerDiemLocation(location);
   if (!normalizedLocation) throw new Error('Location is required');
 
-  const current = await getPerDiemRates();
-  const existing = current.find((row) => row.location === normalizedLocation);
-  const next = existing
-    ? current.map((row) => row.location === normalizedLocation ? { location: row.location, lodgingRate, mieRate } : { location: row.location, lodgingRate: row.lodgingRate, mieRate: row.mieRate })
-    : [...current.map((row) => ({ location: row.location, lodgingRate: row.lodgingRate, mieRate: row.mieRate })), { location: normalizedLocation, lodgingRate, mieRate }];
-
-  return updatePerDiemRates(next);
+  return upsertPerDiemRates([{ location: normalizedLocation, lodgingRate, mieRate }]);
 }
 
 export async function deletePerDiemRate(id: string): Promise<PerDiemRate[]> {
-  const current = await getPerDiemRates();
-  const next = current.filter((row) => row.id !== id).map((row) => ({
-    location: row.location,
-    lodgingRate: row.lodgingRate,
-    mieRate: row.mieRate,
-  }));
-
-  return updatePerDiemRates(next);
+  return apiRequest<PerDiemRate[]>(`/rates/per-diem/${id}`, { method: 'DELETE' });
 }
 
 export async function addOrUpdatePerDiemRate(location: string, lodgingRate: number, mieRate: number): Promise<PerDiemRate[]> {

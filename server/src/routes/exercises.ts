@@ -25,8 +25,8 @@ function normalizeRefinementsInput(value: unknown): RefinementItem[] {
   return value
     .map((item, index) => {
       const candidate = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-      const improvementNote = String(candidate.improvementNote || '').trim();
-      const statusNote = String(candidate.statusNote || '').trim();
+      const improvementNote = String(candidate.improvementNote ?? '');
+      const statusNote = String(candidate.statusNote ?? '');
 
       const rawId = String(candidate.id || '').trim();
       return {
@@ -194,7 +194,7 @@ async function ensurePlanningGroups(exerciseId: string): Promise<void> {
           unitBudgetId: unitBudget.id,
           role: 'PLANNING',
           fundingType: 'RPA',
-          location: 'GULFPORT',
+          location: 'FORT_HUNTER_LIGGETT',
         },
       });
     }
@@ -205,7 +205,7 @@ async function ensurePlanningGroups(exerciseId: string): Promise<void> {
           unitBudgetId: unitBudget.id,
           role: 'PLANNING',
           fundingType: 'OM',
-          location: 'GULFPORT',
+          location: 'FORT_HUNTER_LIGGETT',
         },
       });
     }
@@ -216,7 +216,7 @@ async function ensurePlanningGroups(exerciseId: string): Promise<void> {
           unitBudgetId: unitBudget.id,
           role: 'ANNUAL_TOUR',
           fundingType: 'RPA',
-          location: 'GULFPORT',
+          location: 'FORT_HUNTER_LIGGETT',
         },
       });
     }
@@ -248,7 +248,7 @@ async function seedExerciseDefaults(exerciseId: string) {
       ];
       for (const g of groups) {
         await prisma.personnelGroup.create({
-          data: { unitBudgetId: ub.id, role: g.role, fundingType: g.fundingType, location: 'GULFPORT' },
+          data: { unitBudgetId: ub.id, role: g.role, fundingType: g.fundingType, location: 'FORT_HUNTER_LIGGETT' },
         });
       }
     } else {
@@ -265,7 +265,7 @@ async function seedExerciseDefaults(exerciseId: string) {
       ];
       for (const g of groups) {
         await prisma.personnelGroup.create({
-          data: { unitBudgetId: ub.id, role: g.role, fundingType: g.fundingType, location: 'GULFPORT' },
+          data: { unitBudgetId: ub.id, role: g.role, fundingType: g.fundingType, location: 'FORT_HUNTER_LIGGETT' },
         });
       }
     }
@@ -881,7 +881,7 @@ router.post('/:id/units', async (req: Request, res: Response) => {
             unitBudgetId: ub.id,
             role,
             fundingType,
-            location: 'GULFPORT',
+            location: 'FORT_HUNTER_LIGGETT',
           },
         });
       }
@@ -893,7 +893,7 @@ router.post('/:id/units', async (req: Request, res: Response) => {
           unitBudgetId: ub.id,
           role: 'ANNUAL_TOUR',
           fundingType: 'RPA',
-          location: 'GULFPORT',
+          location: 'FORT_HUNTER_LIGGETT',
         },
       });
     }
