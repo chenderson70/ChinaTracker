@@ -228,6 +228,10 @@ export async function deleteExercise(id: string): Promise<void> {
   await apiRequest<{ success: boolean }>(`/exercises/${id}`, { method: 'DELETE' });
 }
 
+export async function copyExercise(id: string): Promise<ExerciseDetail> {
+  return apiRequest<ExerciseDetail>(`/exercises/${id}/copy`, { method: 'POST' });
+}
+
 export async function restoreExerciseSnapshot(id: string, snapshot: ExerciseUndoSnapshot): Promise<ExerciseDetail> {
   return apiRequest<ExerciseDetail>(`/exercises/${id}/restore`, { method: 'PUT', body: snapshot });
 }

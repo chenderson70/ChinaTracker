@@ -358,6 +358,113 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // ─── UPDATE EXERCISE ───
+router.post('/:id/copy', async (req: Request, res: Response) => {
+  try {
+    const userId = getRequestUserId(req);
+    const sourceExercise = await loadOwnedExercise(req.params.id, userId);
+    if (!sourceExercise) return res.status(404).json({ error: 'Exercise not found' });
+
+    const copiedExercise = await prisma.$transaction(async (tx) => {
+      const createdExercise = await tx.exercise.create({
+        data: {
+          ownerUserId: userId,
+          name: `${sourceExercise.name}_Copy`,
+          totalBudget: Number(sourceExercise.totalBudget || 0),
+          startDate: sourceExercise.startDate,
+          endDate: sourceExercise.endDate,
+          defaultDutyDays: Math.max(1, Number(sourceExercise.defaultDutyDays || 1)),
+          reportAssumption1: String(sourceExercise.reportAssumption1 ?? ''),
+          reportAssumption2: String(sourceExercise.reportAssumption2 ?? ''),
+          reportAssumption3: String(sourceExercise.reportAssumption3 ?? ''),
+          reportAssumption4: String(sourceExercise.reportAssumption4 ?? ''),
+          reportLimfac1: String(sourceExercise.reportLimfac1 ?? ''),
+          reportLimfac2: String(sourceExercise.reportLimfac2 ?? ''),
+          reportLimfac3: String(sourceExercise.reportLimfac3 ?? ''),
+          reportPreparedBy: String(sourceExercise.reportPreparedBy ?? ''),
+          refinementsJson: String(sourceExercise.refinementsJson ?? '[]'),
+        },
+      });
+
+      for (const unitBudget of sourceExercise.unitBudgets || []) {
+        await tx.unitBudget.create({
+          data: {
+            exerciseId: createdExercise.id,
+            unitCode: unitBudget.unitCode,
+            executionCostLines: {
+              create: (unitBudget.executionCostLines || []).map((line) => ({
+                fundingType: line.fundingType,
+                category: line.category,
+                amount: Number(line.amount || 0),
+                notes: line.notes,
+              })),
+            },
+            personnelGroups: {
+              create: (unitBudget.personnelGroups || []).map((group) => ({
+                role: group.role,
+                fundingType: group.fundingType,
+                paxCount: Math.max(0, Number(group.paxCount || 0)),
+                dutyDays: group.dutyDays == null ? null : Math.max(0, Number(group.dutyDays || 0)),
+                location: group.location,
+                isLongTour: !!group.isLongTour,
+                isLocal: !!group.isLocal,
+                airfarePerPerson: group.airfarePerPerson == null ? null : Number(group.airfarePerPerson),
+                rentalCarCount: Math.max(0, Number(group.rentalCarCount || 0)),
+                rentalCarDaily: group.rentalCarDaily == null ? null : Number(group.rentalCarDaily),
+                rentalCarDays: Math.max(0, Number(group.rentalCarDays || 0)),
+                avgCpdOverride: group.avgCpdOverride == null ? null : Number(group.avgCpdOverride),
+                personnelEntries: {
+                  create: (group.personnelEntries || []).map((entry) => ({
+                    rankCode: entry.rankCode,
+                    count: Math.max(0, Number(entry.count || 0)),
+                    dutyDays: entry.dutyDays == null ? null : Math.max(0, Number(entry.dutyDays || 0)),
+                    rentalCarCount: Math.max(0, Number(entry.rentalCarCount || 0)),
+                    location: entry.location,
+                    isLocal: !!entry.isLocal,
+                    note: entry.note,
+                    travelOnly: !!entry.travelOnly,
+                    longTermA7Planner: !!entry.longTermA7Planner,
+                  })),
+                },
+              })),
+            },
+          },
+        });
+      }
+
+      if (sourceExercise.travelConfig) {
+        await tx.travelConfig.create({
+          data: {
+            exerciseId: createdExercise.id,
+            airfarePerPerson: Number(sourceExercise.travelConfig.airfarePerPerson || 0),
+            rentalCarDailyRate: Number(sourceExercise.travelConfig.rentalCarDailyRate || 0),
+            rentalCarCount: Math.max(0, Number(sourceExercise.travelConfig.rentalCarCount || 0)),
+            rentalCarDays: Math.max(0, Number(sourceExercise.travelConfig.rentalCarDays || 0)),
+          },
+        });
+      }
+
+      if ((sourceExercise.omCostLines || []).length > 0) {
+        await tx.omCostLine.createMany({
+          data: sourceExercise.omCostLines.map((line) => ({
+            exerciseId: createdExercise.id,
+            category: line.category,
+            label: line.label,
+            amount: Number(line.amount || 0),
+            notes: line.notes,
+          })),
+        });
+      }
+
+      return createdExercise;
+    });
+
+    const full = await loadFullExercise(copiedExercise.id);
+    res.status(201).json(serializeExercise(full));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const userId = getRequestUserId(req);

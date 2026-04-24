@@ -400,6 +400,83 @@ body {
   max-width: 260px;
 }
 
+.ct-comparison-summary-breakdown {
+  display: grid;
+  gap: 4px;
+  margin: -4px 0 12px;
+}
+
+.ct-comparison-summary-breakdown-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ct-comparison-summary-breakdown-label.ant-typography {
+  color: #596577;
+  font-size: 12px;
+}
+
+.ct-comparison-summary-breakdown-value.ant-typography {
+  color: #1f2f4a;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.ct-comparison-summary-card .ant-card-body {
+  display: grid;
+  gap: 8px;
+}
+
+.ct-comparison-summary-title.ant-typography {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.ct-comparison-summary-label.ant-typography {
+  display: block;
+  font-size: 12px;
+  color: #596577;
+}
+
+.ct-comparison-summary-value.ant-typography {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 18px;
+  line-height: 1.35;
+  color: #1f2f4a;
+}
+
+.ct-comparison-summary-delta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(22, 119, 255, 0.16);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(22, 119, 255, 0.08) 0%, rgba(240, 247, 255, 0.9) 100%);
+}
+
+.ct-comparison-summary-delta-label.ant-typography {
+  color: #102039;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ct-comparison-summary-delta-value {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.ct-comparison-summary-delta-value .ant-typography {
+  font-size: inherit;
+  font-weight: 800 !important;
+}
+
 /* --- Section Cards --- */
 .ct-section-card {
   border-radius: var(--ct-radius) !important;
@@ -797,6 +874,35 @@ body {
   background: #f8f9fb !important;
   font-weight: 600;
   border-top: 2px solid #e8ecf1 !important;
+}
+
+.ct-comparison-compact-table {
+  display: flex;
+  justify-content: flex-start;
+  overflow-x: auto;
+}
+
+.ct-comparison-compact-table .ant-table-wrapper,
+.ct-comparison-compact-table .ant-spin-nested-loading,
+.ct-comparison-compact-table .ant-spin-container,
+.ct-comparison-compact-table .ant-table,
+.ct-comparison-compact-table .ant-table-container {
+  width: auto !important;
+}
+
+.ct-comparison-compact-table .ant-table-container {
+  display: inline-block;
+}
+
+.ct-comparison-compact-table table {
+  width: auto !important;
+  min-width: 820px;
+  table-layout: fixed;
+}
+
+.ct-comparison-compact-table .ant-table-thead > tr > th,
+.ct-comparison-compact-table .ant-table-tbody > tr > td {
+  white-space: nowrap;
 }
 
 /* --- Buttons --- */

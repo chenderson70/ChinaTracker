@@ -215,6 +215,10 @@ interface ReportsPageProps {
   title?: string;
   showBudgetDetails?: boolean;
   showGrandTotals?: boolean;
+  showExerciseDetails?: boolean;
+  showQuickPlanningSummary?: boolean;
+  showFullBudgetBreakdown?: boolean;
+  showTravelConfiguration?: boolean;
   beforeBudgetBreakdownSection?: ReactNode;
   extraSections?: ReactNode;
 }
@@ -260,6 +264,10 @@ export function ReportsPage({
   title = 'Reports & Export',
   showBudgetDetails = true,
   showGrandTotals = true,
+  showExerciseDetails = true,
+  showQuickPlanningSummary = true,
+  showFullBudgetBreakdown = true,
+  showTravelConfiguration = true,
   beforeBudgetBreakdownSection,
   extraSections,
 }: ReportsPageProps) {
@@ -950,6 +958,7 @@ export function ReportsPage({
       </div>
 
       {/* Exercise info */}
+      {showExerciseDetails ? (
       <Card
         title="Exercise Details"
         className="ct-section-card ct-exercise-details-card"
@@ -1064,9 +1073,11 @@ export function ReportsPage({
           </div>
         </div>
       </Card>
+      ) : null}
 
       {beforeBudgetBreakdownSection}
 
+      {showQuickPlanningSummary ? (
       <Card title="Quick Planning Summary" className="ct-section-card ct-quick-summary-card" style={{ marginBottom: 24 }}>
         <div className="ct-quick-summary-grid">
           {quickPlanningSummaryItems.map((item) => (
@@ -1102,8 +1113,10 @@ export function ReportsPage({
           </div>
         </div>
       </Card>
+      ) : null}
 
       {/* Full budget table */}
+      {showFullBudgetBreakdown ? (
       <Card title="Full Budget Breakdown" className="ct-section-card" style={{ marginBottom: 24 }}>
         <div className="ct-table ct-screen-only">
             <Table size="small" pagination={false} dataSource={fullBudgetRows} columns={columns} scroll={{ x: 1080 }} />
@@ -1142,10 +1155,12 @@ export function ReportsPage({
           ))}
         </div>
       </Card>
+      ) : null}
 
       {extraSections}
 
       {/* Travel Config */}
+      {showTravelConfiguration ? (
       <Card
         title="Travel Configuration"
         className="ct-section-card"
@@ -1194,6 +1209,7 @@ export function ReportsPage({
           </Descriptions>
         )}
       </Card>
+      ) : null}
 
       {showGrandTotals ? (
         <Card title="Grand Totals" className="ct-section-card">

@@ -25,6 +25,7 @@ import {
   CloudUploadOutlined,
   DownOutlined,
   DeleteOutlined,
+  CopyOutlined,
   ThunderboltOutlined,
   DatabaseOutlined,
   ArrowRightOutlined,
@@ -370,6 +371,23 @@ export default function AppLayout() {
     });
   };
 
+  const copyExerciseMut = useMutation({
+    mutationFn: (id: string) => api.copyExercise(id),
+    onSuccess: (copiedExercise) => {
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      queryClient.setQueryData(['exercise', copiedExercise.id], copiedExercise);
+      setUndoStacks((current) => ({
+        ...current,
+        [copiedExercise.id]: [],
+      }));
+      setExerciseId(copiedExercise.id);
+      message.success(`Copied exercise as ${copiedExercise.name}`);
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to copy exercise');
+    },
+  });
+
   const handleUndo = () => {
     if (!exerciseId || !currentUndoEntry) return;
     undoMut.mutate({
@@ -491,7 +509,9 @@ export default function AppLayout() {
       label: 'Reports',
       children: [
         { key: '/reports/pm-27-cost-projections', label: 'PM 27 Cost Projections' },
+        { key: '/reports/sustainment', label: 'Exercise Sustainment' },
         { key: '/reports/balance', label: 'Balance' },
+        { key: '/reports/comparison', label: 'Comparison' },
       ],
     },
     { key: '/reports/refinements', icon: <EditOutlined />, label: 'Refinements' },
@@ -562,10 +582,10 @@ export default function AppLayout() {
         <Layout>
           <Header className="ct-header">
             <div className="ct-header-left">
-              <Select
-                style={{ width: 260 }}
-                placeholder="Select exercise"
-                value={exerciseId}
+            <Select
+              style={{ width: 260 }}
+              placeholder="Select exercise"
+              value={exerciseId}
                 onChange={setExerciseId}
                 options={exerciseOptions}
                 optionRender={(option) => {
@@ -607,6 +627,16 @@ export default function AppLayout() {
                 }}
                 suffixIcon={<ThunderboltOutlined style={{ color: '#1677ff' }} />}
               />
+              {exerciseId && (
+                <Tooltip title="Copy current exercise">
+                  <Button
+                    icon={<CopyOutlined />}
+                    onClick={() => copyExerciseMut.mutate(exerciseId)}
+                    loading={copyExerciseMut.isPending}
+                    aria-label="Copy current exercise"
+                  />
+                </Tooltip>
+              )}
               <Tooltip title={hasAnyExercise ? 'Create new exercise' : 'Start here to create your exercise'}>
                 <Button
                   icon={<PlusOutlined />}

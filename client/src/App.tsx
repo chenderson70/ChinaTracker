@@ -6,7 +6,9 @@ import Dashboard from './pages/Dashboard';
 import UnitView from './pages/UnitView';
 import RateConfig from './pages/RateConfig';
 import Pm27CostProjections from './pages/Pm27CostProjections';
+import Sustainment from './pages/Sustainment';
 import Balance from './pages/Balance';
+import Comparison from './pages/Comparison';
 import Refinements from './pages/Refinements';
 import AuthPage from './pages/AuthPage';
 import * as api from './services/api';
@@ -63,7 +65,9 @@ export default function App() {
         <Route path="/units/:unitCode" element={<UnitView />} />
         <Route path="/rates" element={<RateConfig />} />
         <Route path="/reports/pm-27-cost-projections" element={<Pm27CostProjections />} />
+        <Route path="/reports/sustainment" element={<Sustainment />} />
         <Route path="/reports/balance" element={<Balance />} />
+        <Route path="/reports/comparison" element={<Comparison />} />
         <Route path="/reports/refinements" element={<Refinements />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
