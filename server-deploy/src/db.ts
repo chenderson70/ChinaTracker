@@ -1,4 +1,14 @@
 import { PrismaClient } from '@prisma/client';
+import dotenv from 'dotenv';
+import path from 'path';
+
+const SERVER_ROOT = path.resolve(__dirname, '..');
+
+dotenv.config({ path: path.resolve(SERVER_ROOT, '.env') });
+
+if (!process.env.DATABASE_URL) {
+	process.env.DATABASE_URL = 'file:./prisma/prod.db';
+}
 
 export const prisma = new PrismaClient();
 

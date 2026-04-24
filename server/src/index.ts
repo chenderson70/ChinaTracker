@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import dotenv from 'dotenv';
 import exercisesRouter from './routes/exercises';
 import personnelGroupsRouter from './routes/personnelGroups';
 import costLinesRouter from './routes/costLines';
@@ -9,8 +8,6 @@ import ratesRouter from './routes/rates';
 import authRouter from './routes/auth';
 import { requireAuth } from './services/auth';
 import { ensureBaselineData, prisma } from './db';
-
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 const app = express();
 
