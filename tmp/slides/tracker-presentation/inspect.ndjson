@@ -1,0 +1,463 @@
+{"kind":"deck","slideCount":8,"slideSize":{"width":1280,"height":720}}
+{"kind":"slide","slide":1,"id":"dh15un"}
+{"kind":"slide","slide":2,"id":"jyep9r"}
+{"kind":"slide","slide":3,"id":"dad5ru"}
+{"kind":"slide","slide":4,"id":"bja8fr"}
+{"kind":"slide","slide":5,"id":"jnce7a"}
+{"kind":"slide","slide":6,"id":"bv3ze7"}
+{"kind":"slide","slide":7,"id":"uvq3qe"}
+{"kind":"slide","slide":8,"id":"wj6bny"}
+{"kind":"shape","slide":1,"role":"backdrop glow","bbox":[-110,-80,360,360]}
+{"kind":"shape","slide":1,"role":"backdrop glow","bbox":[1010,-120,330,330]}
+{"kind":"shape","slide":1,"role":"backdrop glow","bbox":[980,510,380,380]}
+{"kind":"shape","slide":1,"role":"frame","bbox":[34,28,1212,664]}
+{"kind":"shape","slide":1,"role":"kicker","bbox":[70,40,280,18]}
+{"kind":"textbox","slide":1,"role":"kicker","text":"EXECUTIVE BRIEF","textChars":15,"textLines":1,"bbox":[70,40,280,18]}
+{"kind":"shape","slide":1,"role":"slide index","bbox":[1080,40,120,18]}
+{"kind":"textbox","slide":1,"role":"slide index","text":"01 / 08","textChars":7,"textLines":1,"bbox":[1080,40,120,18]}
+{"kind":"shape","slide":1,"role":"cover pill panel","bbox":[70,92,230,30]}
+{"kind":"shape","slide":1,"role":"cover pill","bbox":[84,99,202,16]}
+{"kind":"textbox","slide":1,"role":"cover pill","text":"PATRIOT MEDIC | CHINA TRACKER","textChars":29,"textLines":1,"bbox":[84,99,202,16]}
+{"kind":"shape","slide":1,"role":"cover title","bbox":[70,138,540,112]}
+{"kind":"textbox","slide":1,"role":"cover title","text":"Exercise Budget Planning\nWithout Excel Fragility","textChars":48,"textLines":2,"bbox":[70,138,540,112]}
+{"kind":"shape","slide":1,"role":"cover subtitle","bbox":[72,270,500,68]}
+{"kind":"textbox","slide":1,"role":"cover subtitle","text":"China Tracker turns unit inputs, rate tables, and reporting requirements into one live planning picture that leadership can trust.","textChars":130,"textLines":1,"bbox":[72,270,500,68]}
+{"kind":"shape","slide":1,"role":"Why it matters now card","bbox":[70,392,488,136]}
+{"kind":"shape","slide":1,"role":"icon circle","bbox":[92,412,42,42]}
+{"kind":"shape","slide":1,"role":"icon text","bbox":[104,420,18,18]}
+{"kind":"textbox","slide":1,"role":"icon text","text":"01","textChars":2,"textLines":1,"bbox":[104,420,18,18]}
+{"kind":"shape","slide":1,"role":"card title","bbox":[148,412,392,24]}
+{"kind":"textbox","slide":1,"role":"card title","text":"Why it matters now","textChars":18,"textLines":1,"bbox":[148,412,392,24]}
+{"kind":"shape","slide":1,"role":"card body","bbox":[94,460,440,46]}
+{"kind":"textbox","slide":1,"role":"card body","text":"The application already replaces disconnected workbook logic with a single web-based planning surface that updates immediately.","textChars":127,"textLines":1,"bbox":[94,460,440,46]}
+{"kind":"shape","slide":1,"role":"pill panel","bbox":[70,556,150,30]}
+{"kind":"shape","slide":1,"role":"pill","bbox":[84,563,122,16]}
+{"kind":"textbox","slide":1,"role":"pill","text":"REAL-TIME TOTALS","textChars":16,"textLines":1,"bbox":[84,563,122,16]}
+{"kind":"shape","slide":1,"role":"pill panel","bbox":[232,556,154,30]}
+{"kind":"shape","slide":1,"role":"pill","bbox":[246,563,126,16]}
+{"kind":"textbox","slide":1,"role":"pill","text":"AUDIT-FRIENDLY","textChars":14,"textLines":1,"bbox":[246,563,126,16]}
+{"kind":"shape","slide":1,"role":"pill panel","bbox":[398,556,160,30]}
+{"kind":"shape","slide":1,"role":"pill","bbox":[412,563,132,16]}
+{"kind":"textbox","slide":1,"role":"pill","text":"EXPORT-READY","textChars":12,"textLines":1,"bbox":[412,563,132,16]}
+{"kind":"shape","slide":1,"role":"screenshot shadow","bbox":[660,98,560,252]}
+{"kind":"shape","slide":1,"role":"screenshot frame","bbox":[650,84,560,252]}
+{"kind":"shape","slide":1,"role":"browser bar","bbox":[666,98,528,26]}
+{"kind":"shape","slide":1,"role":"browser dot","bbox":[678,107,8,8]}
+{"kind":"shape","slide":1,"role":"browser dot","bbox":[692,107,8,8]}
+{"kind":"shape","slide":1,"role":"browser dot","bbox":[706,107,8,8]}
+{"kind":"image","slide":1,"role":"Dashboard","path":"C:\\Users\\culle\\OneDrive\\Desktop\\ChinaTracker\\tmp\\slides\\tracker-presentation\\screenshots\\dashboard.png","bbox":[668,136,524,182]}
+{"kind":"shape","slide":1,"role":"Dashboard tag panel","bbox":[668,308,120,30]}
+{"kind":"shape","slide":1,"role":"Dashboard tag","bbox":[682,315,92,16]}
+{"kind":"textbox","slide":1,"role":"Dashboard tag","text":"Dashboard","textChars":9,"textLines":1,"bbox":[682,315,92,16]}
+{"kind":"shape","slide":1,"role":"screenshot shadow","bbox":[630,320,360,254]}
+{"kind":"shape","slide":1,"role":"screenshot frame","bbox":[620,306,360,254]}
+{"kind":"shape","slide":1,"role":"browser bar","bbox":[636,320,328,26]}
+{"kind":"shape","slide":1,"role":"browser dot","bbox":[648,329,8,8]}
+{"kind":"shape","slide":1,"role":"browser dot","bbox":[662,329,8,8]}
+{"kind":"shape","slide":1,"role":"browser dot","bbox":[676,329,8,8]}
+{"kind":"image","slide":1,"role":"Unit View","path":"C:\\Users\\culle\\OneDrive\\Desktop\\ChinaTracker\\tmp\\slides\\tracker-presentation\\screenshots\\unit-a7.png","bbox":[638,358,324,184]}
+{"kind":"shape","slide":1,"role":"Unit View tag panel","bbox":[638,532,120,30]}
+{"kind":"shape","slide":1,"role":"Unit View tag","bbox":[652,539,92,16]}
+{"kind":"textbox","slide":1,"role":"Unit View tag","text":"Unit View","textChars":9,"textLines":1,"bbox":[652,539,92,16]}
+{"kind":"shape","slide":1,"role":"screenshot shadow","bbox":[954,358,266,182]}
+{"kind":"shape","slide":1,"role":"screenshot frame","bbox":[944,344,266,182]}
+{"kind":"shape","slide":1,"role":"browser bar","bbox":[960,358,234,26]}
+{"kind":"shape","slide":1,"role":"browser dot","bbox":[972,367,8,8]}
+{"kind":"shape","slide":1,"role":"browser dot","bbox":[986,367,8,8]}
+{"kind":"shape","slide":1,"role":"browser dot","bbox":[1000,367,8,8]}
+{"kind":"image","slide":1,"role":"Reports","path":"C:\\Users\\culle\\OneDrive\\Desktop\\ChinaTracker\\tmp\\slides\\tracker-presentation\\screenshots\\reports-balance.png","bbox":[962,396,230,112]}
+{"kind":"shape","slide":1,"role":"Reports tag panel","bbox":[962,498,120,30]}
+{"kind":"shape","slide":1,"role":"Reports tag","bbox":[976,505,92,16]}
+{"kind":"textbox","slide":1,"role":"Reports tag","text":"Reports","textChars":7,"textLines":1,"bbox":[976,505,92,16]}
+{"kind":"shape","slide":2,"role":"backdrop glow","bbox":[-120,-120,360,360]}
+{"kind":"shape","slide":2,"role":"backdrop glow","bbox":[1030,-90,260,260]}
+{"kind":"shape","slide":2,"role":"backdrop glow","bbox":[980,560,280,280]}
+{"kind":"shape","slide":2,"role":"kicker","bbox":[70,40,280,18]}
+{"kind":"textbox","slide":2,"role":"kicker","text":"HOW THE APP WORKS","textChars":17,"textLines":1,"bbox":[70,40,280,18]}
+{"kind":"shape","slide":2,"role":"slide index","bbox":[1080,40,120,18]}
+{"kind":"textbox","slide":2,"role":"slide index","text":"02 / 08","textChars":7,"textLines":1,"bbox":[1080,40,120,18]}
+{"kind":"shape","slide":2,"role":"title","bbox":[70,78,690,116]}
+{"kind":"textbox","slide":2,"role":"title","text":"How the App Works","textChars":17,"textLines":1,"bbox":[70,78,690,116]}
+{"kind":"shape","slide":2,"role":"subtitle","bbox":[72,190,680,64]}
+{"kind":"textbox","slide":2,"role":"subtitle","text":"The workflow mirrors how planners already think, but the calculations and rollups happen automatically.","textChars":103,"textLines":1,"bbox":[72,190,680,64]}
+{"kind":"shape","slide":2,"role":"Create or select an exercise step","bbox":[70,296,352,152]}
+{"kind":"shape","slide":2,"role":"step bubble","bbox":[94,320,40,40]}
+{"kind":"shape","slide":2,"role":"step number","bbox":[108,331,12,12]}
+{"kind":"textbox","slide":2,"role":"step number","text":"1","textChars":1,"textLines":1,"bbox":[108,331,12,12]}
+{"kind":"shape","slide":2,"role":"step title","bbox":[152,320,250,22]}
+{"kind":"textbox","slide":2,"role":"step title","text":"Create or select an exercise","textChars":28,"textLines":1,"bbox":[152,320,250,22]}
+{"kind":"shape","slide":2,"role":"step body","bbox":[94,374,304,46]}
+{"kind":"textbox","slide":2,"role":"step body","text":"Set the exercise name, date range, and default duty day assumptions once at the top.","textChars":84,"textLines":1,"bbox":[94,374,304,46]}
+{"kind":"shape","slide":2,"role":"Configure rates and targets step","bbox":[448,296,352,152]}
+{"kind":"shape","slide":2,"role":"step bubble","bbox":[472,320,40,40]}
+{"kind":"shape","slide":2,"role":"step number","bbox":[486,331,12,12]}
+{"kind":"textbox","slide":2,"role":"step number","text":"2","textChars":1,"textLines":1,"bbox":[486,331,12,12]}
+{"kind":"shape","slide":2,"role":"step title","bbox":[530,320,250,22]}
+{"kind":"textbox","slide":2,"role":"step title","text":"Configure rates and targets","textChars":27,"textLines":1,"bbox":[530,320,250,22]}
+{"kind":"shape","slide":2,"role":"step body","bbox":[472,374,304,46]}
+{"kind":"textbox","slide":2,"role":"step body","text":"Adjust CPD, per diem, travel, meal, and budget target assumptions in one controlled location.","textChars":93,"textLines":1,"bbox":[472,374,304,46]}
+{"kind":"shape","slide":2,"role":"Build each unit page step","bbox":[826,296,352,152]}
+{"kind":"shape","slide":2,"role":"step bubble","bbox":[850,320,40,40]}
+{"kind":"shape","slide":2,"role":"step number","bbox":[864,331,12,12]}
+{"kind":"textbox","slide":2,"role":"step number","text":"3","textChars":1,"textLines":1,"bbox":[864,331,12,12]}
+{"kind":"shape","slide":2,"role":"step title","bbox":[908,320,250,22]}
+{"kind":"textbox","slide":2,"role":"step title","text":"Build each unit page","textChars":20,"textLines":1,"bbox":[908,320,250,22]}
+{"kind":"shape","slide":2,"role":"step body","bbox":[850,374,304,46]}
+{"kind":"textbox","slide":2,"role":"step body","text":"Enter PAX, locations, duty days, and detailed planning or execution inputs for each unit.","textChars":89,"textLines":1,"bbox":[850,374,304,46]}
+{"kind":"shape","slide":2,"role":"Review live rollups step","bbox":[70,468,544,152]}
+{"kind":"shape","slide":2,"role":"step bubble","bbox":[94,492,40,40]}
+{"kind":"shape","slide":2,"role":"step number","bbox":[108,503,12,12]}
+{"kind":"textbox","slide":2,"role":"step number","text":"4","textChars":1,"textLines":1,"bbox":[108,503,12,12]}
+{"kind":"shape","slide":2,"role":"step title","bbox":[152,492,442,22]}
+{"kind":"textbox","slide":2,"role":"step title","text":"Review live rollups","textChars":19,"textLines":1,"bbox":[152,492,442,22]}
+{"kind":"shape","slide":2,"role":"step body","bbox":[94,546,496,46]}
+{"kind":"textbox","slide":2,"role":"step body","text":"Dashboard, balance, and report views update automatically as soon as a planner changes data.","textChars":92,"textLines":1,"bbox":[94,546,496,46]}
+{"kind":"shape","slide":2,"role":"Export and refine step","bbox":[640,468,544,152]}
+{"kind":"shape","slide":2,"role":"step bubble","bbox":[664,492,40,40]}
+{"kind":"shape","slide":2,"role":"step number","bbox":[678,503,12,12]}
+{"kind":"textbox","slide":2,"role":"step number","text":"5","textChars":1,"textLines":1,"bbox":[678,503,12,12]}
+{"kind":"shape","slide":2,"role":"step title","bbox":[722,492,442,22]}
+{"kind":"textbox","slide":2,"role":"step title","text":"Export and refine","textChars":17,"textLines":1,"bbox":[722,492,442,22]}
+{"kind":"shape","slide":2,"role":"step body","bbox":[664,546,496,46]}
+{"kind":"textbox","slide":2,"role":"step body","text":"Use reports, print/PDF, Excel export, refinements, clear tools, and undo to support the briefing cycle.","textChars":103,"textLines":1,"bbox":[664,546,496,46]}
+{"kind":"shape","slide":2,"role":"workflow arrow","bbox":[420,632,430,26]}
+{"kind":"shape","slide":2,"role":"workflow caption","bbox":[442,636,390,14]}
+{"kind":"textbox","slide":2,"role":"workflow caption","text":"Structured input -> calculation engine -> leadership-ready output","textChars":65,"textLines":1,"bbox":[442,636,390,14]}
+{"kind":"shape","slide":3,"role":"backdrop glow","bbox":[-110,-80,360,360]}
+{"kind":"shape","slide":3,"role":"backdrop glow","bbox":[1010,-120,330,330]}
+{"kind":"shape","slide":3,"role":"backdrop glow","bbox":[980,510,380,380]}
+{"kind":"shape","slide":3,"role":"frame","bbox":[34,28,1212,664]}
+{"kind":"shape","slide":3,"role":"kicker","bbox":[70,40,280,18]}
+{"kind":"textbox","slide":3,"role":"kicker","text":"WHY IT BEATS EXCEL","textChars":18,"textLines":1,"bbox":[70,40,280,18]}
+{"kind":"shape","slide":3,"role":"slide index","bbox":[1080,40,120,18]}
+{"kind":"textbox","slide":3,"role":"slide index","text":"03 / 08","textChars":7,"textLines":1,"bbox":[1080,40,120,18]}
+{"kind":"shape","slide":3,"role":"title","bbox":[70,78,690,116]}
+{"kind":"textbox","slide":3,"role":"title","text":"Why It Is Better Than Using Excel","textChars":33,"textLines":1,"bbox":[70,78,690,116]}
+{"kind":"shape","slide":3,"role":"subtitle","bbox":[72,190,680,64]}
+{"kind":"textbox","slide":3,"role":"subtitle","text":"Spreadsheet flexibility helps early on, but briefing-quality planning demands consistent logic, traceability, and faster scenario changes.","textChars":138,"textLines":1,"bbox":[72,190,680,64]}
+{"kind":"shape","slide":3,"role":"comparison pillar panel","bbox":[70,252,150,30]}
+{"kind":"shape","slide":3,"role":"comparison pillar","bbox":[84,259,122,16]}
+{"kind":"textbox","slide":3,"role":"comparison pillar","text":"ONE DATA MODEL","textChars":14,"textLines":1,"bbox":[84,259,122,16]}
+{"kind":"shape","slide":3,"role":"comparison pillar panel","bbox":[236,252,162,30]}
+{"kind":"shape","slide":3,"role":"comparison pillar","bbox":[250,259,134,16]}
+{"kind":"textbox","slide":3,"role":"comparison pillar","text":"FASTER WHAT-IFS","textChars":15,"textLines":1,"bbox":[250,259,134,16]}
+{"kind":"shape","slide":3,"role":"comparison pillar panel","bbox":[414,252,188,30]}
+{"kind":"shape","slide":3,"role":"comparison pillar","bbox":[428,259,160,16]}
+{"kind":"textbox","slide":3,"role":"comparison pillar","text":"BRIEF-READY OUTPUT","textChars":18,"textLines":1,"bbox":[428,259,160,16]}
+{"kind":"shape","slide":3,"role":"comparison pillar panel","bbox":[618,252,176,30]}
+{"kind":"shape","slide":3,"role":"comparison pillar","bbox":[632,259,148,16]}
+{"kind":"textbox","slide":3,"role":"comparison pillar","text":"LOWER WORKBOOK RISK","textChars":19,"textLines":1,"bbox":[632,259,148,16]}
+{"kind":"shape","slide":3,"role":"comparison matrix","bbox":[70,298,1140,332]}
+{"kind":"shape","slide":3,"role":"planning header","bbox":[114,324,170,20]}
+{"kind":"textbox","slide":3,"role":"planning header","text":"Planning Need","textChars":13,"textLines":1,"bbox":[114,324,170,20]}
+{"kind":"shape","slide":3,"role":"excel header","bbox":[320,324,140,20]}
+{"kind":"textbox","slide":3,"role":"excel header","text":"Excel","textChars":5,"textLines":1,"bbox":[320,324,140,20]}
+{"kind":"shape","slide":3,"role":"app header","bbox":[884,324,180,20]}
+{"kind":"textbox","slide":3,"role":"app header","text":"China Tracker","textChars":13,"textLines":1,"bbox":[884,324,180,20]}
+{"kind":"shape","slide":3,"role":"Formula integrity row","bbox":[92,364,1096,44]}
+{"kind":"shape","slide":3,"role":"comparison label","bbox":[114,377,170,18]}
+{"kind":"textbox","slide":3,"role":"comparison label","text":"Formula integrity","textChars":17,"textLines":1,"bbox":[114,377,170,18]}
+{"kind":"shape","slide":3,"role":"excel comparison","bbox":[320,371,282,30]}
+{"kind":"textbox","slide":3,"role":"excel comparison","text":"Linked formulas\nacross tabs","textChars":27,"textLines":2,"bbox":[320,371,282,30]}
+{"kind":"shape","slide":3,"role":"app comparison highlight","bbox":[646,370,520,32]}
+{"kind":"shape","slide":3,"role":"app comparison","bbox":[664,372,486,28]}
+{"kind":"textbox","slide":3,"role":"app comparison","text":"Structured inputs and\nshared calculation rules","textChars":46,"textLines":2,"bbox":[664,372,486,28]}
+{"kind":"shape","slide":3,"role":"Speed to update row","bbox":[92,412,1096,44]}
+{"kind":"shape","slide":3,"role":"comparison label","bbox":[114,425,170,18]}
+{"kind":"textbox","slide":3,"role":"comparison label","text":"Speed to update","textChars":15,"textLines":1,"bbox":[114,425,170,18]}
+{"kind":"shape","slide":3,"role":"excel comparison","bbox":[320,419,282,30]}
+{"kind":"textbox","slide":3,"role":"excel comparison","text":"Rework sheets and totals\nafter each change","textChars":42,"textLines":2,"bbox":[320,419,282,30]}
+{"kind":"shape","slide":3,"role":"app comparison highlight","bbox":[646,418,520,32]}
+{"kind":"shape","slide":3,"role":"app comparison","bbox":[664,420,486,28]}
+{"kind":"textbox","slide":3,"role":"app comparison","text":"Totals and funding splits\nrecalculate immediately","textChars":49,"textLines":2,"bbox":[664,420,486,28]}
+{"kind":"shape","slide":3,"role":"Scenario testing row","bbox":[92,460,1096,44]}
+{"kind":"shape","slide":3,"role":"comparison label","bbox":[114,473,170,18]}
+{"kind":"textbox","slide":3,"role":"comparison label","text":"Scenario testing","textChars":16,"textLines":1,"bbox":[114,473,170,18]}
+{"kind":"shape","slide":3,"role":"excel comparison","bbox":[320,467,282,30]}
+{"kind":"textbox","slide":3,"role":"excel comparison","text":"Duplicate versions\nto compare options","textChars":37,"textLines":2,"bbox":[320,467,282,30]}
+{"kind":"shape","slide":3,"role":"app comparison highlight","bbox":[646,466,520,32]}
+{"kind":"shape","slide":3,"role":"app comparison","bbox":[664,468,486,28]}
+{"kind":"textbox","slide":3,"role":"app comparison","text":"Clear tools and 10-step undo\nsupport fast what-ifs","textChars":50,"textLines":2,"bbox":[664,468,486,28]}
+{"kind":"shape","slide":3,"role":"Traceability row","bbox":[92,508,1096,44]}
+{"kind":"shape","slide":3,"role":"comparison label","bbox":[114,521,170,18]}
+{"kind":"textbox","slide":3,"role":"comparison label","text":"Traceability","textChars":12,"textLines":1,"bbox":[114,521,170,18]}
+{"kind":"shape","slide":3,"role":"excel comparison","bbox":[320,515,282,30]}
+{"kind":"textbox","slide":3,"role":"excel comparison","text":"Hard to brief where\nthe numbers came from","textChars":41,"textLines":2,"bbox":[320,515,282,30]}
+{"kind":"shape","slide":3,"role":"app comparison highlight","bbox":[646,514,520,32]}
+{"kind":"shape","slide":3,"role":"app comparison","bbox":[664,516,486,28]}
+{"kind":"textbox","slide":3,"role":"app comparison","text":"Costs stay grouped by unit,\nsection, and funding line","textChars":53,"textLines":2,"bbox":[664,516,486,28]}
+{"kind":"shape","slide":3,"role":"Briefing output row","bbox":[92,556,1096,44]}
+{"kind":"shape","slide":3,"role":"comparison label","bbox":[114,569,170,18]}
+{"kind":"textbox","slide":3,"role":"comparison label","text":"Briefing output","textChars":15,"textLines":1,"bbox":[114,569,170,18]}
+{"kind":"shape","slide":3,"role":"excel comparison","bbox":[320,563,282,30]}
+{"kind":"textbox","slide":3,"role":"excel comparison","text":"Cleanup before\nevery review","textChars":27,"textLines":2,"bbox":[320,563,282,30]}
+{"kind":"shape","slide":3,"role":"app comparison highlight","bbox":[646,562,520,32]}
+{"kind":"shape","slide":3,"role":"app comparison","bbox":[664,564,486,28]}
+{"kind":"textbox","slide":3,"role":"app comparison","text":"Balance report, print/PDF,\nand export from live data","textChars":52,"textLines":2,"bbox":[664,564,486,28]}
+{"kind":"shape","slide":3,"role":"continuity banner","bbox":[70,646,1140,42]}
+{"kind":"shape","slide":3,"role":"continuity note","bbox":[96,659,1088,16]}
+{"kind":"textbox","slide":3,"role":"continuity note","text":"Planning stays less dependent on one spreadsheet owner because exercises, reports, and refinements are saved inside the same workflow.","textChars":134,"textLines":1,"bbox":[96,659,1088,16]}
+{"kind":"shape","slide":4,"role":"backdrop glow","bbox":[-120,-120,360,360]}
+{"kind":"shape","slide":4,"role":"backdrop glow","bbox":[1030,-90,260,260]}
+{"kind":"shape","slide":4,"role":"backdrop glow","bbox":[980,560,280,280]}
+{"kind":"shape","slide":4,"role":"kicker","bbox":[70,40,280,18]}
+{"kind":"textbox","slide":4,"role":"kicker","text":"MAIN FEATURES","textChars":13,"textLines":1,"bbox":[70,40,280,18]}
+{"kind":"shape","slide":4,"role":"slide index","bbox":[1080,40,120,18]}
+{"kind":"textbox","slide":4,"role":"slide index","text":"04 / 08","textChars":7,"textLines":1,"bbox":[1080,40,120,18]}
+{"kind":"shape","slide":4,"role":"title","bbox":[70,78,690,116]}
+{"kind":"textbox","slide":4,"role":"title","text":"Main Features","textChars":13,"textLines":1,"bbox":[70,78,690,116]}
+{"kind":"shape","slide":4,"role":"subtitle","bbox":[72,190,680,64]}
+{"kind":"textbox","slide":4,"role":"subtitle","text":"The application combines executive visibility, detailed planning controls, and briefing output in one connected workflow.","textChars":121,"textLines":1,"bbox":[72,190,680,64]}
+{"kind":"shape","slide":4,"role":"Real-time rollups feature","bbox":[70,294,352,164]}
+{"kind":"shape","slide":4,"role":"feature badge","bbox":[88,312,56,30]}
+{"kind":"shape","slide":4,"role":"feature badge text","bbox":[88,320,56,12]}
+{"kind":"textbox","slide":4,"role":"feature badge text","text":"LIVE","textChars":4,"textLines":1,"bbox":[88,320,56,12]}
+{"kind":"shape","slide":4,"role":"feature title","bbox":[88,360,316,24]}
+{"kind":"textbox","slide":4,"role":"feature title","text":"Real-time rollups","textChars":17,"textLines":1,"bbox":[88,360,316,24]}
+{"kind":"shape","slide":4,"role":"feature body","bbox":[88,396,316,54]}
+{"kind":"textbox","slide":4,"role":"feature body","text":"Grand total, RPA, O&M, and PAX update immediately as users change any planning input.","textChars":85,"textLines":1,"bbox":[88,396,316,54]}
+{"kind":"shape","slide":4,"role":"Unit-specific planning feature","bbox":[448,294,352,164]}
+{"kind":"shape","slide":4,"role":"feature badge","bbox":[466,312,56,30]}
+{"kind":"shape","slide":4,"role":"feature badge text","bbox":[466,320,56,12]}
+{"kind":"textbox","slide":4,"role":"feature badge text","text":"UNIT","textChars":4,"textLines":1,"bbox":[466,320,56,12]}
+{"kind":"shape","slide":4,"role":"feature title","bbox":[466,360,316,24]}
+{"kind":"textbox","slide":4,"role":"feature title","text":"Unit-specific planning","textChars":22,"textLines":1,"bbox":[466,360,316,24]}
+{"kind":"shape","slide":4,"role":"feature body","bbox":[466,396,316,54]}
+{"kind":"textbox","slide":4,"role":"feature body","text":"SG, AE, CAB, and A7 each have purpose-built sections for planning, players, white cell, and support logic.","textChars":106,"textLines":1,"bbox":[466,396,316,54]}
+{"kind":"shape","slide":4,"role":"Rate configuration feature","bbox":[826,294,352,164]}
+{"kind":"shape","slide":4,"role":"feature badge","bbox":[844,312,56,30]}
+{"kind":"shape","slide":4,"role":"feature badge text","bbox":[844,320,56,12]}
+{"kind":"textbox","slide":4,"role":"feature badge text","text":"RATE","textChars":4,"textLines":1,"bbox":[844,320,56,12]}
+{"kind":"shape","slide":4,"role":"feature title","bbox":[844,360,316,24]}
+{"kind":"textbox","slide":4,"role":"feature title","text":"Rate configuration","textChars":18,"textLines":1,"bbox":[844,360,316,24]}
+{"kind":"shape","slide":4,"role":"feature body","bbox":[844,396,316,54]}
+{"kind":"textbox","slide":4,"role":"feature body","text":"CPD, per diem, meals, airfare, rental assumptions, and budget targets are maintained centrally.","textChars":95,"textLines":1,"bbox":[844,396,316,54]}
+{"kind":"shape","slide":4,"role":"Reporting and export feature","bbox":[70,476,352,164]}
+{"kind":"shape","slide":4,"role":"feature badge","bbox":[88,494,56,30]}
+{"kind":"shape","slide":4,"role":"feature badge text","bbox":[88,502,56,12]}
+{"kind":"textbox","slide":4,"role":"feature badge text","text":"RPT","textChars":3,"textLines":1,"bbox":[88,502,56,12]}
+{"kind":"shape","slide":4,"role":"feature title","bbox":[88,542,316,24]}
+{"kind":"textbox","slide":4,"role":"feature title","text":"Reporting and export","textChars":20,"textLines":1,"bbox":[88,542,316,24]}
+{"kind":"shape","slide":4,"role":"feature body","bbox":[88,578,316,54]}
+{"kind":"textbox","slide":4,"role":"feature body","text":"Balance, print/PDF, and Excel output make the same live data ready for briefings and follow-on documents.","textChars":105,"textLines":1,"bbox":[88,578,316,54]}
+{"kind":"shape","slide":4,"role":"Refinements workspace feature","bbox":[448,476,352,164]}
+{"kind":"shape","slide":4,"role":"feature badge","bbox":[466,494,56,30]}
+{"kind":"shape","slide":4,"role":"feature badge text","bbox":[466,502,56,12]}
+{"kind":"textbox","slide":4,"role":"feature badge text","text":"NOTE","textChars":4,"textLines":1,"bbox":[466,502,56,12]}
+{"kind":"shape","slide":4,"role":"feature title","bbox":[466,542,316,24]}
+{"kind":"textbox","slide":4,"role":"feature title","text":"Refinements workspace","textChars":21,"textLines":1,"bbox":[466,542,316,24]}
+{"kind":"shape","slide":4,"role":"feature body","bbox":[466,578,316,54]}
+{"kind":"textbox","slide":4,"role":"feature body","text":"Improvement notes, status tracking, and follow-up context live inside the app instead of in side notes.","textChars":103,"textLines":1,"bbox":[466,578,316,54]}
+{"kind":"shape","slide":4,"role":"Safety controls feature","bbox":[826,476,352,164]}
+{"kind":"shape","slide":4,"role":"feature badge","bbox":[844,494,56,30]}
+{"kind":"shape","slide":4,"role":"feature badge text","bbox":[844,502,56,12]}
+{"kind":"textbox","slide":4,"role":"feature badge text","text":"SAFE","textChars":4,"textLines":1,"bbox":[844,502,56,12]}
+{"kind":"shape","slide":4,"role":"feature title","bbox":[844,542,316,24]}
+{"kind":"textbox","slide":4,"role":"feature title","text":"Safety controls","textChars":15,"textLines":1,"bbox":[844,542,316,24]}
+{"kind":"shape","slide":4,"role":"feature body","bbox":[844,578,316,54]}
+{"kind":"textbox","slide":4,"role":"feature body","text":"Section clear, unit clear, authenticated persistence, and 10-step undo reduce the risk of bad edits during preparation.","textChars":119,"textLines":1,"bbox":[844,578,316,54]}
+{"kind":"shape","slide":5,"role":"backdrop glow","bbox":[-120,-120,360,360]}
+{"kind":"shape","slide":5,"role":"backdrop glow","bbox":[1030,-90,260,260]}
+{"kind":"shape","slide":5,"role":"backdrop glow","bbox":[980,560,280,280]}
+{"kind":"shape","slide":5,"role":"kicker","bbox":[70,40,280,18]}
+{"kind":"textbox","slide":5,"role":"kicker","text":"LIVE DEMONSTRATION","textChars":18,"textLines":1,"bbox":[70,40,280,18]}
+{"kind":"shape","slide":5,"role":"slide index","bbox":[1080,40,120,18]}
+{"kind":"textbox","slide":5,"role":"slide index","text":"05 / 08","textChars":7,"textLines":1,"bbox":[1080,40,120,18]}
+{"kind":"shape","slide":5,"role":"title","bbox":[70,78,690,116]}
+{"kind":"textbox","slide":5,"role":"title","text":"Live Demonstration: Executive Dashboard","textChars":39,"textLines":1,"bbox":[70,78,690,116]}
+{"kind":"shape","slide":5,"role":"subtitle","bbox":[72,190,680,64]}
+{"kind":"textbox","slide":5,"role":"subtitle","text":"Leadership can immediately see total cost, funding split, PAX, and unit-level impact from one screen.","textChars":101,"textLines":1,"bbox":[72,190,680,64]}
+{"kind":"shape","slide":5,"role":"screenshot shadow","bbox":[430,218,790,448]}
+{"kind":"shape","slide":5,"role":"screenshot frame","bbox":[420,204,790,448]}
+{"kind":"shape","slide":5,"role":"browser bar","bbox":[436,218,758,26]}
+{"kind":"shape","slide":5,"role":"browser dot","bbox":[448,227,8,8]}
+{"kind":"shape","slide":5,"role":"browser dot","bbox":[462,227,8,8]}
+{"kind":"shape","slide":5,"role":"browser dot","bbox":[476,227,8,8]}
+{"kind":"image","slide":5,"role":"Dashboard","path":"C:\\Users\\culle\\OneDrive\\Desktop\\ChinaTracker\\tmp\\slides\\tracker-presentation\\screenshots\\dashboard.png","bbox":[438,256,754,378]}
+{"kind":"shape","slide":5,"role":"Dashboard tag panel","bbox":[438,624,120,30]}
+{"kind":"shape","slide":5,"role":"Dashboard tag","bbox":[452,631,92,16]}
+{"kind":"textbox","slide":5,"role":"Dashboard tag","text":"Dashboard","textChars":9,"textLines":1,"bbox":[452,631,92,16]}
+{"kind":"shape","slide":5,"role":"At-a-glance totals callout","bbox":[70,250,300,86]}
+{"kind":"shape","slide":5,"role":"callout title","bbox":[86,264,268,18]}
+{"kind":"textbox","slide":5,"role":"callout title","text":"At-a-glance totals","textChars":18,"textLines":1,"bbox":[86,264,268,18]}
+{"kind":"shape","slide":5,"role":"callout body","bbox":[86,286,268,34]}
+{"kind":"textbox","slide":5,"role":"callout body","text":"Grand Total, RPA, O&M, and PAX are visible immediately at the top of the screen.","textChars":80,"textLines":1,"bbox":[86,286,268,34]}
+{"kind":"shape","slide":5,"role":"Executive briefing table callout","bbox":[70,354,300,86]}
+{"kind":"shape","slide":5,"role":"callout title","bbox":[86,368,268,18]}
+{"kind":"textbox","slide":5,"role":"callout title","text":"Executive briefing table","textChars":24,"textLines":1,"bbox":[86,368,268,18]}
+{"kind":"shape","slide":5,"role":"callout body","bbox":[86,390,268,34]}
+{"kind":"textbox","slide":5,"role":"callout body","text":"Unit-level totals summarize how SG, AE, CAB, and A7 each contribute to the overall cost picture.","textChars":96,"textLines":1,"bbox":[86,390,268,34]}
+{"kind":"shape","slide":5,"role":"Visual comparison callout","bbox":[70,458,300,86]}
+{"kind":"shape","slide":5,"role":"callout title","bbox":[86,472,268,18]}
+{"kind":"textbox","slide":5,"role":"callout title","text":"Visual comparison","textChars":17,"textLines":1,"bbox":[86,472,268,18]}
+{"kind":"shape","slide":5,"role":"callout body","bbox":[86,494,268,34]}
+{"kind":"textbox","slide":5,"role":"callout body","text":"Charts make the funding mix and cost distribution easier to explain in a live room.","textChars":83,"textLines":1,"bbox":[86,494,268,34]}
+{"kind":"shape","slide":5,"role":"Fast scenario review callout","bbox":[70,562,300,86]}
+{"kind":"shape","slide":5,"role":"callout title","bbox":[86,576,268,18]}
+{"kind":"textbox","slide":5,"role":"callout title","text":"Fast scenario review","textChars":20,"textLines":1,"bbox":[86,576,268,18]}
+{"kind":"shape","slide":5,"role":"callout body","bbox":[86,598,268,34]}
+{"kind":"textbox","slide":5,"role":"callout body","text":"A planner can update assumptions and keep leadership oriented without leaving the application.","textChars":94,"textLines":1,"bbox":[86,598,268,34]}
+{"kind":"shape","slide":6,"role":"backdrop glow","bbox":[-120,-120,360,360]}
+{"kind":"shape","slide":6,"role":"backdrop glow","bbox":[1030,-90,260,260]}
+{"kind":"shape","slide":6,"role":"backdrop glow","bbox":[980,560,280,280]}
+{"kind":"shape","slide":6,"role":"kicker","bbox":[70,40,280,18]}
+{"kind":"textbox","slide":6,"role":"kicker","text":"LIVE DEMONSTRATION","textChars":18,"textLines":1,"bbox":[70,40,280,18]}
+{"kind":"shape","slide":6,"role":"slide index","bbox":[1080,40,120,18]}
+{"kind":"textbox","slide":6,"role":"slide index","text":"06 / 08","textChars":7,"textLines":1,"bbox":[1080,40,120,18]}
+{"kind":"shape","slide":6,"role":"title","bbox":[70,78,690,116]}
+{"kind":"textbox","slide":6,"role":"title","text":"Live Demonstration: From Unit Entry to Reporting","textChars":48,"textLines":1,"bbox":[70,78,690,116]}
+{"kind":"shape","slide":6,"role":"subtitle","bbox":[72,190,680,64]}
+{"kind":"textbox","slide":6,"role":"subtitle","text":"The same data drives detailed unit planning, report generation, and the refinements loop.","textChars":89,"textLines":1,"bbox":[72,190,680,64]}
+{"kind":"shape","slide":6,"role":"screenshot shadow","bbox":[80,264,660,394]}
+{"kind":"shape","slide":6,"role":"screenshot frame","bbox":[70,250,660,394]}
+{"kind":"shape","slide":6,"role":"browser bar","bbox":[86,264,628,26]}
+{"kind":"shape","slide":6,"role":"browser dot","bbox":[98,273,8,8]}
+{"kind":"shape","slide":6,"role":"browser dot","bbox":[112,273,8,8]}
+{"kind":"shape","slide":6,"role":"browser dot","bbox":[126,273,8,8]}
+{"kind":"image","slide":6,"role":"Unit Planning","path":"C:\\Users\\culle\\OneDrive\\Desktop\\ChinaTracker\\tmp\\slides\\tracker-presentation\\screenshots\\unit-a7.png","bbox":[88,302,624,324]}
+{"kind":"shape","slide":6,"role":"Unit Planning tag panel","bbox":[88,616,120,30]}
+{"kind":"shape","slide":6,"role":"Unit Planning tag","bbox":[102,623,92,16]}
+{"kind":"textbox","slide":6,"role":"Unit Planning tag","text":"Unit Planning","textChars":13,"textLines":1,"bbox":[102,623,92,16]}
+{"kind":"shape","slide":6,"role":"screenshot shadow","bbox":[780,264,440,186]}
+{"kind":"shape","slide":6,"role":"screenshot frame","bbox":[770,250,440,186]}
+{"kind":"shape","slide":6,"role":"browser bar","bbox":[786,264,408,26]}
+{"kind":"shape","slide":6,"role":"browser dot","bbox":[798,273,8,8]}
+{"kind":"shape","slide":6,"role":"browser dot","bbox":[812,273,8,8]}
+{"kind":"shape","slide":6,"role":"browser dot","bbox":[826,273,8,8]}
+{"kind":"image","slide":6,"role":"Reports","path":"C:\\Users\\culle\\OneDrive\\Desktop\\ChinaTracker\\tmp\\slides\\tracker-presentation\\screenshots\\reports-balance.png","bbox":[788,302,404,116]}
+{"kind":"shape","slide":6,"role":"Reports tag panel","bbox":[788,408,120,30]}
+{"kind":"shape","slide":6,"role":"Reports tag","bbox":[802,415,92,16]}
+{"kind":"textbox","slide":6,"role":"Reports tag","text":"Reports","textChars":7,"textLines":1,"bbox":[802,415,92,16]}
+{"kind":"shape","slide":6,"role":"screenshot shadow","bbox":[780,472,440,186]}
+{"kind":"shape","slide":6,"role":"screenshot frame","bbox":[770,458,440,186]}
+{"kind":"shape","slide":6,"role":"browser bar","bbox":[786,472,408,26]}
+{"kind":"shape","slide":6,"role":"browser dot","bbox":[798,481,8,8]}
+{"kind":"shape","slide":6,"role":"browser dot","bbox":[812,481,8,8]}
+{"kind":"shape","slide":6,"role":"browser dot","bbox":[826,481,8,8]}
+{"kind":"image","slide":6,"role":"Refinements","path":"C:\\Users\\culle\\OneDrive\\Desktop\\ChinaTracker\\tmp\\slides\\tracker-presentation\\screenshots\\refinements.png","bbox":[788,510,404,116]}
+{"kind":"shape","slide":6,"role":"Refinements tag panel","bbox":[788,616,120,30]}
+{"kind":"shape","slide":6,"role":"Refinements tag","bbox":[802,623,92,16]}
+{"kind":"textbox","slide":6,"role":"Refinements tag","text":"Refinements","textChars":11,"textLines":1,"bbox":[802,623,92,16]}
+{"kind":"shape","slide":6,"role":"pill panel","bbox":[90,612,170,30]}
+{"kind":"shape","slide":6,"role":"pill","bbox":[104,619,142,16]}
+{"kind":"textbox","slide":6,"role":"pill","text":"ENTER COST DRIVERS","textChars":18,"textLines":1,"bbox":[104,619,142,16]}
+{"kind":"shape","slide":6,"role":"unit caption","bbox":[272,608,430,24]}
+{"kind":"textbox","slide":6,"role":"unit caption","text":"Unit pages let users work at the level planners actually need: section totals, duty days, locations, contracts, and execution costs.","textChars":132,"textLines":1,"bbox":[272,608,430,24]}
+{"kind":"shape","slide":6,"role":"pill panel","bbox":[790,612,150,30]}
+{"kind":"shape","slide":6,"role":"pill","bbox":[804,619,122,16]}
+{"kind":"textbox","slide":6,"role":"pill","text":"BRIEF + FOLLOW UP","textChars":17,"textLines":1,"bbox":[804,619,122,16]}
+{"kind":"shape","slide":6,"role":"reports caption","bbox":[952,608,236,30]}
+{"kind":"textbox","slide":6,"role":"reports caption","text":"Report output and refinements keep the briefing package and improvement tracking inside the same environment.","textChars":109,"textLines":1,"bbox":[952,608,236,30]}
+{"kind":"shape","slide":7,"role":"backdrop glow","bbox":[-120,-120,360,360]}
+{"kind":"shape","slide":7,"role":"backdrop glow","bbox":[1030,-90,260,260]}
+{"kind":"shape","slide":7,"role":"backdrop glow","bbox":[980,560,280,280]}
+{"kind":"shape","slide":7,"role":"kicker","bbox":[70,40,280,18]}
+{"kind":"textbox","slide":7,"role":"kicker","text":"FUTURE POTENTIAL","textChars":16,"textLines":1,"bbox":[70,40,280,18]}
+{"kind":"shape","slide":7,"role":"slide index","bbox":[1080,40,120,18]}
+{"kind":"textbox","slide":7,"role":"slide index","text":"07 / 08","textChars":7,"textLines":1,"bbox":[1080,40,120,18]}
+{"kind":"shape","slide":7,"role":"title","bbox":[70,78,690,116]}
+{"kind":"textbox","slide":7,"role":"title","text":"Future Potential Uses and Improvements","textChars":38,"textLines":1,"bbox":[70,78,690,116]}
+{"kind":"shape","slide":7,"role":"subtitle","bbox":[72,190,680,64]}
+{"kind":"textbox","slide":7,"role":"subtitle","text":"The current version already replaces manual budgeting; the next phase can turn it into a broader planning platform.","textChars":115,"textLines":1,"bbox":[72,190,680,64]}
+{"kind":"shape","slide":7,"role":"Near-term roadmap","bbox":[70,270,350,208]}
+{"kind":"shape","slide":7,"role":"roadmap accent","bbox":[70,270,350,8]}
+{"kind":"shape","slide":7,"role":"roadmap title","bbox":[90,292,310,24]}
+{"kind":"textbox","slide":7,"role":"roadmap title","text":"Near-term","textChars":9,"textLines":1,"bbox":[90,292,310,24]}
+{"kind":"shape","slide":7,"role":"roadmap subtitle","bbox":[90,320,310,18]}
+{"kind":"textbox","slide":7,"role":"roadmap subtitle","text":"Improve the current operating loop","textChars":34,"textLines":1,"bbox":[90,320,310,18]}
+{"kind":"shape","slide":7,"role":"bullet dot","bbox":[90,363,8,8]}
+{"kind":"shape","slide":7,"role":"bullet","bbox":[110,356,290,42]}
+{"kind":"textbox","slide":7,"role":"bullet","text":"Role-based permissions and approval flow","textChars":40,"textLines":1,"bbox":[110,356,290,42]}
+{"kind":"shape","slide":7,"role":"bullet dot","bbox":[90,411,8,8]}
+{"kind":"shape","slide":7,"role":"bullet","bbox":[110,404,290,42]}
+{"kind":"textbox","slide":7,"role":"bullet","text":"Saved report packs and leadership templates","textChars":43,"textLines":1,"bbox":[110,404,290,42]}
+{"kind":"shape","slide":7,"role":"bullet dot","bbox":[90,459,8,8]}
+{"kind":"shape","slide":7,"role":"bullet","bbox":[110,452,290,42]}
+{"kind":"textbox","slide":7,"role":"bullet","text":"More guided setup for new exercises","textChars":35,"textLines":1,"bbox":[110,452,290,42]}
+{"kind":"shape","slide":7,"role":"Next expansion roadmap","bbox":[465,270,350,208]}
+{"kind":"shape","slide":7,"role":"roadmap accent","bbox":[465,270,350,8]}
+{"kind":"shape","slide":7,"role":"roadmap title","bbox":[485,292,310,24]}
+{"kind":"textbox","slide":7,"role":"roadmap title","text":"Next expansion","textChars":14,"textLines":1,"bbox":[485,292,310,24]}
+{"kind":"shape","slide":7,"role":"roadmap subtitle","bbox":[485,320,310,18]}
+{"kind":"textbox","slide":7,"role":"roadmap subtitle","text":"Strengthen planning depth","textChars":25,"textLines":1,"bbox":[485,320,310,18]}
+{"kind":"shape","slide":7,"role":"bullet dot","bbox":[485,363,8,8]}
+{"kind":"shape","slide":7,"role":"bullet","bbox":[505,356,290,42]}
+{"kind":"textbox","slide":7,"role":"bullet","text":"Scenario versioning and side-by-side comparisons","textChars":48,"textLines":1,"bbox":[505,356,290,42]}
+{"kind":"shape","slide":7,"role":"bullet dot","bbox":[485,411,8,8]}
+{"kind":"shape","slide":7,"role":"bullet","bbox":[505,404,290,42]}
+{"kind":"textbox","slide":7,"role":"bullet","text":"Exercise history and trend snapshots","textChars":36,"textLines":1,"bbox":[505,404,290,42]}
+{"kind":"shape","slide":7,"role":"bullet dot","bbox":[485,459,8,8]}
+{"kind":"shape","slide":7,"role":"bullet","bbox":[505,452,290,42]}
+{"kind":"textbox","slide":7,"role":"bullet","text":"Portfolio view across multiple exercises","textChars":40,"textLines":1,"bbox":[505,452,290,42]}
+{"kind":"shape","slide":7,"role":"Strategic potential roadmap","bbox":[860,270,350,208]}
+{"kind":"shape","slide":7,"role":"roadmap accent","bbox":[860,270,350,8]}
+{"kind":"shape","slide":7,"role":"roadmap title","bbox":[880,292,310,24]}
+{"kind":"textbox","slide":7,"role":"roadmap title","text":"Strategic potential","textChars":19,"textLines":1,"bbox":[880,292,310,24]}
+{"kind":"shape","slide":7,"role":"roadmap subtitle","bbox":[880,320,310,18]}
+{"kind":"textbox","slide":7,"role":"roadmap subtitle","text":"Turn the tool into decision support","textChars":35,"textLines":1,"bbox":[880,320,310,18]}
+{"kind":"shape","slide":7,"role":"bullet dot","bbox":[880,363,8,8]}
+{"kind":"shape","slide":7,"role":"bullet","bbox":[900,356,290,42]}
+{"kind":"textbox","slide":7,"role":"bullet","text":"Forecasting for future budget posture","textChars":37,"textLines":1,"bbox":[900,356,290,42]}
+{"kind":"shape","slide":7,"role":"bullet dot","bbox":[880,411,8,8]}
+{"kind":"shape","slide":7,"role":"bullet","bbox":[900,404,290,42]}
+{"kind":"textbox","slide":7,"role":"bullet","text":"Recommendation support for staffing or travel changes","textChars":53,"textLines":1,"bbox":[900,404,290,42]}
+{"kind":"shape","slide":7,"role":"bullet dot","bbox":[880,459,8,8]}
+{"kind":"shape","slide":7,"role":"bullet","bbox":[900,452,290,42]}
+{"kind":"textbox","slide":7,"role":"bullet","text":"Cross-functional planning beyond a single briefing cycle","textChars":56,"textLines":1,"bbox":[900,452,290,42]}
+{"kind":"shape","slide":7,"role":"use case strip","bbox":[70,538,1140,110]}
+{"kind":"shape","slide":7,"role":"use case label","bbox":[96,556,220,20]}
+{"kind":"textbox","slide":7,"role":"use case label","text":"Potential future use cases","textChars":26,"textLines":1,"bbox":[96,556,220,20]}
+{"kind":"shape","slide":7,"role":"use case pill panel","bbox":[290,548,150,30]}
+{"kind":"shape","slide":7,"role":"use case pill","bbox":[304,555,122,16]}
+{"kind":"textbox","slide":7,"role":"use case pill","text":"Funding drills","textChars":14,"textLines":1,"bbox":[304,555,122,16]}
+{"kind":"shape","slide":7,"role":"use case pill panel","bbox":[456,548,182,30]}
+{"kind":"shape","slide":7,"role":"use case pill","bbox":[470,555,154,16]}
+{"kind":"textbox","slide":7,"role":"use case pill","text":"Scenario rehearsal","textChars":18,"textLines":1,"bbox":[470,555,154,16]}
+{"kind":"shape","slide":7,"role":"use case pill panel","bbox":[654,548,198,30]}
+{"kind":"shape","slide":7,"role":"use case pill","bbox":[668,555,170,16]}
+{"kind":"textbox","slide":7,"role":"use case pill","text":"After-action lessons","textChars":20,"textLines":1,"bbox":[668,555,170,16]}
+{"kind":"shape","slide":7,"role":"use case pill panel","bbox":[868,548,166,30]}
+{"kind":"shape","slide":7,"role":"use case pill","bbox":[882,555,138,16]}
+{"kind":"textbox","slide":7,"role":"use case pill","text":"Portfolio review","textChars":16,"textLines":1,"bbox":[882,555,138,16]}
+{"kind":"shape","slide":7,"role":"use case pill panel","bbox":[1050,548,166,30]}
+{"kind":"shape","slide":7,"role":"use case pill","bbox":[1064,555,138,16]}
+{"kind":"textbox","slide":7,"role":"use case pill","text":"Decision support","textChars":16,"textLines":1,"bbox":[1064,555,138,16]}
+{"kind":"shape","slide":8,"role":"backdrop glow","bbox":[-110,-80,360,360]}
+{"kind":"shape","slide":8,"role":"backdrop glow","bbox":[1010,-120,330,330]}
+{"kind":"shape","slide":8,"role":"backdrop glow","bbox":[980,510,380,380]}
+{"kind":"shape","slide":8,"role":"frame","bbox":[34,28,1212,664]}
+{"kind":"shape","slide":8,"role":"kicker","bbox":[70,40,280,18]}
+{"kind":"textbox","slide":8,"role":"kicker","text":"CLOSING","textChars":7,"textLines":1,"bbox":[70,40,280,18]}
+{"kind":"shape","slide":8,"role":"slide index","bbox":[1080,40,120,18]}
+{"kind":"textbox","slide":8,"role":"slide index","text":"08 / 08","textChars":7,"textLines":1,"bbox":[1080,40,120,18]}
+{"kind":"shape","slide":8,"role":"title","bbox":[70,78,690,116]}
+{"kind":"textbox","slide":8,"role":"title","text":"What This Enables","textChars":17,"textLines":1,"bbox":[70,78,690,116]}
+{"kind":"shape","slide":8,"role":"subtitle","bbox":[72,190,680,64]}
+{"kind":"textbox","slide":8,"role":"subtitle","text":"Faster planning cycles. Cleaner leadership briefings. More confidence in the numbers.","textChars":85,"textLines":1,"bbox":[72,190,680,64]}
+{"kind":"shape","slide":8,"role":"Faster decisions card","bbox":[70,280,352,136]}
+{"kind":"shape","slide":8,"role":"icon circle","bbox":[92,300,42,42]}
+{"kind":"shape","slide":8,"role":"icon text","bbox":[104,308,18,18]}
+{"kind":"textbox","slide":8,"role":"icon text","text":"01","textChars":2,"textLines":1,"bbox":[104,308,18,18]}
+{"kind":"shape","slide":8,"role":"card title","bbox":[148,300,256,24]}
+{"kind":"textbox","slide":8,"role":"card title","text":"Faster decisions","textChars":16,"textLines":1,"bbox":[148,300,256,24]}
+{"kind":"shape","slide":8,"role":"card body","bbox":[94,348,304,46]}
+{"kind":"textbox","slide":8,"role":"card body","text":"Leaders can ask 'what if' questions and get an updated answer without a workbook rebuild.","textChars":89,"textLines":1,"bbox":[94,348,304,46]}
+{"kind":"shape","slide":8,"role":"More defensible briefs card","bbox":[464,280,352,136]}
+{"kind":"shape","slide":8,"role":"icon circle","bbox":[486,300,42,42]}
+{"kind":"shape","slide":8,"role":"icon text","bbox":[498,308,18,18]}
+{"kind":"textbox","slide":8,"role":"icon text","text":"02","textChars":2,"textLines":1,"bbox":[498,308,18,18]}
+{"kind":"shape","slide":8,"role":"card title","bbox":[542,300,256,24]}
+{"kind":"textbox","slide":8,"role":"card title","text":"More defensible briefs","textChars":22,"textLines":1,"bbox":[542,300,256,24]}
+{"kind":"shape","slide":8,"role":"card body","bbox":[488,348,304,46]}
+{"kind":"textbox","slide":8,"role":"card body","text":"Every total ties back to structured unit inputs, rate assumptions, and repeatable logic.","textChars":88,"textLines":1,"bbox":[488,348,304,46]}
+{"kind":"shape","slide":8,"role":"Better continuity card","bbox":[858,280,352,136]}
+{"kind":"shape","slide":8,"role":"icon circle","bbox":[880,300,42,42]}
+{"kind":"shape","slide":8,"role":"icon text","bbox":[892,308,18,18]}
+{"kind":"textbox","slide":8,"role":"icon text","text":"03","textChars":2,"textLines":1,"bbox":[892,308,18,18]}
+{"kind":"shape","slide":8,"role":"card title","bbox":[936,300,256,24]}
+{"kind":"textbox","slide":8,"role":"card title","text":"Better continuity","textChars":17,"textLines":1,"bbox":[936,300,256,24]}
+{"kind":"shape","slide":8,"role":"card body","bbox":[882,348,304,46]}
+{"kind":"textbox","slide":8,"role":"card body","text":"Refinements, exports, clear actions, and undo reduce rework across the full preparation cycle.","textChars":94,"textLines":1,"bbox":[882,348,304,46]}
+{"kind":"shape","slide":8,"role":"closing banner","bbox":[70,600,1140,66]}
+{"kind":"shape","slide":8,"role":"closing banner text","bbox":[98,621,1084,20]}
+{"kind":"textbox","slide":8,"role":"closing banner text","text":"Patriot Medic is already a stronger planning surface than a spreadsheet and is positioned to grow into a broader decision-support platform.","textChars":139,"textLines":1,"bbox":[98,621,1084,20]}
