@@ -24,6 +24,7 @@ async function main() {
     { rankCode: 'COL', costPerDay: 744 },
     { rankCode: 'BG', costPerDay: 861 },
     { rankCode: 'MG', costPerDay: 960 },
+    { rankCode: 'CIV', costPerDay: 0 },
   ];
 
   // Remove legacy grade-format rows so the UI/rate tables remain consistent.

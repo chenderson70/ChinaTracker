@@ -49,6 +49,12 @@ bootstrapSqliteFileIfMissing();
 
 export const prisma = new PrismaClient();
 
+const LEGACY_REPORT_ASSUMPTIONS = [
+	'Location of exercise: Fort Hunter Liggett, CA',
+	'Unit of Action execution costs to be mainly funded by the NAF',
+	`Pay estimations for long tour orders include MAJ's & SMSGT's. Site visits and planning conferences used CAPT's`,
+] as const;
+
 async function hasSqliteTable(tableName: string): Promise<boolean> {
 	const tableCheck = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
 		"SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
@@ -106,17 +112,17 @@ async function ensureSqliteCompatibilityColumns(): Promise<void> {
 	await ensureSqliteColumn(
 		'exercises',
 		'report_assumption_1',
-		`TEXT NOT NULL DEFAULT 'Location of exercise: Fort Hunter Liggett, CA'`,
+		`TEXT NOT NULL DEFAULT ''`,
 	);
 	await ensureSqliteColumn(
 		'exercises',
 		'report_assumption_2',
-		`TEXT NOT NULL DEFAULT 'Unit of Action execution costs to be mainly funded by the NAF'`,
+		`TEXT NOT NULL DEFAULT ''`,
 	);
 	await ensureSqliteColumn(
 		'exercises',
 		'report_assumption_3',
-		`TEXT NOT NULL DEFAULT 'Pay estimations for long tour orders include MAJ''s & SMSGT''s. Site visits and planning conferences used CAPT''s'`,
+		`TEXT NOT NULL DEFAULT ''`,
 	);
 	await ensureSqliteColumn('exercises', 'report_assumption_4', `TEXT NOT NULL DEFAULT ''`);
 	await ensureSqliteColumn('exercises', 'report_limfac_1', `TEXT NOT NULL DEFAULT ''`);
@@ -180,6 +186,21 @@ async function ensureSqliteSchema(): Promise<void> {
 	await ensureSqliteCompatibilityColumns();
 }
 
+async function clearLegacyReportDefaults(): Promise<void> {
+	await prisma.exercise.updateMany({
+		where: { reportAssumption1: LEGACY_REPORT_ASSUMPTIONS[0] },
+		data: { reportAssumption1: '' },
+	});
+	await prisma.exercise.updateMany({
+		where: { reportAssumption2: LEGACY_REPORT_ASSUMPTIONS[1] },
+		data: { reportAssumption2: '' },
+	});
+	await prisma.exercise.updateMany({
+		where: { reportAssumption3: LEGACY_REPORT_ASSUMPTIONS[2] },
+		data: { reportAssumption3: '' },
+	});
+}
+
 const BASE_CPD_RATES = [
 	{ rankCode: 'AB', costPerDay: 191 },
 	{ rankCode: 'AMN', costPerDay: 185 },
@@ -220,9 +241,7 @@ const BASE_CONFIG: Array<{ key: string; value: string }> = [
 	{ key: 'BUDGET_TARGET_OM', value: '0.00' },
 ];
 
-export async function ensureBaselineData(): Promise<void> {
-	await ensureSqliteSchema();
-
+export async function ensureBaselineCpdRates(): Promise<void> {
 	for (const rate of BASE_CPD_RATES) {
 		await prisma.rankCpdRate.upsert({
 			where: { rankCode: rate.rankCode },
@@ -234,6 +253,13 @@ export async function ensureBaselineData(): Promise<void> {
 			},
 		});
 	}
+}
+
+export async function ensureBaselineData(): Promise<void> {
+	await ensureSqliteSchema();
+	await clearLegacyReportDefaults();
+
+	await ensureBaselineCpdRates();
 
 	for (const rate of BASE_PER_DIEM) {
 		await prisma.perDiemRate.upsert({

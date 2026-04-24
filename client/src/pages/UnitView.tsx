@@ -394,6 +394,9 @@ export default function UnitView() {
       setEntryModalLongTermA7PlannerDraft(false);
       entryForm.resetFields();
     },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to add entry');
+    },
   });
 
   const deleteEntryMut = useMutation({
@@ -1431,27 +1434,41 @@ export default function UnitView() {
       <Modal
         title="Add Detail"
         open={!!entryModal}
+        confirmLoading={addEntryMut.isPending}
         onOk={async () => {
-          const values = await entryForm.validateFields();
-          const calculatedDutyDays = entryModalIsPlanning && values.months !== undefined && values.months !== null
-            ? monthsToDutyDays(values.months)
-            : values.dutyDays;
-          const payload = {
-            rankCode: values.rankCode,
-            count: values.count,
-            dutyDays: calculatedDutyDays,
-            rentalCarCount: entryModalUsesBinaryRentalCar
-              ? (values.hasRentalCar ? 1 : 0)
-              : entryModalSupportsRentalCars
-                ? (values.rentalCarCount || 0)
-                : 0,
-            location: values.location,
-            note: (entryModalIsPlanning || entryModalIsWhiteCell) ? (entryModalNoteDraft.trim() || null) : null,
-            travelOnly: entryModalAllowsTravelOnly ? entryModalTravelOnlyDraft : false,
-            longTermA7Planner: entryModalIsPlanning ? entryModalLongTermA7PlannerDraft : false,
-            isLocal: !!values.isLocal,
-          };
-          addEntryMut.mutate({ groupId: entryModal!.groupId, data: payload });
+          try {
+            const values = await entryForm.validateFields();
+            const calculatedDutyDays = entryModalIsPlanning && values.months !== undefined && values.months !== null
+              ? monthsToDutyDays(values.months)
+              : values.dutyDays;
+            const payload = {
+              rankCode: values.rankCode,
+              count: values.count,
+              dutyDays: calculatedDutyDays,
+              rentalCarCount: entryModalUsesBinaryRentalCar
+                ? (values.hasRentalCar ? 1 : 0)
+                : entryModalSupportsRentalCars
+                  ? (values.rentalCarCount || 0)
+                  : 0,
+              location: values.location,
+              note: (entryModalIsPlanning || entryModalIsWhiteCell) ? (entryModalNoteDraft.trim() || null) : null,
+              travelOnly: entryModalAllowsTravelOnly ? entryModalTravelOnlyDraft : false,
+              longTermA7Planner: entryModalIsPlanning ? entryModalLongTermA7PlannerDraft : false,
+              isLocal: !!values.isLocal,
+            };
+            await addEntryMut.mutateAsync({ groupId: entryModal!.groupId, data: payload });
+          } catch (error: any) {
+            const errorFields = Array.isArray(error?.errorFields) ? error.errorFields : [];
+            if (errorFields.length > 0) {
+              entryForm.scrollToField(errorFields[0].name, { block: 'center' });
+              message.warning('Please complete the required fields before saving.');
+              return;
+            }
+
+            if (!String(error?.message || '').trim()) {
+              message.error('Failed to add entry');
+            }
+          }
         }}
         onCancel={() => {
           setEntryModal(null);
@@ -1461,9 +1478,9 @@ export default function UnitView() {
           entryForm.resetFields();
         }}
       >
-        <Form form={entryForm} layout="vertical">
+        <Form form={entryForm} layout="vertical" scrollToFirstError>
           <Form.Item name="rankCode" label="Rank" rules={[{ required: true }]}>
-            <Select options={RANKS.map((r) => ({ value: r, label: r }))} />
+            <Select placeholder="Select a rank" options={RANKS.map((r) => ({ value: r, label: r }))} />
           </Form.Item>
           <Form.Item name="count" label="PAX" initialValue={1} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />

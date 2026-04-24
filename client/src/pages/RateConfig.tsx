@@ -1,51 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Table, InputNumber, Button, Typography, Row, Col, Divider, Space, message, Spin, Modal, Input, Popconfirm, Select } from 'antd';
+import { useEffect, useRef, useState } from 'react';
+import { Card, Table, InputNumber, Button, Typography, Row, Col, Divider, Space, message, Spin, Modal, Input, Popconfirm } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '../services/api';
 import { useApp } from '../components/AppLayout';
-import type { RankCpdRate, PerDiemRate, PerDiemMasterRecord } from '../types';
-
-const STATE_NAMES: Record<string, string> = {
-  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut',
-  DE: 'Delaware', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa',
-  KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan',
-  MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire',
-  NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio',
-  OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota',
-  TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia',
-  WI: 'Wisconsin', WY: 'Wyoming', DC: 'District of Columbia',
-};
-
-type MasterSearchField = 'all' | 'destination' | 'state' | 'county';
-
-function getMasterRateAliases(row: PerDiemMasterRecord): string[] {
-  const destination = String(row.destination || '').trim().toUpperCase();
-  const county = String(row.countyOrLocationDefined || '').trim().toUpperCase();
-  const state = String(row.state || '').trim().toUpperCase();
-
-  if (state === 'GA' && destination === 'MARIETTA' && county === 'COBB') {
-    return ['DOBBINS ARB', 'DOBBINS ARB / MARIETTA NAS', 'MARIETTA NAS', 'NOSC ATLANTA'];
-  }
-
-  if (state === 'GA' && destination === 'WARNER ROBINS' && county === 'HOUSTON') {
-    return ['ROBINS AFB', 'ROBINS AFB / WARNER ROBINS'];
-  }
-
-  if (state === 'GA' && destination === 'AUGUSTA' && county === 'RICHMOND') {
-    return ['FORT EISENHOWER', 'FT EISENHOWER', 'FORT GORDON', 'FT GORDON', 'NOSC AUGUSTA'];
-  }
-
-  if (state === 'GA' && destination === 'SAVANNAH' && county === 'CHATHAM') {
-    return ['HUNTER ARMY AIRFIELD', 'HUNTER AAF'];
-  }
-
-  if (state === 'GA' && destination === 'ATLANTA' && county === 'FULTON / DEKALB') {
-    return ['NOSC ATLANTA'];
-  }
-
-  return [];
-}
+import type { RankCpdRate, PerDiemRate } from '../types';
 
 export default function RateConfig() {
   const { exerciseId } = useApp();
@@ -54,15 +13,12 @@ export default function RateConfig() {
   // Fetch rates & config
   const { data: cpdRates = [], isLoading: cpdLoading } = useQuery({ queryKey: ['cpdRates'], queryFn: api.getCpdRates });
   const { data: perDiemRates = [], isLoading: pdLoading } = useQuery({ queryKey: ['perDiemRates'], queryFn: api.getPerDiemRates });
-  const { data: masterRates = [], isLoading: masterLoading } = useQuery({ queryKey: ['perDiemMasterRates'], queryFn: api.getPerDiemMasterRates });
   const { data: config = {}, isLoading: cfgLoading } = useQuery({ queryKey: ['appConfig'], queryFn: api.getAppConfig });
 
   // Local editable state
   const [cpdEdits, setCpdEdits] = useState<Record<string, number>>({});
   const [pdEdits, setPdEdits] = useState<Record<string, { lodging?: number; mie?: number }>>({});
   const [cfgEdits, setCfgEdits] = useState<Record<string, string>>({});
-  const [pdSearch, setPdSearch] = useState('');
-  const [pdSearchField, setPdSearchField] = useState<MasterSearchField>('all');
   const cpdAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pdAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cfgAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -163,48 +119,8 @@ export default function RateConfig() {
     },
   });
 
-  const importMasterRateMut = useMutation({
-    scope: { id: 'per-diem-rates' },
-    mutationFn: (row: PerDiemMasterRecord) =>
-      api.addOrUpdatePerDiemRate(
-        row.destination,
-        row.fy26LodgingRate,
-        row.fy26Mie,
-      ),
-    onSuccess: (data) => {
-      syncPerDiemRates(data);
-      message.success('Rate added to system locations');
-    },
-  });
-
   const [addLocOpen, setAddLocOpen] = useState(false);
   const [newLoc, setNewLoc] = useState({ name: '', lodging: 0, mie: 0 });
-
-  const filteredMasterRates = useMemo(() => {
-    const safeLower = (value: unknown) => (typeof value === 'string' ? value.toLowerCase() : '');
-    const safeUpper = (value: unknown) => (typeof value === 'string' ? value.toUpperCase() : '');
-    const stateFullName = (stateCode: unknown) => STATE_NAMES[safeUpper(stateCode).trim()] ?? '';
-    const matches = (value: string, q: string) => value.includes(q);
-
-    const q = pdSearch.trim().toLowerCase();
-    if (!q) return masterRates;
-
-    return masterRates
-      .filter((row) => {
-        const destination = safeLower(row.destination);
-        const stateCode = safeLower(row.state).trim();
-        const stateName = safeLower(stateFullName(row.state));
-        const county = safeLower(row.countyOrLocationDefined);
-        const aliases = getMasterRateAliases(row).map((alias) => alias.toLowerCase());
-        const aliasMatch = aliases.some((alias) => matches(alias, q));
-
-        if (pdSearchField === 'destination') return matches(destination, q) || aliasMatch;
-        if (pdSearchField === 'state') return matches(stateCode, q) || matches(stateName, q);
-        if (pdSearchField === 'county') return matches(county, q) || aliasMatch;
-
-        return matches(destination, q) || matches(stateCode, q) || matches(stateName, q) || matches(county, q) || aliasMatch;
-      });
-  }, [masterRates, pdSearch, pdSearchField]);
 
   const saveCfgMut = useMutation({
     mutationFn: (submittedEdits: Record<string, string>) => api.updateAppConfig({ ...config, ...submittedEdits }),
@@ -313,62 +229,6 @@ export default function RateConfig() {
     },
   ];
 
-  const masterPdColumns = [
-    {
-      title: 'Destination',
-      dataIndex: 'destination',
-      width: 180,
-      render: (val: string, row: PerDiemMasterRecord) => {
-        const aliases = getMasterRateAliases(row);
-        return (
-          <div>
-            <div>{val?.toUpperCase()}</div>
-            {aliases.length > 0 ? (
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                Alias: {aliases[0]}
-              </Typography.Text>
-            ) : null}
-          </div>
-        );
-      },
-    },
-    {
-      title: 'State',
-      dataIndex: 'state',
-      width: 90,
-      render: (val: string) => {
-        const stateCode = typeof val === 'string' ? val.trim().toUpperCase() : '';
-        const stateName = STATE_NAMES[stateCode];
-        return stateName ? `${stateName} (${stateCode})` : stateCode;
-      },
-    },
-    {
-      title: 'Lodging ($/night)',
-      dataIndex: 'fy26LodgingRate',
-      width: 140,
-      render: (v: number) => v.toFixed(2),
-    },
-    {
-      title: 'M&IE ($/day)',
-      dataIndex: 'fy26Mie',
-      width: 120,
-      render: (v: number) => v.toFixed(2),
-    },
-    {
-      title: '',
-      width: 120,
-      render: (_: unknown, row: PerDiemMasterRecord) => (
-        <Button
-          size="small"
-          onClick={() => importMasterRateMut.mutate(row)}
-          loading={importMasterRateMut.isPending}
-        >
-          Use Rate
-        </Button>
-      ),
-    },
-  ];
-
   const cfgVal = (key: string) => parseFloat(cfgEdits[key] ?? config[key] ?? '0');
 
   return (
@@ -397,50 +257,37 @@ export default function RateConfig() {
         title="Per Diem Rates (Planning & Support Only)"
         className="ct-config-card"
         extra={
-          <Space>
+          <Space wrap size={10}>
             <Button icon={<PlusOutlined />} onClick={() => setAddLocOpen(true)}>Add Location</Button>
+            <Button
+              href="https://www.travel.dod.mil/Travel-Transportation-Rates/Per-Diem/Per-Diem-Rate-Lookup/"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                fontWeight: 700,
+                background: '#fff7e6',
+                borderColor: '#ffd591',
+                color: '#ad4e00',
+                boxShadow: '0 0 0 2px rgba(250, 173, 20, 0.12)',
+              }}
+            >
+              DoD Lookup
+            </Button>
             <Typography.Text type="secondary">{savePdMut.isPending ? 'Autosaving...' : 'Changes auto-save'}</Typography.Text>
           </Space>
         }
       >
         <Space direction="vertical" style={{ width: '100%', marginBottom: 12 }}>
-          <Typography.Text type="secondary">Search FY2026 master per diem file and add a location/rate into system rates.</Typography.Text>
           <Typography.Text type="secondary">
             These location-based rates apply only to planning and support/white cell calculations. Player calculations use the player-specific per diem and billeting settings below.
           </Typography.Text>
-          <Space.Compact style={{ width: '100%' }}>
-            <Select<MasterSearchField>
-              value={pdSearchField}
-              onChange={setPdSearchField}
-              style={{ width: 220 }}
-              options={[
-                { value: 'all', label: 'All Columns' },
-                { value: 'destination', label: 'Destination' },
-                { value: 'state', label: 'State (Code/Name)' },
-                { value: 'county', label: 'County / Location' },
-              ]}
-            />
-            <Input
-              allowClear
-              placeholder={pdSearchField === 'state' ? 'Search state code or full state name (e.g., CO or Colorado)...' : 'Search per selected column...'}
-              value={pdSearch}
-              onChange={(e) => setPdSearch(e.target.value)}
-            />
-          </Space.Compact>
+          <Typography.Text type="secondary">
+            Use the highlighted <strong>DoD Lookup</strong> link above to find lodging and M&amp;IE for a location, then add it manually with <strong>Add Location</strong>.
+          </Typography.Text>
+          <Typography.Text type="secondary">
+            If no location-specific M&amp;IE is listed, use the standard DoD M&amp;IE rate of $68.
+          </Typography.Text>
         </Space>
-        <div className="ct-table" style={{ marginBottom: 12 }}>
-          <Table
-            size="small"
-            loading={masterLoading}
-            pagination={{ pageSize: 8 }}
-            dataSource={filteredMasterRates.map((r, idx) => ({
-              ...r,
-              key: `${r.id ?? 'NA'}-${r.state ?? 'NA'}-${r.destination ?? 'NA'}-${r.seasonBegin ?? 'NA'}-${r.seasonEnd ?? 'NA'}-${r.fy26LodgingRate}-${r.fy26Mie}-${idx}`,
-            }))}
-            rowKey="key"
-            columns={masterPdColumns}
-          />
-        </div>
         <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>
           Default Locations
         </Typography.Title>

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../db';
+import { ensureBaselineCpdRates, prisma } from '../db';
 
 const router = Router();
 
@@ -19,7 +19,11 @@ function normalizePerDiemRates(input: unknown): Array<{ location: string; lodgin
 
 router.get('/cpd', async (_req: Request, res: Response) => {
   try {
-    const rates = await prisma.rankCpdRate.findMany({ orderBy: { rankCode: 'asc' } });
+    let rates = await prisma.rankCpdRate.findMany({ orderBy: { rankCode: 'asc' } });
+    if (rates.length === 0) {
+      await ensureBaselineCpdRates();
+      rates = await prisma.rankCpdRate.findMany({ orderBy: { rankCode: 'asc' } });
+    }
     res.json(rates);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

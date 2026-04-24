@@ -18,18 +18,30 @@ type ReportAssumptions = [string, string, string, string];
 type ReportLimfacs = [string, string, string];
 
 const DEFAULT_REPORT_ASSUMPTIONS: ReportAssumptions = [
+  '',
+  '',
+  '',
+  '',
+];
+const DEFAULT_REPORT_LIMFACS: ReportLimfacs = ['', '', ''];
+
+const LEGACY_REPORT_ASSUMPTIONS: ReportAssumptions = [
   'Location of exercise: Fort Hunter Liggett, CA',
   'Unit of Action execution costs to be mainly funded by the NAF',
   'Pay estimations for long tour orders include MAJ\'s & SMSGT\'s. Site visits and planning conferences used CAPT\'s',
   '',
 ];
-const DEFAULT_REPORT_LIMFACS: ReportLimfacs = ['', '', ''];
+
+function normalizeLegacyReportAssumption(value: unknown, legacyValue: string): string {
+  const nextValue = String(value ?? '');
+  return nextValue === legacyValue ? '' : nextValue;
+}
 
 function getReportAssumptions(exercise: ExerciseDetail): ReportAssumptions {
   return [
-    String(exercise.reportAssumption1 ?? DEFAULT_REPORT_ASSUMPTIONS[0]),
-    String(exercise.reportAssumption2 ?? DEFAULT_REPORT_ASSUMPTIONS[1]),
-    String(exercise.reportAssumption3 ?? DEFAULT_REPORT_ASSUMPTIONS[2]),
+    normalizeLegacyReportAssumption(exercise.reportAssumption1, LEGACY_REPORT_ASSUMPTIONS[0]),
+    normalizeLegacyReportAssumption(exercise.reportAssumption2, LEGACY_REPORT_ASSUMPTIONS[1]),
+    normalizeLegacyReportAssumption(exercise.reportAssumption3, LEGACY_REPORT_ASSUMPTIONS[2]),
     String(exercise.reportAssumption4 ?? DEFAULT_REPORT_ASSUMPTIONS[3]),
   ];
 }
