@@ -10,7 +10,14 @@ import { exportElementToPdf } from '../services/pdf';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
 import { ANNUAL_TOUR_BILLETING_LABEL, ANNUAL_TOUR_MEALS_LABEL, ANNUAL_TOUR_MIL_PAY_LABEL, ANNUAL_TOUR_TRAVEL_PAY_LABEL, getAnnualTourBilletingOmTotal, getAnnualTourRpaMealsTotal, getPlayerOmResponsibilityByUnit, getRpaCategoryTotals, getRpaMealsResponsibilityByUnit, getUnitRpaCategoryTotals } from '../utils/budgetSummary';
-import type { BudgetResult, ExerciseDetail } from '../types';
+import { getExerciseTemplateLabel } from '../utils/exerciseTemplates';
+import {
+  buildAllQuarterlySnapshotNoteLine,
+  buildQuarterlySnapshotNoteLine,
+  getFiscalYearForExercise,
+  getQuarterlySnapshotEntries,
+} from '../utils/quarterlySnapshots';
+import type { BudgetResult, ExerciseDetail, QuarterlySnapshotKey } from '../types';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const DAYS_PER_MONTH = 30;
@@ -462,6 +469,8 @@ export function ReportsPage({
   const [currentReportLimfac1, currentReportLimfac2, currentReportLimfac3] = currentReportLimfacs;
   const currentReportPreparedBy = String(activeExercise.reportPreparedBy ?? '');
   const reportPreparedByDraftStorageKey = exerciseId ? `chinaTracker.reportPreparedByDraft.${exerciseId}` : null;
+  const quarterlySnapshotEntries = getQuarterlySnapshotEntries(activeExercise);
+  const fiscalYear = getFiscalYearForExercise(activeExercise);
 
   const persistPreparedBy = (value: string) => {
     const nextPreparedBy = value.trim();
@@ -708,6 +717,52 @@ export function ReportsPage({
       detail: 'O&M',
     },
   ];
+
+  const insertReportAssumptionLines = (lines: string[]) => {
+    const sanitizedLines = lines.map((line) => line.trim()).filter(Boolean);
+    if (sanitizedLines.length === 0) {
+      message.warning('Unable to insert quarterly snapshot notes.');
+      return;
+    }
+
+    setDraftReportAssumptions((current) => {
+      const next = [...current] as ReportAssumptions;
+      let preferredStartIndex = 0;
+
+      for (const line of sanitizedLines) {
+        let targetIndex = next.findIndex((existing, index) => index >= preferredStartIndex && !existing.trim());
+        if (targetIndex === -1) {
+          targetIndex = next.findIndex((existing) => !existing.trim());
+        }
+        if (targetIndex === -1) {
+          targetIndex = next.length - 1;
+        }
+
+        next[targetIndex] = next[targetIndex].trim()
+          ? `${next[targetIndex]} | ${line}`
+          : line;
+        preferredStartIndex = Math.min(next.length - 1, targetIndex + 1);
+      }
+
+      return next;
+    });
+  };
+
+  const handleInsertSnapshotNote = (key: QuarterlySnapshotKey) => {
+    insertReportAssumptionLines([buildQuarterlySnapshotNoteLine(key, activeExercise)]);
+  };
+
+  const handleInsertAllSnapshotNotes = () => {
+    const summaryLine = buildAllQuarterlySnapshotNoteLine(activeExercise);
+    if (!summaryLine) {
+      message.warning('Unable to insert quarterly snapshot notes.');
+      return;
+    }
+
+    insertReportAssumptionLines(
+      quarterlySnapshotEntries.map((entry) => buildQuarterlySnapshotNoteLine(entry.key, activeExercise)),
+    );
+  };
 
   useEffect(() => {
     skipBudgetTargetsSaveRef.current = true;
@@ -983,6 +1038,7 @@ export function ReportsPage({
       >
         <Descriptions column={4} size="small">
           <Descriptions.Item label="Name">{exercise.name}</Descriptions.Item>
+          <Descriptions.Item label="Template">{getExerciseTemplateLabel(exercise.exerciseTemplate)}</Descriptions.Item>
           <Descriptions.Item label="Start">{dayjs(exercise.startDate).format('DD MMM YYYY')}</Descriptions.Item>
           <Descriptions.Item label="End">{dayjs(exercise.endDate).format('DD MMM YYYY')}</Descriptions.Item>
           {showBudgetDetails ? (
@@ -1027,6 +1083,53 @@ export function ReportsPage({
             />
           </Descriptions.Item>
         </Descriptions>
+        <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid #eef2f6' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div>
+              <Typography.Text strong>Standard Fiscal Quarter Windows</Typography.Text>
+              <Typography.Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
+                Derived automatically from the exercise fiscal year (FY{fiscalYear}) and available for report notes and PM27 planning.
+              </Typography.Text>
+            </div>
+            <Space wrap>
+              <Button size="small" onClick={() => handleInsertSnapshotNote('q1')}>
+                Insert Q1 Note
+              </Button>
+              <Button size="small" onClick={() => handleInsertSnapshotNote('q2')}>
+                Insert Q2 Note
+              </Button>
+              <Button size="small" onClick={() => handleInsertSnapshotNote('q3')}>
+                Insert Q3 Note
+              </Button>
+              <Button size="small" onClick={() => handleInsertSnapshotNote('q4')}>
+                Insert Q4 Note
+              </Button>
+              <Button size="small" type="primary" onClick={handleInsertAllSnapshotNotes}>
+                Insert All Snapshot Notes
+              </Button>
+            </Space>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+            {quarterlySnapshotEntries.map((entry) => (
+              <div
+                key={entry.key}
+                style={{
+                  border: '1px solid #e8ecf1',
+                  borderRadius: 12,
+                  padding: '12px 14px',
+                  background: '#fafcff',
+                }}
+              >
+                <Typography.Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
+                  {entry.label}
+                </Typography.Text>
+                <Typography.Text strong style={{ fontSize: 15, color: '#102039' }}>
+                  {entry.rangeLabel}
+                </Typography.Text>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="ct-report-notes-layout">
           <div className="ct-report-notes-section">
             <Typography.Text strong>Estimations include:</Typography.Text>

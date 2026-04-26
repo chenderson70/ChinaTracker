@@ -36,10 +36,21 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import * as api from '../services/api';
-import type { Exercise, ExerciseDetail, BudgetResult, ExerciseUndoSnapshot } from '../types';
+import type {
+  Exercise,
+  ExerciseDetail,
+  BudgetResult,
+  ExerciseTemplate,
+  ExerciseUndoSnapshot,
+} from '../types';
 import { getStoredUser } from '../services/auth';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
+import {
+  DEFAULT_EXERCISE_TEMPLATE,
+  EXERCISE_TEMPLATE_OPTIONS,
+  normalizeExerciseTemplate,
+} from '../utils/exerciseTemplates';
 
 const { Header, Sider, Content } = Layout;
 
@@ -64,7 +75,6 @@ export const AppContext = createContext<AppCtx>({
 export const useApp = () => useContext(AppContext);
 
 const MAX_UNDO_STEPS = 10;
-
 type UndoEntry = {
   createdAt: number;
   label: string;
@@ -220,6 +230,7 @@ export default function AppLayout() {
     form.validateFields().then((vals) => {
       createMut.mutate({
         name: vals.name,
+        exerciseTemplate: vals.exerciseTemplate,
         startDate: vals.dates[0].format('YYYY-MM-DD'),
         endDate: vals.dates[1].format('YYYY-MM-DD'),
         defaultDutyDays: vals.defaultDutyDays,
@@ -230,6 +241,7 @@ export default function AppLayout() {
   const editExerciseMut = useMutation({
     mutationFn: async (data: {
       name: string;
+      exerciseTemplate: ExerciseTemplate;
       startDate: string;
       endDate: string;
       defaultDutyDays: number;
@@ -253,6 +265,7 @@ export default function AppLayout() {
     editExerciseForm.validateFields().then((vals) => {
       editExerciseMut.mutate({
         name: vals.name,
+        exerciseTemplate: vals.exerciseTemplate,
         startDate: vals.dates[0].format('YYYY-MM-DD'),
         endDate: vals.dates[1].format('YYYY-MM-DD'),
         defaultDutyDays: vals.defaultDutyDays,
@@ -538,6 +551,7 @@ export default function AppLayout() {
     if (!editExerciseOpen || !exercise) return;
     editExerciseForm.setFieldsValue({
       name: exercise.name,
+      exerciseTemplate: normalizeExerciseTemplate(exercise.exerciseTemplate),
       dates: [dayjs(exercise.startDate), dayjs(exercise.endDate)],
       defaultDutyDays: exercise.defaultDutyDays,
     });
@@ -763,11 +777,26 @@ export default function AppLayout() {
         confirmLoading={createMut.isPending}
         onCancel={() => setCreateOpen(false)}
         okText="Create Exercise"
-        width={520}
+        width={640}
       >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+        <Form
+          form={form}
+          layout="vertical"
+          style={{ marginTop: 16 }}
+          initialValues={{
+            defaultDutyDays: 14,
+            exerciseTemplate: DEFAULT_EXERCISE_TEMPLATE,
+          }}
+        >
           <Form.Item name="name" label="Exercise Name" rules={[{ required: true }]}>
             <Input placeholder="e.g., China Focus FY26 Spring" size="large" />
+          </Form.Item>
+          <Form.Item name="exerciseTemplate" label="Select Template" rules={[{ required: true }]}>
+            <Select
+              options={EXERCISE_TEMPLATE_OPTIONS}
+              placeholder="Choose a template"
+              size="large"
+            />
           </Form.Item>
           <Form.Item name="dates" label="Start / End Date" rules={[{ required: true }]}>
             <DatePicker.RangePicker
@@ -781,9 +810,13 @@ export default function AppLayout() {
               }}
             />
           </Form.Item>
-          <Form.Item name="defaultDutyDays" label="Default Duty Days" initialValue={14}>
+          <Form.Item name="defaultDutyDays" label="Default Duty Days">
             <InputNumber min={1} max={365} style={{ width: '100%' }} size="large" />
           </Form.Item>
+          <Typography.Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+            Quarterly planning uses the standard fiscal schedule automatically:
+            {' '}Q1 Oct-Dec, Q2 Jan-Mar, Q3 Apr-Jun, Q4 Jul-Sep.
+          </Typography.Text>
         </Form>
       </Modal>
 
@@ -794,11 +827,18 @@ export default function AppLayout() {
         confirmLoading={editExerciseMut.isPending}
         onCancel={() => setEditExerciseOpen(false)}
         okText="Save Exercise"
-        width={520}
+        width={640}
       >
         <Form form={editExerciseForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="name" label="Exercise Name" rules={[{ required: true }]}>
             <Input placeholder="e.g., China Focus FY26 Spring" size="large" />
+          </Form.Item>
+          <Form.Item name="exerciseTemplate" label="Select Template" rules={[{ required: true }]}>
+            <Select
+              options={EXERCISE_TEMPLATE_OPTIONS}
+              placeholder="Choose a template"
+              size="large"
+            />
           </Form.Item>
           <Form.Item name="dates" label="Start / End Date" rules={[{ required: true }]}>
             <DatePicker.RangePicker
@@ -815,6 +855,10 @@ export default function AppLayout() {
           <Form.Item name="defaultDutyDays" label="Default Duty Days" rules={[{ required: true }]}>
             <InputNumber min={1} max={365} style={{ width: '100%' }} size="large" />
           </Form.Item>
+          <Typography.Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+            Quarterly planning uses the standard fiscal schedule automatically:
+            {' '}Q1 Oct-Dec, Q2 Jan-Mar, Q3 Apr-Jun, Q4 Jul-Sep.
+          </Typography.Text>
         </Form>
       </Modal>
 

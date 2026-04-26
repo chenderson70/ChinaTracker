@@ -16,17 +16,21 @@ import {
   Input,
   Space,
   Divider,
+  DatePicker,
   Spin,
   Popconfirm,
   message,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Dayjs } from 'dayjs';
 import { useApp } from '../components/AppLayout';
+import InlineDateInput from '../components/InlineDateInput';
 import * as api from '../services/api';
-import type { ExerciseDetail, PersonnelGroup, UnitBudget, FundingType, UnitCalc, GroupCalc, PerDiemRate } from '../types';
+import type { ExerciseDetail, PersonnelEntry, PersonnelGroup, UnitBudget, FundingType, UnitCalc, GroupCalc, PerDiemRate } from '../types';
 import { getUnitDisplayLabel } from '../utils/unitLabels';
 import { getRpaMealsResponsibilityByUnit } from '../utils/budgetSummary';
+import { calculateInclusiveDateRangeDays } from '../utils/dateRanges';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const formatNumberInput = (value: string | number | null | undefined) => {
@@ -78,6 +82,31 @@ function monthsToDutyDays(months: number): number {
 
 function dutyDaysToMonths(dutyDays: number): number {
   return Number((dutyDays / DAYS_PER_MONTH).toFixed(2));
+}
+
+function getDateRangePayload(value: [Dayjs | null, Dayjs | null] | null | undefined) {
+  const start = value?.[0] ?? null;
+  const end = value?.[1] ?? null;
+
+  return {
+    startDate: start ? start.format('YYYY-MM-DD') : null,
+    endDate: end ? end.format('YYYY-MM-DD') : null,
+  };
+}
+
+function buildPersonnelEntryDatePatch(
+  entry: Pick<PersonnelEntry, 'startDate' | 'endDate'>,
+  field: 'startDate' | 'endDate',
+  value: string | null,
+) {
+  const nextStartDate = field === 'startDate' ? value : (entry.startDate ?? null);
+  const nextEndDate = field === 'endDate' ? value : (entry.endDate ?? null);
+  const nextDutyDays = calculateInclusiveDateRangeDays(nextStartDate, nextEndDate);
+
+  return {
+    [field]: value,
+    ...(nextDutyDays ? { dutyDays: nextDutyDays } : {}),
+  };
 }
 
 function EntryAutoCompleteInput({
@@ -535,6 +564,7 @@ export default function UnitView() {
     entryForm.setFieldsValue({
       rankCode: undefined,
       count: 1,
+      dateRange: null,
       dutyDays: exercise?.defaultDutyDays ?? 1,
       hasRentalCar: false,
       rentalCarCount: 0,
@@ -811,6 +841,36 @@ export default function UnitView() {
                 ),
               }] : []),
               {
+                title: 'Start',
+                dataIndex: 'startDate',
+                width: 140,
+                render: (value: string | null, row: any) => (
+                  <InlineDateInput
+                    value={value}
+                    style={{ width: '100%' }}
+                    onSave={(nextValue) => updateEntryMut.mutate({
+                      id: row.id,
+                      data: buildPersonnelEntryDatePatch(row as PersonnelEntry, 'startDate', nextValue),
+                    })}
+                  />
+                ),
+              },
+              {
+                title: 'End',
+                dataIndex: 'endDate',
+                width: 140,
+                render: (value: string | null, row: any) => (
+                  <InlineDateInput
+                    value={value}
+                    style={{ width: '100%' }}
+                    onSave={(nextValue) => updateEntryMut.mutate({
+                      id: row.id,
+                      data: buildPersonnelEntryDatePatch(row as PersonnelEntry, 'endDate', nextValue),
+                    })}
+                  />
+                ),
+              },
+              {
                 title: 'Duty Days',
                 dataIndex: 'dutyDays',
                 width: 110,
@@ -964,6 +1024,38 @@ export default function UnitView() {
   const execColumns = [
     { title: 'Category', dataIndex: 'category' },
     { title: 'Funding', dataIndex: 'fundingType', width: 80, render: (value: string) => value === 'OM' ? 'O&M' : value },
+    {
+      title: 'Start',
+      dataIndex: 'startDate',
+      width: 140,
+      render: (value: string | null, row: any) => (
+        row.isDerived ? (
+          <Typography.Text type="secondary">Auto</Typography.Text>
+        ) : (
+          <InlineDateInput
+            value={value}
+            style={{ width: '100%' }}
+            onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { startDate: nextValue } })}
+          />
+        )
+      ),
+    },
+    {
+      title: 'End',
+      dataIndex: 'endDate',
+      width: 140,
+      render: (value: string | null, row: any) => (
+        row.isDerived ? (
+          <Typography.Text type="secondary">Auto</Typography.Text>
+        ) : (
+          <InlineDateInput
+            value={value}
+            style={{ width: '100%' }}
+            onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { endDate: nextValue } })}
+          />
+        )
+      ),
+    },
     { title: 'Amount', dataIndex: 'amount', render: (v: number) => fmt(v) },
     { title: 'Notes', dataIndex: 'notes' },
     {
@@ -1273,6 +1365,7 @@ export default function UnitView() {
                   <Table
                     size="small"
                     pagination={false}
+                    scroll={{ x: 'max-content' }}
                     dataSource={contractLinesForDisplay}
                     locale={{ emptyText: 'No contract details yet' }}
                     columns={[
@@ -1287,6 +1380,38 @@ export default function UnitView() {
                                 value={value}
                                 placeholder="Contract type"
                                 onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { notes: nextValue } })}
+                              />
+                            )
+                        ),
+                      },
+                      {
+                        title: 'Start',
+                        dataIndex: 'startDate',
+                        width: 140,
+                        render: (value: string | null, row: any) => (
+                          row.isDerived
+                            ? <Typography.Text type="secondary">Auto</Typography.Text>
+                            : (
+                              <InlineDateInput
+                                value={value}
+                                style={{ width: '100%' }}
+                                onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { startDate: nextValue } })}
+                              />
+                            )
+                        ),
+                      },
+                      {
+                        title: 'End',
+                        dataIndex: 'endDate',
+                        width: 140,
+                        render: (value: string | null, row: any) => (
+                          row.isDerived
+                            ? <Typography.Text type="secondary">Auto</Typography.Text>
+                            : (
+                              <InlineDateInput
+                                value={value}
+                                style={{ width: '100%' }}
+                                onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { endDate: nextValue } })}
                               />
                             )
                         ),
@@ -1350,6 +1475,7 @@ export default function UnitView() {
                   <Table
                     size="small"
                     pagination={false}
+                    scroll={{ x: 'max-content' }}
                     dataSource={gpcLinesForDisplay}
                     locale={{ emptyText: 'No GPC purchase details yet' }}
                     columns={[
@@ -1361,6 +1487,30 @@ export default function UnitView() {
                             value={value}
                             placeholder="GPC purchase type"
                             onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { notes: nextValue } })}
+                          />
+                        ),
+                      },
+                      {
+                        title: 'Start',
+                        dataIndex: 'startDate',
+                        width: 140,
+                        render: (value: string | null, row: any) => (
+                          <InlineDateInput
+                            value={value}
+                            style={{ width: '100%' }}
+                            onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { startDate: nextValue } })}
+                          />
+                        ),
+                      },
+                      {
+                        title: 'End',
+                        dataIndex: 'endDate',
+                        width: 140,
+                        render: (value: string | null, row: any) => (
+                          <InlineDateInput
+                            value={value}
+                            style={{ width: '100%' }}
+                            onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { endDate: nextValue } })}
                           />
                         ),
                       },
@@ -1423,6 +1573,7 @@ export default function UnitView() {
           <Table
             size="small"
             pagination={false}
+            scroll={{ x: 'max-content' }}
             dataSource={executionCostLinesForDisplay}
             columns={execColumns}
             locale={{ emptyText: 'No execution cost lines yet' }}
@@ -1438,13 +1589,17 @@ export default function UnitView() {
         onOk={async () => {
           try {
             const values = await entryForm.validateFields();
+            const { startDate, endDate } = getDateRangePayload(values.dateRange);
+            const dateRangeDutyDays = calculateInclusiveDateRangeDays(startDate, endDate);
             const calculatedDutyDays = entryModalIsPlanning && values.months !== undefined && values.months !== null
               ? monthsToDutyDays(values.months)
               : values.dutyDays;
             const payload = {
               rankCode: values.rankCode,
               count: values.count,
-              dutyDays: calculatedDutyDays,
+              dutyDays: dateRangeDutyDays ?? calculatedDutyDays,
+              startDate,
+              endDate,
               rentalCarCount: entryModalUsesBinaryRentalCar
                 ? (values.hasRentalCar ? 1 : 0)
                 : entryModalSupportsRentalCars
@@ -1499,6 +1654,16 @@ export default function UnitView() {
               />
             </Form.Item>
           )}
+          <Form.Item name="dateRange" label="Date Range (optional)">
+            <DatePicker.RangePicker
+              style={{ width: '100%' }}
+              onChange={(dates) => {
+                if (dates && dates[0] && dates[1]) {
+                  entryForm.setFieldValue('dutyDays', dates[1].diff(dates[0], 'day') + 1);
+                }
+              }}
+            />
+          </Form.Item>
           <Form.Item name="dutyDays" label="Duty Days" initialValue={exercise.defaultDutyDays} rules={[{ required: true }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
@@ -1571,12 +1736,15 @@ export default function UnitView() {
         open={contractModalOpen}
         onOk={async () => {
           const values = await contractForm.validateFields();
+          const { startDate, endDate } = getDateRangePayload(values.dateRange);
           await addExecMut.mutateAsync({
             unitId: ub.id,
             data: {
               fundingType: 'OM',
               category: 'TITLE_CONTRACTS',
               amount: Number(values.cost) || 0,
+              startDate,
+              endDate,
               notes: values.type,
             },
           });
@@ -1592,6 +1760,9 @@ export default function UnitView() {
           <Form.Item name="type" label="Type" rules={[{ required: true, message: 'Enter contract type' }]}>
             <Input />
           </Form.Item>
+          <Form.Item name="dateRange" label="Date Range (optional)">
+            <DatePicker.RangePicker style={{ width: '100%' }} />
+          </Form.Item>
           <Form.Item name="cost" label="Cost" rules={[{ required: true, message: 'Enter contract cost' }]}>
             <InputNumber min={0} style={{ width: '100%' }} prefix="$" />
           </Form.Item>
@@ -1603,12 +1774,15 @@ export default function UnitView() {
         open={gpcModalOpen}
         onOk={async () => {
           const values = await gpcForm.validateFields();
+          const { startDate, endDate } = getDateRangePayload(values.dateRange);
           await addExecMut.mutateAsync({
             unitId: ub.id,
             data: {
               fundingType: 'OM',
               category: 'GPC_PURCHASES',
               amount: Number(values.cost) || 0,
+              startDate,
+              endDate,
               notes: values.type?.trim() || null,
             },
           });
@@ -1624,6 +1798,9 @@ export default function UnitView() {
           <Form.Item name="type" label="Type" rules={[{ required: true, message: 'Enter purchase type' }]}>
             <Input />
           </Form.Item>
+          <Form.Item name="dateRange" label="Date Range (optional)">
+            <DatePicker.RangePicker style={{ width: '100%' }} />
+          </Form.Item>
           <Form.Item name="cost" label="Cost" rules={[{ required: true, message: 'Enter purchase cost' }]}>
             <InputNumber min={0} style={{ width: '100%' }} prefix="$" />
           </Form.Item>
@@ -1635,9 +1812,20 @@ export default function UnitView() {
         title="Add Execution Cost"
         open={execModal}
         onOk={() =>
-          execForm.validateFields().then((v) =>
-            addExecMut.mutate({ unitId: ub.id, data: v })
-          )
+          execForm.validateFields().then((values) => {
+            const { startDate, endDate } = getDateRangePayload(values.dateRange);
+            addExecMut.mutate({
+              unitId: ub.id,
+              data: {
+                category: values.category,
+                fundingType: values.fundingType,
+                amount: values.amount,
+                startDate,
+                endDate,
+                notes: values.notes,
+              },
+            });
+          })
         }
         onCancel={() => setExecModal(false)}
       >
@@ -1650,6 +1838,9 @@ export default function UnitView() {
           </Form.Item>
           <Form.Item name="amount" label="Amount" rules={[{ required: true }]}>
             <InputNumber min={0} style={{ width: '100%' }} prefix="$" />
+          </Form.Item>
+          <Form.Item name="dateRange" label="Date Range (optional)">
+            <DatePicker.RangePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="notes" label="Notes">
             <Input.TextArea />

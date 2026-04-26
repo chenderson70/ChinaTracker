@@ -35,6 +35,8 @@ export interface PersonnelEntryRow {
   personnelGroupId: string;
   rankCode: string;
   count: number;
+  startDate: string | null;
+  endDate: string | null;
 }
 
 export interface TravelConfigRow {
@@ -52,6 +54,8 @@ export interface ExecutionCostLineRow {
   fundingType: string;
   category: string;
   amount: number;
+  startDate: string | null;
+  endDate: string | null;
   notes: string | null;
 }
 
@@ -61,6 +65,8 @@ export interface OmCostLineRow {
   category: string;
   label: string;
   amount: number;
+  startDate: string | null;
+  endDate: string | null;
   notes: string | null;
 }
 

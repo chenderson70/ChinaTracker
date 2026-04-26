@@ -4,6 +4,14 @@ import { getRequestUserId } from '../services/auth';
 
 const router = Router();
 
+function parseOptionalDateField(value: unknown): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || String(value).trim() === '') return null;
+
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 // ─── EXECUTION COST LINES ───
 
 router.get('/units/:unitId/execution-costs', async (req: Request, res: Response) => {
@@ -35,9 +43,17 @@ router.post('/units/:unitId/execution-costs', async (req: Request, res: Response
       return res.status(404).json({ error: 'Unit not found' });
     }
 
-    const { fundingType, category, amount, notes } = req.body;
+    const { fundingType, category, amount, startDate, endDate, notes } = req.body;
     const line = await prisma.executionCostLine.create({
-      data: { unitBudgetId: req.params.unitId, fundingType, category, amount, notes },
+      data: {
+        unitBudgetId: req.params.unitId,
+        fundingType,
+        category,
+        amount,
+        startDate: parseOptionalDateField(startDate),
+        endDate: parseOptionalDateField(endDate),
+        notes,
+      },
     });
     res.status(201).json(line);
   } catch (err: any) {
@@ -106,9 +122,13 @@ router.put('/execution-costs/:lineId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Execution cost not found' });
     }
 
+    const updateData = { ...req.body } as Record<string, unknown>;
+    if (req.body?.startDate !== undefined) updateData.startDate = parseOptionalDateField(req.body.startDate);
+    if (req.body?.endDate !== undefined) updateData.endDate = parseOptionalDateField(req.body.endDate);
+
     const line = await prisma.executionCostLine.update({
       where: { id: req.params.lineId },
-      data: req.body,
+      data: updateData,
     });
     res.json(line);
   } catch (err: any) {
@@ -157,9 +177,17 @@ router.post('/exercises/:id/om-costs', async (req: Request, res: Response) => {
     const exercise = await prisma.exercise.findFirst({ where: { id: req.params.id, ownerUserId: userId } });
     if (!exercise) return res.status(404).json({ error: 'Exercise not found' });
 
-    const { category, label, amount, notes } = req.body;
+    const { category, label, amount, startDate, endDate, notes } = req.body;
     const line = await prisma.omCostLine.create({
-      data: { exerciseId: req.params.id, category, label, amount, notes },
+      data: {
+        exerciseId: req.params.id,
+        category,
+        label,
+        amount,
+        startDate: parseOptionalDateField(startDate),
+        endDate: parseOptionalDateField(endDate),
+        notes,
+      },
     });
     res.status(201).json(line);
   } catch (err: any) {
@@ -178,9 +206,13 @@ router.put('/om-costs/:lineId', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'O&M cost not found' });
     }
 
+    const updateData = { ...req.body } as Record<string, unknown>;
+    if (req.body?.startDate !== undefined) updateData.startDate = parseOptionalDateField(req.body.startDate);
+    if (req.body?.endDate !== undefined) updateData.endDate = parseOptionalDateField(req.body.endDate);
+
     const line = await prisma.omCostLine.update({
       where: { id: req.params.lineId },
-      data: req.body,
+      data: updateData,
     });
     res.json(line);
   } catch (err: any) {

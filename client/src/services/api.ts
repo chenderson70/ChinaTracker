@@ -15,6 +15,8 @@ import type {
   AuthUser,
   RefinementItem,
   ExerciseUndoSnapshot,
+  ExerciseTemplate,
+  QuarterlySnapshotDates,
 } from '../types';
 import { clearAuthSession, getAuthToken, getRefreshToken, setAuthSession } from './auth';
 
@@ -203,6 +205,8 @@ export async function getExercise(id: string): Promise<ExerciseDetail> {
 
 export async function createExercise(data: {
   name: string;
+  exerciseTemplate?: ExerciseTemplate;
+  quarterlySnapshots?: QuarterlySnapshotDates;
   totalBudget?: number;
   startDate: string;
   endDate: string;
@@ -279,6 +283,8 @@ export async function addPersonnelEntry(
     rankCode: string;
     count: number;
     dutyDays?: number | null;
+    startDate?: string | null;
+    endDate?: string | null;
     rentalCarCount?: number;
     location?: string | null;
     isLocal?: boolean;
@@ -292,7 +298,7 @@ export async function addPersonnelEntry(
 
 export async function updatePersonnelEntry(
   entryId: string,
-  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'dutyDays' | 'rentalCarCount' | 'location' | 'isLocal' | 'note' | 'travelOnly' | 'longTermA7Planner'>>,
+  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'dutyDays' | 'startDate' | 'endDate' | 'rentalCarCount' | 'location' | 'isLocal' | 'note' | 'travelOnly' | 'longTermA7Planner'>>,
 ): Promise<PersonnelEntry> {
   return apiRequest<PersonnelEntry>(`/personnel-entries/${entryId}`, { method: 'PUT', body: data });
 }
@@ -304,14 +310,14 @@ export async function deletePersonnelEntry(entryId: string): Promise<void> {
 // ── Execution Cost Lines ──
 export async function addExecutionCost(
   unitId: string,
-  data: { fundingType: string; category: string; amount: number; notes?: string | null },
+  data: { fundingType: string; category: string; amount: number; startDate?: string | null; endDate?: string | null; notes?: string | null },
 ): Promise<ExecutionCostLine> {
   return apiRequest<ExecutionCostLine>(`/units/${unitId}/execution-costs`, { method: 'POST', body: data });
 }
 
 export async function updateExecutionCost(
   lineId: string,
-  data: Partial<Pick<ExecutionCostLine, 'fundingType' | 'category' | 'amount' | 'notes'>>,
+  data: Partial<Pick<ExecutionCostLine, 'fundingType' | 'category' | 'amount' | 'startDate' | 'endDate' | 'notes'>>,
 ): Promise<ExecutionCostLine> {
   return apiRequest<ExecutionCostLine>(`/execution-costs/${lineId}`, { method: 'PUT', body: data });
 }
@@ -323,9 +329,16 @@ export async function deleteExecutionCost(lineId: string): Promise<void> {
 // ── O&M Cost Lines ──
 export async function addOmCost(
   exerciseId: string,
-  data: { category: string; label: string; amount: number; notes?: string | null },
+  data: { category: string; label: string; amount: number; startDate?: string | null; endDate?: string | null; notes?: string | null },
 ): Promise<OmCostLine> {
   return apiRequest<OmCostLine>(`/exercises/${exerciseId}/om-costs`, { method: 'POST', body: data });
+}
+
+export async function updateOmCost(
+  lineId: string,
+  data: Partial<Pick<OmCostLine, 'category' | 'label' | 'amount' | 'startDate' | 'endDate' | 'notes'>>,
+): Promise<OmCostLine> {
+  return apiRequest<OmCostLine>(`/om-costs/${lineId}`, { method: 'PUT', body: data });
 }
 
 export async function deleteOmCost(lineId: string): Promise<void> {
@@ -474,6 +487,8 @@ export async function exportAllData(): Promise<string> {
           rankCode: entry.rankCode,
           count: entry.count,
           dutyDays: entry.dutyDays,
+          startDate: entry.startDate,
+          endDate: entry.endDate,
           rentalCarCount: entry.rentalCarCount,
           location: entry.location,
           isLocal: entry.isLocal,
@@ -531,6 +546,8 @@ export async function importAllData(json: string): Promise<void> {
       rankCode: string;
       count: number;
       dutyDays?: number | null;
+      startDate?: string | null;
+      endDate?: string | null;
       rentalCarCount?: number;
       location?: string | null;
       isLocal?: boolean;
@@ -550,6 +567,8 @@ export async function importAllData(json: string): Promise<void> {
       fundingType: string;
       category: string;
       amount: number;
+      startDate?: string | null;
+      endDate?: string | null;
       notes: string | null;
     }>;
     omCostLines?: Array<{
@@ -557,6 +576,8 @@ export async function importAllData(json: string): Promise<void> {
       category: string;
       label: string;
       amount: number;
+      startDate?: string | null;
+      endDate?: string | null;
       notes: string | null;
     }>;
     rankCpdRates?: Array<{ rankCode: string; costPerDay: number }>;
@@ -598,6 +619,8 @@ export async function importAllData(json: string): Promise<void> {
   for (const sourceExercise of sourceExercises) {
     let created = await createExercise({
       name: sourceExercise.name,
+      exerciseTemplate: sourceExercise.exerciseTemplate,
+      quarterlySnapshots: sourceExercise.quarterlySnapshots,
       totalBudget: sourceExercise.totalBudget ?? 0,
       startDate: sourceExercise.startDate,
       endDate: sourceExercise.endDate,
@@ -658,6 +681,8 @@ export async function importAllData(json: string): Promise<void> {
           fundingType: line.fundingType,
           category: line.category,
           amount: line.amount,
+          startDate: line.startDate ?? null,
+          endDate: line.endDate ?? null,
           notes: line.notes,
         });
       }
@@ -672,6 +697,8 @@ export async function importAllData(json: string): Promise<void> {
           rankCode: entry.rankCode,
           count: entry.count,
           dutyDays: entry.dutyDays ?? null,
+          startDate: entry.startDate ?? null,
+          endDate: entry.endDate ?? null,
           rentalCarCount: entry.rentalCarCount ?? 0,
           location: entry.location ?? null,
           isLocal: !!entry.isLocal,
@@ -697,6 +724,8 @@ export async function importAllData(json: string): Promise<void> {
         category: line.category,
         label: line.label,
         amount: line.amount,
+        startDate: line.startDate ?? null,
+        endDate: line.endDate ?? null,
         notes: line.notes,
       });
     }

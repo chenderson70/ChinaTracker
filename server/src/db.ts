@@ -108,6 +108,14 @@ async function ensureSqliteCompatibilityColumns(): Promise<void> {
 	await ensureSqliteColumn('personnel_entries', 'travel_only', 'BOOLEAN NOT NULL DEFAULT false');
 	await ensureSqliteColumn('personnel_entries', 'rental_car_count', 'INTEGER NOT NULL DEFAULT 0');
 	await ensureSqliteColumn('personnel_entries', 'long_term_a7_planner', 'BOOLEAN NOT NULL DEFAULT false');
+	await ensureSqliteColumn('personnel_entries', 'start_date', 'DATETIME');
+	await ensureSqliteColumn('personnel_entries', 'end_date', 'DATETIME');
+
+	await ensureSqliteColumn('execution_cost_lines', 'start_date', 'DATETIME');
+	await ensureSqliteColumn('execution_cost_lines', 'end_date', 'DATETIME');
+
+	await ensureSqliteColumn('om_cost_lines', 'start_date', 'DATETIME');
+	await ensureSqliteColumn('om_cost_lines', 'end_date', 'DATETIME');
 
 	await ensureSqliteColumn(
 		'exercises',
@@ -130,6 +138,8 @@ async function ensureSqliteCompatibilityColumns(): Promise<void> {
 	await ensureSqliteColumn('exercises', 'report_limfac_3', `TEXT NOT NULL DEFAULT ''`);
 	await ensureSqliteColumn('exercises', 'report_prepared_by', `TEXT NOT NULL DEFAULT ''`);
 	await ensureSqliteColumn('exercises', 'refinements_json', `TEXT NOT NULL DEFAULT '[]'`);
+	await ensureSqliteColumn('exercises', 'exercise_template', `TEXT NOT NULL DEFAULT 'PATRIOT_MEDIC'`);
+	await ensureSqliteColumn('exercises', 'quarterly_snapshots_json', `TEXT NOT NULL DEFAULT '{}'`);
 }
 
 async function ensureSqliteSchema(): Promise<void> {

@@ -1,10 +1,16 @@
-import { Card, Empty, Select, Spin, Table, Typography } from 'antd';
+import { Card, Empty, Select, Spin, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useApp } from '../components/AppLayout';
 import * as api from '../services/api';
-import type { BudgetResult, Exercise, ExerciseDetail, PersonnelEntry, PersonnelGroup } from '../types';
-import { getAnnualTourBilletingOmTotal, getAnnualTourBoxTotal, getAnnualTourMilPayTotal, getAnnualTourTravelPayTotal, getRpaCategoryTotals } from '../utils/budgetSummary';
+import type { BudgetResult, ExerciseDetail, PersonnelEntry, PersonnelGroup } from '../types';
+import {
+  getAnnualTourBilletingOmTotal,
+  getAnnualTourBoxTotal,
+  getAnnualTourMilPayTotal,
+  getAnnualTourTravelPayTotal,
+  getRpaCategoryTotals,
+} from '../utils/budgetSummary';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 
 type SustainmentCounts = {
@@ -46,6 +52,8 @@ type ComparisonRow = {
   current: number;
   comparison: number;
   delta: number;
+  valueFormatter?: MetricFormatter;
+  deltaFormatter?: MetricFormatter;
 };
 
 type UnitComparisonRow = {
@@ -65,23 +73,29 @@ type UnitComparisonRow = {
   localHotelRoomDelta: number;
 };
 
-type SummaryBreakdownItem = {
+type SnapshotMetric = {
   label: string;
   value: string;
+  detail: string;
 };
 
-type SummaryCard = {
-  key: string;
+type MetricFormatter = (value: number) => string;
+
+type ComparisonBandSectionProps = {
   title: string;
-  currentLabel: string;
-  currentValue: string;
-  comparisonLabel: string;
-  comparisonValue: string;
-  delta: number;
-  deltaText: string;
-  formatter: (value: number) => string;
-  currentBreakdown?: SummaryBreakdownItem[];
-  comparisonBreakdown?: SummaryBreakdownItem[];
+  description: string;
+  rows: ComparisonRow[];
+  formatter: MetricFormatter;
+  deltaFormatter: MetricFormatter;
+  currentName: string;
+  comparisonName: string;
+};
+
+type ExerciseSnapshotCardProps = {
+  badge: string;
+  name: string;
+  metrics: ExerciseComparisonMetrics;
+  tone: 'current' | 'comparison';
 };
 
 const fmtCurrency = (value: number) => `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
@@ -97,9 +111,35 @@ function formatSignedCount(value: number): string {
   return `${value > 0 ? '+' : '-'}${fmtCount(Math.abs(value))}`;
 }
 
-function renderSignedValue(value: number, formatter: (amount: number) => string) {
-  const color = value > 0 ? '#cf1322' : value < 0 ? '#1677ff' : '#1f1f1f';
-  return <Typography.Text style={{ color, fontWeight: 600 }}>{formatter(value)}</Typography.Text>;
+type DeltaTone = 'increase' | 'decrease' | 'neutral';
+
+function getDeltaTone(value: number): DeltaTone {
+  if (value > 0) return 'increase';
+  if (value < 0) return 'decrease';
+  return 'neutral';
+}
+
+function getDeltaStateLabel(value: number): string {
+  if (value > 0) return 'Higher';
+  if (value < 0) return 'Lower';
+  return 'No change';
+}
+
+function renderDeltaBlock(value: number, formatter: MetricFormatter, compact = false) {
+  const tone = getDeltaTone(value);
+
+  return (
+    <div
+      className={[
+        'ct-comparison-delta-block',
+        `ct-comparison-delta-block--${tone}`,
+        compact ? 'ct-comparison-delta-block--compact' : '',
+      ].filter(Boolean).join(' ')}
+    >
+      <span className="ct-comparison-delta-state">{getDeltaStateLabel(value)}</span>
+      {value !== 0 && <span className="ct-comparison-delta-number">{formatter(value)}</span>}
+    </div>
+  );
 }
 
 function toCount(value: unknown): number {
@@ -289,6 +329,134 @@ function buildExerciseMetrics(exercise: ExerciseDetail, budget: BudgetResult): E
   };
 }
 
+function getTotalExecutionPax(metrics: ExerciseComparisonMetrics): number {
+  return metrics.executionPax.playerPax + metrics.executionPax.whiteCellSupportPax;
+}
+
+function getTotalRooms(metrics: ExerciseComparisonMetrics): number {
+  return metrics.sustainment.playerRoomsNeeded + metrics.sustainment.localHotelRoomsNeeded;
+}
+
+function buildSnapshotMetrics(metrics: ExerciseComparisonMetrics): SnapshotMetric[] {
+  return [
+    {
+      label: 'Total funding',
+      value: fmtCurrency(metrics.totalFunding),
+      detail: `RPA ${fmtCurrency(metrics.rpaFunding)} / O&M ${fmtCurrency(metrics.omFunding)}`,
+    },
+    {
+      label: 'Travel & per diem',
+      value: fmtCurrency(metrics.travelPerDiemFunding),
+      detail: `Annual tour ${fmtCurrency(metrics.annualTourFunding)}`,
+    },
+    {
+      label: 'Execution PAX',
+      value: `${fmtCount(getTotalExecutionPax(metrics))} PAX`,
+      detail: `Player ${fmtCount(metrics.executionPax.playerPax)} / White Cell ${fmtCount(metrics.executionPax.whiteCellSupportPax)}`,
+    },
+    {
+      label: 'Meals',
+      value: `${fmtCount(metrics.sustainment.mresNeeded)} MREs`,
+      detail: `Funding ${fmtCurrency(metrics.mealsFunding)}`,
+    },
+    {
+      label: 'Lodging',
+      value: `${fmtCount(getTotalRooms(metrics))} rooms`,
+      detail: `Player ${fmtCount(metrics.sustainment.playerRoomsNeeded)} / Support hotel ${fmtCount(metrics.sustainment.localHotelRoomsNeeded)}`,
+    },
+  ];
+}
+
+function ComparisonBandSection({
+  title,
+  description,
+  rows,
+  formatter,
+  deltaFormatter,
+  currentName,
+  comparisonName,
+}: ComparisonBandSectionProps) {
+  return (
+    <Card title={title} className="ct-section-card ct-comparison-band-card">
+      <Typography.Text type="secondary" className="ct-comparison-band-description">
+        {description}
+      </Typography.Text>
+      <div className="ct-comparison-band">
+        <div className="ct-comparison-band-header">
+          <span>Metric</span>
+          <span>{currentName}</span>
+          <span>{comparisonName}</span>
+          <span>Difference</span>
+        </div>
+        {rows.map((row) => (
+          <div key={row.key} className="ct-comparison-band-row">
+            <div className="ct-comparison-band-cell ct-comparison-band-cell--metric">
+              <Typography.Text strong className="ct-comparison-band-label">
+                {row.metric}
+              </Typography.Text>
+            </div>
+            <div className="ct-comparison-band-cell ct-comparison-band-cell--value">
+              <span className="ct-comparison-band-mobile-label">Current</span>
+              <span className="ct-comparison-band-number">
+                {(row.valueFormatter || formatter)(row.current)}
+              </span>
+            </div>
+            <div className="ct-comparison-band-cell ct-comparison-band-cell--value">
+              <span className="ct-comparison-band-mobile-label">Compared</span>
+              <span className="ct-comparison-band-number">
+                {(row.valueFormatter || formatter)(row.comparison)}
+              </span>
+            </div>
+            <div className="ct-comparison-band-cell ct-comparison-band-cell--delta">
+              <span className="ct-comparison-band-mobile-label">Difference</span>
+              {renderDeltaBlock(row.delta, row.deltaFormatter || deltaFormatter)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function ExerciseSnapshotCard({ badge, name, metrics, tone }: ExerciseSnapshotCardProps) {
+  const snapshotMetrics = buildSnapshotMetrics(metrics);
+
+  return (
+    <Card className={`ct-section-card ct-comparison-snapshot-card ct-comparison-snapshot-card--${tone}`}>
+      <div className="ct-comparison-snapshot-header">
+        <Typography.Text className="ct-comparison-snapshot-badge">
+          {badge}
+        </Typography.Text>
+        <Typography.Title level={5} className="ct-comparison-snapshot-name">
+          {name}
+        </Typography.Title>
+      </div>
+      <div className="ct-comparison-snapshot-metrics">
+        {snapshotMetrics.map((item) => (
+          <div key={`${badge}-${item.label}`} className="ct-comparison-snapshot-metric">
+            <Typography.Text className="ct-comparison-snapshot-metric-label">
+              {item.label}
+            </Typography.Text>
+            <Typography.Text strong className="ct-comparison-snapshot-metric-value">
+              {item.value}
+            </Typography.Text>
+            <Typography.Text className="ct-comparison-snapshot-metric-detail">
+              {item.detail}
+            </Typography.Text>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function hasUnitChange(row: UnitComparisonRow): boolean {
+  return row.fundingDelta !== 0
+    || row.mresDelta !== 0
+    || row.playerRoomDelta !== 0
+    || row.localHotelRoomDelta !== 0;
+}
+
 export default function Comparison() {
   const { exercise, budget, exerciseId } = useApp();
   const [comparisonExerciseId, setComparisonExerciseId] = useState<string | null>(null);
@@ -368,103 +536,51 @@ export default function Comparison() {
   const currentMetrics = buildExerciseMetrics(exercise, budget);
   const selectedMetrics = buildExerciseMetrics(comparisonExercise, comparisonBudget);
 
-  const summaryCards: SummaryCard[] = [
+  const highlightRows: ComparisonRow[] = [
     {
-      key: 'funding',
-      title: 'Funding Difference',
-      currentLabel: exercise.name,
-      currentValue: fmtCurrency(currentMetrics.totalFunding),
-      comparisonLabel: comparisonExercise.name,
-      comparisonValue: fmtCurrency(selectedMetrics.totalFunding),
+      key: 'highlight-grand-total',
+      metric: 'Grand total funding',
+      current: currentMetrics.totalFunding,
+      comparison: selectedMetrics.totalFunding,
       delta: selectedMetrics.totalFunding - currentMetrics.totalFunding,
-      deltaText: 'Grand total',
-      formatter: formatSignedCurrency,
+      valueFormatter: fmtCurrency,
+      deltaFormatter: formatSignedCurrency,
     },
     {
-      key: 'travel',
-      title: 'Travel & Per Diem Difference',
-      currentLabel: exercise.name,
-      currentValue: fmtCurrency(currentMetrics.travelPerDiemFunding),
-      comparisonLabel: comparisonExercise.name,
-      comparisonValue: fmtCurrency(selectedMetrics.travelPerDiemFunding),
+      key: 'highlight-travel',
+      metric: 'Travel & per diem',
+      current: currentMetrics.travelPerDiemFunding,
+      comparison: selectedMetrics.travelPerDiemFunding,
       delta: selectedMetrics.travelPerDiemFunding - currentMetrics.travelPerDiemFunding,
-      deltaText: 'Travel + per diem',
-      formatter: formatSignedCurrency,
+      valueFormatter: fmtCurrency,
+      deltaFormatter: formatSignedCurrency,
     },
     {
-      key: 'meals',
-      title: 'Meals Difference',
-      currentLabel: exercise.name,
-      currentValue: `${fmtCount(currentMetrics.sustainment.mresNeeded)} MREs`,
-      comparisonLabel: comparisonExercise.name,
-      comparisonValue: `${fmtCount(selectedMetrics.sustainment.mresNeeded)} MREs`,
+      key: 'highlight-pax',
+      metric: 'Total execution PAX',
+      current: getTotalExecutionPax(currentMetrics),
+      comparison: getTotalExecutionPax(selectedMetrics),
+      delta: getTotalExecutionPax(selectedMetrics) - getTotalExecutionPax(currentMetrics),
+      valueFormatter: (value) => `${fmtCount(value)} PAX`,
+      deltaFormatter: (value) => `${value > 0 ? '+' : value < 0 ? '-' : ''}${fmtCount(Math.abs(value))} PAX`,
+    },
+    {
+      key: 'highlight-mres',
+      metric: 'MRE requirement',
+      current: currentMetrics.sustainment.mresNeeded,
+      comparison: selectedMetrics.sustainment.mresNeeded,
       delta: selectedMetrics.sustainment.mresNeeded - currentMetrics.sustainment.mresNeeded,
-      deltaText: 'MRE requirement',
-      formatter: formatSignedCount,
+      valueFormatter: (value) => `${fmtCount(value)} MREs`,
+      deltaFormatter: (value) => `${value > 0 ? '+' : value < 0 ? '-' : ''}${fmtCount(Math.abs(value))} MREs`,
     },
     {
-      key: 'pax',
-      title: 'PAX Difference',
-      currentLabel: exercise.name,
-      currentValue: `${fmtCount(currentMetrics.executionPax.playerPax + currentMetrics.executionPax.whiteCellSupportPax)} PAX`,
-      currentBreakdown: [
-        {
-          label: 'Player',
-          value: `${fmtCount(currentMetrics.executionPax.playerPax)} PAX`,
-        },
-        {
-          label: 'White Cell / Support',
-          value: `${fmtCount(currentMetrics.executionPax.whiteCellSupportPax)} PAX`,
-        },
-      ],
-      comparisonLabel: comparisonExercise.name,
-      comparisonValue: `${fmtCount(selectedMetrics.executionPax.playerPax + selectedMetrics.executionPax.whiteCellSupportPax)} PAX`,
-      comparisonBreakdown: [
-        {
-          label: 'Player',
-          value: `${fmtCount(selectedMetrics.executionPax.playerPax)} PAX`,
-        },
-        {
-          label: 'White Cell / Support',
-          value: `${fmtCount(selectedMetrics.executionPax.whiteCellSupportPax)} PAX`,
-        },
-      ],
-      delta: (selectedMetrics.executionPax.playerPax + selectedMetrics.executionPax.whiteCellSupportPax)
-        - (currentMetrics.executionPax.playerPax + currentMetrics.executionPax.whiteCellSupportPax),
-      deltaText: 'Total execution PAX',
-      formatter: formatSignedCount,
-    },
-    {
-      key: 'lodging',
-      title: 'Lodging Difference',
-      currentLabel: exercise.name,
-      currentValue: `${fmtCount(currentMetrics.sustainment.playerRoomsNeeded + currentMetrics.sustainment.localHotelRoomsNeeded)} rooms`,
-      currentBreakdown: [
-        {
-          label: 'Player billeting',
-          value: `${fmtCount(currentMetrics.sustainment.playerRoomsNeeded)} rooms`,
-        },
-        {
-          label: 'Support / White Cell hotel',
-          value: `${fmtCount(currentMetrics.sustainment.localHotelRoomsNeeded)} rooms`,
-        },
-      ],
-      comparisonLabel: comparisonExercise.name,
-      comparisonValue: `${fmtCount(selectedMetrics.sustainment.playerRoomsNeeded + selectedMetrics.sustainment.localHotelRoomsNeeded)} rooms`,
-      comparisonBreakdown: [
-        {
-          label: 'Player billeting',
-          value: `${fmtCount(selectedMetrics.sustainment.playerRoomsNeeded)} rooms`,
-        },
-        {
-          label: 'Support / White Cell hotel',
-          value: `${fmtCount(selectedMetrics.sustainment.localHotelRoomsNeeded)} rooms`,
-        },
-      ],
-      delta: (selectedMetrics.sustainment.playerRoomsNeeded + selectedMetrics.sustainment.localHotelRoomsNeeded)
-        - (currentMetrics.sustainment.playerRoomsNeeded + currentMetrics.sustainment.localHotelRoomsNeeded),
-      deltaText: 'Total rooms',
-      formatter: formatSignedCount,
+      key: 'highlight-rooms',
+      metric: 'Total rooms',
+      current: getTotalRooms(currentMetrics),
+      comparison: getTotalRooms(selectedMetrics),
+      delta: getTotalRooms(selectedMetrics) - getTotalRooms(currentMetrics),
+      valueFormatter: (value) => `${fmtCount(value)} rooms`,
+      deltaFormatter: (value) => `${value > 0 ? '+' : value < 0 ? '-' : ''}${fmtCount(Math.abs(value))} rooms`,
     },
   ];
 
@@ -497,9 +613,6 @@ export default function Comparison() {
       comparison: selectedMetrics.annualTourFunding,
       delta: selectedMetrics.annualTourFunding - currentMetrics.annualTourFunding,
     },
-  ];
-
-  const budgetDriverRows: ComparisonRow[] = [
     {
       key: 'mil-pay',
       metric: 'Mil Pay',
@@ -530,10 +643,31 @@ export default function Comparison() {
     },
   ];
 
-  const sustainmentRows: ComparisonRow[] = [
+  const personnelAndLodgingRows: ComparisonRow[] = [
+    {
+      key: 'player-pax',
+      metric: 'Player PAX',
+      current: currentMetrics.executionPax.playerPax,
+      comparison: selectedMetrics.executionPax.playerPax,
+      delta: selectedMetrics.executionPax.playerPax - currentMetrics.executionPax.playerPax,
+    },
+    {
+      key: 'white-cell-pax',
+      metric: 'White Cell / Support PAX',
+      current: currentMetrics.executionPax.whiteCellSupportPax,
+      comparison: selectedMetrics.executionPax.whiteCellSupportPax,
+      delta: selectedMetrics.executionPax.whiteCellSupportPax - currentMetrics.executionPax.whiteCellSupportPax,
+    },
+    {
+      key: 'total-pax',
+      metric: 'Total execution PAX',
+      current: getTotalExecutionPax(currentMetrics),
+      comparison: getTotalExecutionPax(selectedMetrics),
+      delta: getTotalExecutionPax(selectedMetrics) - getTotalExecutionPax(currentMetrics),
+    },
     {
       key: 'mres',
-      metric: "MRE's",
+      metric: 'MREs',
       current: currentMetrics.sustainment.mresNeeded,
       comparison: selectedMetrics.sustainment.mresNeeded,
       delta: selectedMetrics.sustainment.mresNeeded - currentMetrics.sustainment.mresNeeded,
@@ -573,61 +707,55 @@ export default function Comparison() {
     ...Object.keys(selectedMetrics.units),
   ])).sort(compareUnitCodes);
 
-  const unitRows: UnitComparisonRow[] = allUnitCodes.map((unitCode) => {
-    const currentUnit = currentMetrics.units[unitCode] || {
-      ...createEmptySustainmentCounts(),
-      totalFunding: 0,
-      rpaFunding: 0,
-      omFunding: 0,
-    };
-    const comparisonUnit = selectedMetrics.units[unitCode] || {
-      ...createEmptySustainmentCounts(),
-      totalFunding: 0,
-      rpaFunding: 0,
-      omFunding: 0,
-    };
+  const unitRows: UnitComparisonRow[] = allUnitCodes
+    .map((unitCode) => {
+      const currentUnit = currentMetrics.units[unitCode] || {
+        ...createEmptySustainmentCounts(),
+        totalFunding: 0,
+        rpaFunding: 0,
+        omFunding: 0,
+      };
+      const comparisonUnit = selectedMetrics.units[unitCode] || {
+        ...createEmptySustainmentCounts(),
+        totalFunding: 0,
+        rpaFunding: 0,
+        omFunding: 0,
+      };
 
-    return {
-      key: unitCode,
-      unit: getUnitDisplayLabel(unitCode),
-      currentFunding: currentUnit.totalFunding,
-      comparisonFunding: comparisonUnit.totalFunding,
-      fundingDelta: comparisonUnit.totalFunding - currentUnit.totalFunding,
-      currentPlayerRooms: currentUnit.playerRoomsNeeded,
-      comparisonPlayerRooms: comparisonUnit.playerRoomsNeeded,
-      playerRoomDelta: comparisonUnit.playerRoomsNeeded - currentUnit.playerRoomsNeeded,
-      currentMres: currentUnit.mresNeeded,
-      comparisonMres: comparisonUnit.mresNeeded,
-      mresDelta: comparisonUnit.mresNeeded - currentUnit.mresNeeded,
-      currentLocalHotelRooms: currentUnit.localHotelRoomsNeeded,
-      comparisonLocalHotelRooms: comparisonUnit.localHotelRoomsNeeded,
-      localHotelRoomDelta: comparisonUnit.localHotelRoomsNeeded - currentUnit.localHotelRoomsNeeded,
-    };
-  });
+      return {
+        key: unitCode,
+        unit: getUnitDisplayLabel(unitCode),
+        currentFunding: currentUnit.totalFunding,
+        comparisonFunding: comparisonUnit.totalFunding,
+        fundingDelta: comparisonUnit.totalFunding - currentUnit.totalFunding,
+        currentPlayerRooms: currentUnit.playerRoomsNeeded,
+        comparisonPlayerRooms: comparisonUnit.playerRoomsNeeded,
+        playerRoomDelta: comparisonUnit.playerRoomsNeeded - currentUnit.playerRoomsNeeded,
+        currentMres: currentUnit.mresNeeded,
+        comparisonMres: comparisonUnit.mresNeeded,
+        mresDelta: comparisonUnit.mresNeeded - currentUnit.mresNeeded,
+        currentLocalHotelRooms: currentUnit.localHotelRoomsNeeded,
+        comparisonLocalHotelRooms: comparisonUnit.localHotelRoomsNeeded,
+        localHotelRoomDelta: comparisonUnit.localHotelRoomsNeeded - currentUnit.localHotelRoomsNeeded,
+      };
+    })
+    .sort((left, right) => {
+      const leftChanged = hasUnitChange(left) ? 1 : 0;
+      const rightChanged = hasUnitChange(right) ? 1 : 0;
 
-  const fundingColumns = [
-    { title: 'Category', dataIndex: 'metric', key: 'metric', width: 280, render: (value: string) => <strong>{value}</strong> },
-    { title: exercise.name, dataIndex: 'current', key: 'current', width: 180, align: 'right' as const, render: (value: number) => fmtCurrency(value) },
-    { title: comparisonExercise.name, dataIndex: 'comparison', key: 'comparison', width: 180, align: 'right' as const, render: (value: number) => fmtCurrency(value) },
-    { title: 'Difference', dataIndex: 'delta', key: 'delta', width: 180, align: 'right' as const, render: (value: number) => renderSignedValue(value, formatSignedCurrency) },
-  ];
+      if (leftChanged !== rightChanged) {
+        return rightChanged - leftChanged;
+      }
 
-  const sustainmentColumns = [
-    { title: 'Metric', dataIndex: 'metric', key: 'metric', width: 280, render: (value: string) => <strong>{value}</strong> },
-    { title: exercise.name, dataIndex: 'current', key: 'current', width: 180, align: 'right' as const, render: (value: number) => fmtCount(value) },
-    { title: comparisonExercise.name, dataIndex: 'comparison', key: 'comparison', width: 180, align: 'right' as const, render: (value: number) => fmtCount(value) },
-    { title: 'Difference', dataIndex: 'delta', key: 'delta', width: 180, align: 'right' as const, render: (value: number) => renderSignedValue(value, formatSignedCount) },
-  ];
+      const fundingMagnitude = Math.abs(right.fundingDelta) - Math.abs(left.fundingDelta);
+      if (fundingMagnitude !== 0) {
+        return fundingMagnitude;
+      }
 
-  const unitColumns = [
-    { title: 'Unit', dataIndex: 'unit', key: 'unit', render: (value: string) => <strong>{value}</strong> },
-    { title: `${exercise.name} Funding`, dataIndex: 'currentFunding', key: 'currentFunding', align: 'right' as const, render: (value: number) => fmtCurrency(value) },
-    { title: `${comparisonExercise.name} Funding`, dataIndex: 'comparisonFunding', key: 'comparisonFunding', align: 'right' as const, render: (value: number) => fmtCurrency(value) },
-    { title: 'Funding Diff', dataIndex: 'fundingDelta', key: 'fundingDelta', align: 'right' as const, render: (value: number) => renderSignedValue(value, formatSignedCurrency) },
-    { title: "MRE Diff", dataIndex: 'mresDelta', key: 'mresDelta', align: 'right' as const, render: (value: number) => renderSignedValue(value, formatSignedCount) },
-    { title: 'Player Room Diff', dataIndex: 'playerRoomDelta', key: 'playerRoomDelta', align: 'right' as const, render: (value: number) => renderSignedValue(value, formatSignedCount) },
-    { title: 'Hotel Room Diff', dataIndex: 'localHotelRoomDelta', key: 'localHotelRoomDelta', align: 'right' as const, render: (value: number) => renderSignedValue(value, formatSignedCount) },
-  ];
+      return left.unit.localeCompare(right.unit);
+    });
+
+  const changedUnitCount = unitRows.filter(hasUnitChange).length;
 
   return (
     <div>
@@ -635,11 +763,26 @@ export default function Comparison() {
         <Typography.Title level={4} className="ct-page-title">Comparison</Typography.Title>
       </div>
 
-      <Card className="ct-section-card" style={{ marginBottom: 24 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) 1fr', gap: 20, alignItems: 'end' }}>
-          <div>
-            <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-              Compare current exercise against
+      <Card className="ct-section-card ct-comparison-hero-card" style={{ marginBottom: 24 }}>
+        <div className="ct-comparison-hero-grid">
+          <div className="ct-comparison-hero-panel ct-comparison-hero-panel--current">
+            <Typography.Text className="ct-comparison-hero-eyebrow">
+              Current exercise
+            </Typography.Text>
+            <Typography.Title level={4} className="ct-comparison-hero-name">
+              {exercise.name}
+            </Typography.Title>
+            <Typography.Text className="ct-comparison-hero-value-label">
+              Total funding
+            </Typography.Text>
+            <Typography.Text strong className="ct-comparison-hero-value">
+              {fmtCurrency(currentMetrics.totalFunding)}
+            </Typography.Text>
+          </div>
+
+          <div className="ct-comparison-hero-selector">
+            <Typography.Text className="ct-comparison-hero-selector-label">
+              Compare against
             </Typography.Text>
             <Select
               style={{ width: '100%' }}
@@ -647,114 +790,174 @@ export default function Comparison() {
               options={comparisonOptions}
               onChange={setComparisonExerciseId}
             />
+            <Typography.Text type="secondary" className="ct-comparison-hero-helper">
+              Difference values show <strong>{comparisonExercise.name}</strong> minus <strong>{exercise.name}</strong>.
+            </Typography.Text>
           </div>
-          <Typography.Text type="secondary">
-            Current exercise: <strong>{exercise.name}</strong>. Difference columns show <strong>{comparisonExercise.name}</strong> minus <strong>{exercise.name}</strong>.
-          </Typography.Text>
+
+          <div className="ct-comparison-hero-panel ct-comparison-hero-panel--comparison">
+            <Typography.Text className="ct-comparison-hero-eyebrow">
+              Selected comparison
+            </Typography.Text>
+            <Typography.Title level={4} className="ct-comparison-hero-name">
+              {comparisonExercise.name}
+            </Typography.Title>
+            <Typography.Text className="ct-comparison-hero-value-label">
+              Total funding
+            </Typography.Text>
+            <Typography.Text strong className="ct-comparison-hero-value">
+              {fmtCurrency(selectedMetrics.totalFunding)}
+            </Typography.Text>
+          </div>
         </div>
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 24 }}>
-        {summaryCards.map((card) => (
-          <Card key={card.key} className="ct-section-card ct-comparison-summary-card">
-            <Typography.Text type="secondary" className="ct-comparison-summary-title">
-              {card.title}
-            </Typography.Text>
-            <Typography.Text className="ct-comparison-summary-label">
-              {card.currentLabel}
-            </Typography.Text>
-            <Typography.Text strong className="ct-comparison-summary-value">
-              {card.currentValue}
-            </Typography.Text>
-            {card.currentBreakdown && (
-              <div className="ct-comparison-summary-breakdown">
-                {card.currentBreakdown.map((item) => (
-                  <div key={`${card.key}-current-${item.label}`} className="ct-comparison-summary-breakdown-line">
-                    <Typography.Text className="ct-comparison-summary-breakdown-label">
-                      {item.label}
-                    </Typography.Text>
-                    <Typography.Text className="ct-comparison-summary-breakdown-value">
-                      {item.value}
-                    </Typography.Text>
-                  </div>
-                ))}
-              </div>
-            )}
-            <Typography.Text className="ct-comparison-summary-label">
-              {card.comparisonLabel}
-            </Typography.Text>
-            <Typography.Text strong className="ct-comparison-summary-value">
-              {card.comparisonValue}
-            </Typography.Text>
-            {card.comparisonBreakdown && (
-              <div className="ct-comparison-summary-breakdown">
-                {card.comparisonBreakdown.map((item) => (
-                  <div key={`${card.key}-comparison-${item.label}`} className="ct-comparison-summary-breakdown-line">
-                    <Typography.Text className="ct-comparison-summary-breakdown-label">
-                      {item.label}
-                    </Typography.Text>
-                    <Typography.Text className="ct-comparison-summary-breakdown-value">
-                      {item.value}
-                    </Typography.Text>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="ct-comparison-summary-delta">
-              <Typography.Text className="ct-comparison-summary-delta-label">
-                {card.deltaText}
-              </Typography.Text>
-              <div className="ct-comparison-summary-delta-value">
-                {renderSignedValue(card.delta, card.formatter)}
-              </div>
-            </div>
-          </Card>
-        ))}
+      <div className="ct-comparison-snapshot-grid">
+        <ExerciseSnapshotCard
+          badge="Current snapshot"
+          name={exercise.name}
+          metrics={currentMetrics}
+          tone="current"
+        />
+        <ExerciseSnapshotCard
+          badge="Comparison snapshot"
+          name={comparisonExercise.name}
+          metrics={selectedMetrics}
+          tone="comparison"
+        />
       </div>
 
-      <Card title="Funding Comparison" className="ct-section-card" style={{ marginBottom: 24 }}>
-        <div className="ct-table ct-comparison-compact-table">
-          <Table
-            size="small"
-            pagination={false}
-            dataSource={fundingRows}
-            columns={fundingColumns}
-          />
-        </div>
-      </Card>
+      <div className="ct-comparison-sections">
+        <ComparisonBandSection
+          title="Biggest Differences"
+          description="Start here for the headline changes most likely to drive the brief."
+          rows={highlightRows}
+          formatter={fmtCurrency}
+          deltaFormatter={formatSignedCurrency}
+          currentName={exercise.name}
+          comparisonName={comparisonExercise.name}
+        />
 
-      <Card title="Key Budget Drivers" className="ct-section-card" style={{ marginBottom: 24 }}>
-        <div className="ct-table ct-comparison-compact-table">
-          <Table
-            size="small"
-            pagination={false}
-            dataSource={budgetDriverRows}
-            columns={fundingColumns}
+        <div className="ct-comparison-detail-grid">
+          <ComparisonBandSection
+            title="Funding Structure"
+            description="Topline funding plus the main cost drivers behind the total."
+            rows={fundingRows}
+            formatter={fmtCurrency}
+            deltaFormatter={formatSignedCurrency}
+            currentName={exercise.name}
+            comparisonName={comparisonExercise.name}
+          />
+          <ComparisonBandSection
+            title="Personnel, Meals & Lodging"
+            description="Execution footprint and sustainment requirements side by side."
+            rows={personnelAndLodgingRows}
+            formatter={fmtCount}
+            deltaFormatter={formatSignedCount}
+            currentName={exercise.name}
+            comparisonName={comparisonExercise.name}
           />
         </div>
-      </Card>
+      </div>
 
-      <Card title="Meals & Lodging Comparison" className="ct-section-card" style={{ marginBottom: 24 }}>
-        <div className="ct-table ct-comparison-compact-table">
-          <Table
-            size="small"
-            pagination={false}
-            dataSource={sustainmentRows}
-            columns={sustainmentColumns}
-          />
-        </div>
-      </Card>
+      <Card title="Unit-by-Unit Changes" className="ct-section-card">
+        <Typography.Text type="secondary" className="ct-comparison-unit-summary">
+          {changedUnitCount === 0
+            ? 'No unit-level differences were detected between these exercises.'
+            : `${changedUnitCount} unit${changedUnitCount === 1 ? '' : 's'} changed. Units with differences are listed first.`}
+        </Typography.Text>
 
-      <Card title="Unit-Level Differences" className="ct-section-card">
-        <div className="ct-table">
-          <Table
-            size="small"
-            pagination={false}
-            dataSource={unitRows}
-            columns={unitColumns}
-            scroll={{ x: 1080 }}
-          />
-        </div>
+        {unitRows.length === 0 ? (
+          <Empty description="No unit data is available for this comparison." />
+        ) : (
+          <div className="ct-comparison-unit-grid">
+            {unitRows.map((row) => {
+              const unitMetrics = [
+                {
+                  key: 'funding',
+                  label: 'Total funding',
+                  current: row.currentFunding,
+                  comparison: row.comparisonFunding,
+                  delta: row.fundingDelta,
+                  formatter: fmtCurrency,
+                  deltaFormatter: formatSignedCurrency,
+                },
+                {
+                  key: 'mres',
+                  label: 'MREs',
+                  current: row.currentMres,
+                  comparison: row.comparisonMres,
+                  delta: row.mresDelta,
+                  formatter: fmtCount,
+                  deltaFormatter: formatSignedCount,
+                },
+                {
+                  key: 'player-rooms',
+                  label: 'Player rooms',
+                  current: row.currentPlayerRooms,
+                  comparison: row.comparisonPlayerRooms,
+                  delta: row.playerRoomDelta,
+                  formatter: fmtCount,
+                  deltaFormatter: formatSignedCount,
+                },
+                {
+                  key: 'hotel-rooms',
+                  label: 'Hotel rooms',
+                  current: row.currentLocalHotelRooms,
+                  comparison: row.comparisonLocalHotelRooms,
+                  delta: row.localHotelRoomDelta,
+                  formatter: fmtCount,
+                  deltaFormatter: formatSignedCount,
+                },
+              ];
+
+              return (
+                <div
+                  key={row.key}
+                  className={[
+                    'ct-comparison-unit-card',
+                    hasUnitChange(row) ? '' : 'ct-comparison-unit-card--unchanged',
+                  ].filter(Boolean).join(' ')}
+                >
+                  <div className="ct-comparison-unit-card-header">
+                    <Typography.Text strong className="ct-comparison-unit-card-title">
+                      {row.unit}
+                    </Typography.Text>
+                    {renderDeltaBlock(row.fundingDelta, formatSignedCurrency, true)}
+                  </div>
+
+                  <div className="ct-comparison-unit-card-body">
+                    {unitMetrics.map((metric) => (
+                      <div key={`${row.key}-${metric.key}`} className="ct-comparison-unit-stat">
+                        <div className="ct-comparison-unit-stat-top">
+                          <Typography.Text className="ct-comparison-unit-stat-label">
+                            {metric.label}
+                          </Typography.Text>
+                          {renderDeltaBlock(metric.delta, metric.deltaFormatter, true)}
+                        </div>
+
+                        <div className="ct-comparison-unit-stat-values">
+                          <div className="ct-comparison-unit-stat-value">
+                            <span className="ct-comparison-unit-stat-caption">Current</span>
+                            <span className="ct-comparison-unit-stat-number">
+                              {metric.formatter(metric.current)}
+                            </span>
+                          </div>
+                          <div className="ct-comparison-unit-stat-value">
+                            <span className="ct-comparison-unit-stat-caption">Compared</span>
+                            <span className="ct-comparison-unit-stat-number">
+                              {metric.formatter(metric.comparison)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Card>
     </div>
   );

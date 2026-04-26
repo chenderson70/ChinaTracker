@@ -15,6 +15,66 @@ type RefinementItem = {
   statusNote: string;
 };
 
+type QuarterlySnapshotDates = {
+  q1: string;
+  q2: string;
+  q3: string;
+  q4: string;
+};
+
+type ExerciseTemplate = 'PATRIOT_MEDIC' | 'PATRIOT_PHOENIX' | 'PATRIOT_FORGE';
+
+const DEFAULT_EXERCISE_TEMPLATE: ExerciseTemplate = 'PATRIOT_MEDIC';
+const VALID_EXERCISE_TEMPLATES = new Set<ExerciseTemplate>([
+  'PATRIOT_MEDIC',
+  'PATRIOT_PHOENIX',
+  'PATRIOT_FORGE',
+]);
+
+const EMPTY_QUARTERLY_SNAPSHOTS: QuarterlySnapshotDates = {
+  q1: '',
+  q2: '',
+  q3: '',
+  q4: '',
+};
+
+function normalizeExerciseTemplate(value: unknown): ExerciseTemplate {
+  const normalized = String(value || '').trim().toUpperCase() as ExerciseTemplate;
+  return VALID_EXERCISE_TEMPLATES.has(normalized) ? normalized : DEFAULT_EXERCISE_TEMPLATE;
+}
+
+function normalizeQuarterlySnapshotsInput(value: unknown): QuarterlySnapshotDates {
+  const candidate = value && typeof value === 'object' ? value as Partial<Record<keyof QuarterlySnapshotDates, unknown>> : {};
+
+  return {
+    q1: String(candidate.q1 ?? '').trim(),
+    q2: String(candidate.q2 ?? '').trim(),
+    q3: String(candidate.q3 ?? '').trim(),
+    q4: String(candidate.q4 ?? '').trim(),
+  };
+}
+
+function parseQuarterlySnapshotsJson(value: unknown): QuarterlySnapshotDates {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return { ...EMPTY_QUARTERLY_SNAPSHOTS };
+  }
+
+  try {
+    return normalizeQuarterlySnapshotsInput(JSON.parse(value));
+  } catch {
+    return { ...EMPTY_QUARTERLY_SNAPSHOTS };
+  }
+}
+
+function parseOptionalDateField(value: unknown): Date | null {
+  if (value === null || value === undefined || String(value).trim() === '') {
+    return null;
+  }
+
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function createFallbackRefinementId(index: number): string {
   return `refinement-${Date.now()}-${index}-${Math.random().toString(16).slice(2, 10)}`;
 }
@@ -52,10 +112,14 @@ function parseRefinementsJson(value: unknown): RefinementItem[] {
 function serializeExercise<T extends { refinementsJson?: string | null }>(exercise: T | null) {
   if (!exercise) return exercise;
 
-  const { refinementsJson, ...rest } = exercise as T & { refinementsJson?: string | null };
+  const { refinementsJson, quarterlySnapshotsJson, ...rest } = exercise as T & {
+    refinementsJson?: string | null;
+    quarterlySnapshotsJson?: string | null;
+  };
   return {
     ...rest,
     refinements: parseRefinementsJson(refinementsJson),
+    quarterlySnapshots: parseQuarterlySnapshotsJson(quarterlySnapshotsJson),
   };
 }
 
@@ -307,6 +371,8 @@ router.post('/', async (req: Request, res: Response) => {
       endDate,
       defaultDutyDays,
       totalBudget,
+      exerciseTemplate,
+      quarterlySnapshots,
       reportAssumption1,
       reportAssumption2,
       reportAssumption3,
@@ -322,6 +388,8 @@ router.post('/', async (req: Request, res: Response) => {
       data: {
         ownerUserId: userId,
         name,
+        exerciseTemplate: normalizeExerciseTemplate(exerciseTemplate),
+        quarterlySnapshotsJson: JSON.stringify(normalizeQuarterlySnapshotsInput(quarterlySnapshots)),
         totalBudget: Number.isFinite(parsedTotalBudget) ? parsedTotalBudget : 0,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
@@ -369,6 +437,8 @@ router.post('/:id/copy', async (req: Request, res: Response) => {
         data: {
           ownerUserId: userId,
           name: `${sourceExercise.name}_Copy`,
+          exerciseTemplate: normalizeExerciseTemplate(sourceExercise.exerciseTemplate),
+          quarterlySnapshotsJson: String(sourceExercise.quarterlySnapshotsJson ?? '{}'),
           totalBudget: Number(sourceExercise.totalBudget || 0),
           startDate: sourceExercise.startDate,
           endDate: sourceExercise.endDate,
@@ -395,6 +465,8 @@ router.post('/:id/copy', async (req: Request, res: Response) => {
                 fundingType: line.fundingType,
                 category: line.category,
                 amount: Number(line.amount || 0),
+                startDate: line.startDate == null ? null : line.startDate,
+                endDate: line.endDate == null ? null : line.endDate,
                 notes: line.notes,
               })),
             },
@@ -417,6 +489,8 @@ router.post('/:id/copy', async (req: Request, res: Response) => {
                     rankCode: entry.rankCode,
                     count: Math.max(0, Number(entry.count || 0)),
                     dutyDays: entry.dutyDays == null ? null : Math.max(0, Number(entry.dutyDays || 0)),
+                    startDate: entry.startDate == null ? null : entry.startDate,
+                    endDate: entry.endDate == null ? null : entry.endDate,
                     rentalCarCount: Math.max(0, Number(entry.rentalCarCount || 0)),
                     location: entry.location,
                     isLocal: !!entry.isLocal,
@@ -450,6 +524,8 @@ router.post('/:id/copy', async (req: Request, res: Response) => {
             category: line.category,
             label: line.label,
             amount: Number(line.amount || 0),
+            startDate: line.startDate == null ? null : line.startDate,
+            endDate: line.endDate == null ? null : line.endDate,
             notes: line.notes,
           })),
         });
@@ -477,6 +553,8 @@ router.put('/:id', async (req: Request, res: Response) => {
       endDate,
       defaultDutyDays,
       totalBudget,
+      exerciseTemplate,
+      quarterlySnapshots,
       reportAssumption1,
       reportAssumption2,
       reportAssumption3,
@@ -489,6 +567,8 @@ router.put('/:id', async (req: Request, res: Response) => {
     } = req.body;
     const data: any = {};
     if (name !== undefined) data.name = name;
+    if (exerciseTemplate !== undefined) data.exerciseTemplate = normalizeExerciseTemplate(exerciseTemplate);
+    if (quarterlySnapshots !== undefined) data.quarterlySnapshotsJson = JSON.stringify(normalizeQuarterlySnapshotsInput(quarterlySnapshots));
     if (startDate !== undefined) data.startDate = new Date(startDate);
     if (endDate !== undefined) data.endDate = new Date(endDate);
     if (defaultDutyDays !== undefined) data.defaultDutyDays = defaultDutyDays;
@@ -558,6 +638,8 @@ router.put('/:id/restore', async (req: Request, res: Response) => {
         where: { id: req.params.id },
         data: {
           name: String(sourceExercise.name || existing.name),
+          exerciseTemplate: normalizeExerciseTemplate(sourceExercise.exerciseTemplate),
+          quarterlySnapshotsJson: JSON.stringify(normalizeQuarterlySnapshotsInput(sourceExercise.quarterlySnapshots)),
           totalBudget: Number.isFinite(Number(sourceExercise.totalBudget)) ? Number(sourceExercise.totalBudget) : 0,
           startDate: new Date(String(sourceExercise.startDate || existing.startDate)),
           endDate: new Date(String(sourceExercise.endDate || existing.endDate)),
@@ -623,6 +705,8 @@ router.put('/:id/restore', async (req: Request, res: Response) => {
                 rankCode: String(sourcePersonnelEntry.rankCode || ''),
                 count: Math.max(0, Number(sourcePersonnelEntry.count || 0)),
                 dutyDays: sourcePersonnelEntry.dutyDays == null ? null : Math.max(0, Number(sourcePersonnelEntry.dutyDays || 0)),
+                startDate: parseOptionalDateField(sourcePersonnelEntry.startDate),
+                endDate: parseOptionalDateField(sourcePersonnelEntry.endDate),
                 rentalCarCount: Math.max(0, Number(sourcePersonnelEntry.rentalCarCount || 0)),
                 location: sourcePersonnelEntry.location == null ? null : String(sourcePersonnelEntry.location || ''),
                 isLocal: !!sourcePersonnelEntry.isLocal,
@@ -641,6 +725,8 @@ router.put('/:id/restore', async (req: Request, res: Response) => {
               fundingType: String(sourceExecutionCostLine.fundingType || ''),
               category: String(sourceExecutionCostLine.category || ''),
               amount: Number(sourceExecutionCostLine.amount || 0),
+              startDate: parseOptionalDateField(sourceExecutionCostLine.startDate),
+              endDate: parseOptionalDateField(sourceExecutionCostLine.endDate),
               notes: sourceExecutionCostLine.notes == null ? null : String(sourceExecutionCostLine.notes || ''),
             },
           });
@@ -666,6 +752,8 @@ router.put('/:id/restore', async (req: Request, res: Response) => {
             category: String(sourceOmCostLine.category || ''),
             label: String(sourceOmCostLine.label || ''),
             amount: Number(sourceOmCostLine.amount || 0),
+            startDate: parseOptionalDateField(sourceOmCostLine.startDate),
+            endDate: parseOptionalDateField(sourceOmCostLine.endDate),
             notes: sourceOmCostLine.notes == null ? null : String(sourceOmCostLine.notes || ''),
           },
         });

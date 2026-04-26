@@ -4,6 +4,14 @@ import { getRequestUserId } from '../services/auth';
 
 const router = Router();
 
+function parseOptionalDateField(value: unknown): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || String(value).trim() === '') return null;
+
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 // ─── UPDATE PERSONNEL GROUP ───
 router.put('/personnel-groups/:groupId', async (req: Request, res: Response) => {
   try {
@@ -121,7 +129,7 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
       return res.status(404).json({ error: 'Personnel group not found' });
     }
 
-    const { rankCode, count, dutyDays, rentalCarCount, location, isLocal, note, travelOnly, longTermA7Planner } = req.body;
+    const { rankCode, count, dutyDays, startDate, endDate, rentalCarCount, location, isLocal, note, travelOnly, longTermA7Planner } = req.body;
     const normalizedRentalCarCount = group.role === 'PLANNING'
       ? (Number(rentalCarCount || 0) > 0 ? 1 : 0)
       : (rentalCarCount ?? 0);
@@ -131,6 +139,8 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
         rankCode,
         count,
         dutyDays,
+        startDate: parseOptionalDateField(startDate),
+        endDate: parseOptionalDateField(endDate),
         rentalCarCount: normalizedRentalCarCount,
         location,
         isLocal,
@@ -177,11 +187,13 @@ router.put('/personnel-entries/:entryId', async (req: Request, res: Response) =>
       return res.status(404).json({ error: 'Personnel entry not found' });
     }
 
-    const { rankCode, count, dutyDays, rentalCarCount, location, isLocal, note, travelOnly, longTermA7Planner } = req.body;
+    const { rankCode, count, dutyDays, startDate, endDate, rentalCarCount, location, isLocal, note, travelOnly, longTermA7Planner } = req.body;
     const data: Record<string, unknown> = {};
     if (rankCode !== undefined) data.rankCode = rankCode;
     if (count !== undefined) data.count = count;
     if (dutyDays !== undefined) data.dutyDays = dutyDays;
+    if (startDate !== undefined) data.startDate = parseOptionalDateField(startDate);
+    if (endDate !== undefined) data.endDate = parseOptionalDateField(endDate);
     if (rentalCarCount !== undefined) {
       data.rentalCarCount = existing.personnelGroup.role === 'PLANNING'
         ? (Number(rentalCarCount || 0) > 0 ? 1 : 0)

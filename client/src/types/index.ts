@@ -3,6 +3,8 @@ export type UnitCode = string;
 export type PersonnelRole = 'PLAYER' | 'WHITE_CELL' | 'PLANNING' | 'SUPPORT' | 'ANNUAL_TOUR';
 export type FundingType = 'RPA' | 'OM';
 export type Location = string;
+export type ExerciseTemplate = 'PATRIOT_MEDIC' | 'PATRIOT_PHOENIX' | 'PATRIOT_FORGE';
+export type QuarterlySnapshotKey = 'q1' | 'q2' | 'q3' | 'q4';
 export type OmCategory =
   | 'CONTRACT'
   | 'TRANSPORTATION'
@@ -26,6 +28,8 @@ export interface Exercise {
   id: string;
   ownerUserId?: string;
   name: string;
+  exerciseTemplate?: ExerciseTemplate;
+  quarterlySnapshots?: QuarterlySnapshotDates;
   totalBudget: number;
   startDate: string;
   endDate: string;
@@ -47,6 +51,13 @@ export interface ExerciseDetail extends Exercise {
   unitBudgets: UnitBudget[];
   travelConfig: TravelConfig | null;
   omCostLines: OmCostLine[];
+}
+
+export interface QuarterlySnapshotDates {
+  q1: string;
+  q2: string;
+  q3: string;
+  q4: string;
 }
 
 export interface ExerciseUndoBudgetTargets {
@@ -91,6 +102,8 @@ export interface PersonnelEntry {
   rankCode: string;
   count: number;
   dutyDays: number | null;
+  startDate: string | null;
+  endDate: string | null;
   rentalCarCount: number;
   location: Location | null;
   isLocal: boolean;
@@ -114,6 +127,8 @@ export interface ExecutionCostLine {
   fundingType: FundingType;
   category: string;
   amount: number;
+  startDate: string | null;
+  endDate: string | null;
   notes: string | null;
 }
 
@@ -123,6 +138,8 @@ export interface OmCostLine {
   category: OmCategory;
   label: string;
   amount: number;
+  startDate: string | null;
+  endDate: string | null;
   notes: string | null;
 }
 

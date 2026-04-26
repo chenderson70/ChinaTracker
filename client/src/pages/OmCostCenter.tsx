@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Typography, Popconfirm, Spin, message } from 'antd';
+import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Typography, Popconfirm, Spin, message, DatePicker } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Dayjs } from 'dayjs';
 import { useApp } from '../components/AppLayout';
+import InlineDateInput from '../components/InlineDateInput';
 import * as api from '../services/api';
 import type { OmCostLine, OmCategory } from '../types';
 
@@ -18,6 +20,16 @@ const OM_CATEGORIES: { value: OmCategory; label: string }[] = [
   { value: 'WRM', label: 'WRM' },
   { value: 'OTHER', label: 'Other' },
 ];
+
+function getDateRangePayload(value: [Dayjs | null, Dayjs | null] | null | undefined) {
+  const start = value?.[0] ?? null;
+  const end = value?.[1] ?? null;
+
+  return {
+    startDate: start ? start.format('YYYY-MM-DD') : null,
+    endDate: end ? end.format('YYYY-MM-DD') : null,
+  };
+}
 
 export default function OmCostCenter() {
   const { exercise, budget, exerciseId, pushUndoSnapshot } = useApp();
@@ -46,11 +58,43 @@ export default function OmCostCenter() {
     onSuccess: () => { invalidate(); message.success('Removed'); },
   });
 
+  const updateMut = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<OmCostLine> }) => {
+      await pushUndoSnapshot('Update O&M Cost');
+      return api.updateOmCost(id, data);
+    },
+    onSuccess: invalidate,
+  });
+
   if (!exercise || !budget) return <div className="ct-loading"><Spin size="large" /></div>;
 
   const columns = [
     { title: 'Category', dataIndex: 'category', width: 160, render: (v: string) => OM_CATEGORIES.find((c) => c.value === v)?.label || v },
     { title: 'Label', dataIndex: 'label' },
+    {
+      title: 'Start',
+      dataIndex: 'startDate',
+      width: 140,
+      render: (value: string | null, row: OmCostLine) => (
+        <InlineDateInput
+          value={value}
+          style={{ width: '100%' }}
+          onSave={(nextValue) => updateMut.mutate({ id: row.id, data: { startDate: nextValue } })}
+        />
+      ),
+    },
+    {
+      title: 'End',
+      dataIndex: 'endDate',
+      width: 140,
+      render: (value: string | null, row: OmCostLine) => (
+        <InlineDateInput
+          value={value}
+          style={{ width: '100%' }}
+          onSave={(nextValue) => updateMut.mutate({ id: row.id, data: { endDate: nextValue } })}
+        />
+      ),
+    },
     { title: 'Amount', dataIndex: 'amount', width: 140, render: (v: number) => fmt(v) },
     { title: 'Notes', dataIndex: 'notes' },
     {
@@ -81,10 +125,11 @@ export default function OmCostCenter() {
             columns={columns}
             dataSource={data}
             pagination={false}
+            scroll={{ x: 'max-content' }}
             locale={{ emptyText: 'No exercise-level O&M costs yet' }}
             summary={() => (
               <Table.Summary.Row>
-                <Table.Summary.Cell index={0} colSpan={2}><strong>Total Exercise O&M</strong></Table.Summary.Cell>
+                <Table.Summary.Cell index={0} colSpan={4}><strong>Total Exercise O&M</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={1}><strong style={{ color: '#52c41a' }}>{fmt(total)}</strong></Table.Summary.Cell>
                 <Table.Summary.Cell index={2} colSpan={2} />
               </Table.Summary.Row>
@@ -96,7 +141,17 @@ export default function OmCostCenter() {
       <Modal
         title="Add O&M Cost Line"
         open={modalOpen}
-        onOk={() => form.validateFields().then((v) => addMut.mutate(v))}
+        onOk={() => form.validateFields().then((values) => {
+          const { startDate, endDate } = getDateRangePayload(values.dateRange);
+          addMut.mutate({
+            category: values.category,
+            label: values.label,
+            amount: values.amount,
+            startDate,
+            endDate,
+            notes: values.notes,
+          });
+        })}
         confirmLoading={addMut.isPending}
         onCancel={() => setModalOpen(false)}
       >
@@ -109,6 +164,9 @@ export default function OmCostCenter() {
           </Form.Item>
           <Form.Item name="amount" label="Amount ($)" rules={[{ required: true }]}>
             <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="dateRange" label="Date Range (optional)">
+            <DatePicker.RangePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="notes" label="Notes">
             <Input.TextArea />

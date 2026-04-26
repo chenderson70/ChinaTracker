@@ -1,0 +1,1 @@
+ALTER TABLE "exercises" ADD COLUMN "exercise_template" TEXT NOT NULL DEFAULT 'PATRIOT_MEDIC';
