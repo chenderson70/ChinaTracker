@@ -14,6 +14,7 @@ import {
 import { TeamOutlined, UserOutlined, DollarOutlined, RocketOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { useApp } from './AppLayout';
 import BudgetHeroSummary from './BudgetHeroSummary';
+import ExpenseNarrativesSection from './ExpenseNarrativesSection';
 import { renderCostBarLabel } from './charts/CostBarLabel';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { formatFundingPaxBreakdown, getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
@@ -475,6 +476,8 @@ export default function BudgetOverviewSection() {
           </Col>
         ))}
       </Row>
+
+      <ExpenseNarrativesSection />
 
       <Card title="Unit Budget Summary" className="ct-section-card" style={{ marginBottom: 28 }}>
         <div className="ct-table" style={{ maxWidth: 1040, margin: '0 auto' }}>

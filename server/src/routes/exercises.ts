@@ -15,6 +15,13 @@ type RefinementItem = {
   statusNote: string;
 };
 
+type ExpenseNarrativeItem = {
+  expenseKey: string;
+  expenseLabel: string;
+  justification: string;
+  impact: string;
+};
+
 type QuarterlySnapshotDates = {
   q1: string;
   q2: string;
@@ -109,16 +116,47 @@ function parseRefinementsJson(value: unknown): RefinementItem[] {
   }
 }
 
+function normalizeExpenseNarrativesInput(value: unknown): ExpenseNarrativeItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      const candidate = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+      const expenseKey = String(candidate.expenseKey ?? '').trim();
+      if (!expenseKey) return null;
+
+      return {
+        expenseKey,
+        expenseLabel: String(candidate.expenseLabel ?? expenseKey).trim(),
+        justification: String(candidate.justification ?? ''),
+        impact: String(candidate.impact ?? ''),
+      } satisfies ExpenseNarrativeItem;
+    })
+    .filter((item): item is ExpenseNarrativeItem => item !== null);
+}
+
+function parseExpenseNarrativesJson(value: unknown): ExpenseNarrativeItem[] {
+  if (typeof value !== 'string' || value.trim().length === 0) return [];
+
+  try {
+    return normalizeExpenseNarrativesInput(JSON.parse(value));
+  } catch {
+    return [];
+  }
+}
+
 function serializeExercise<T extends { refinementsJson?: string | null }>(exercise: T | null) {
   if (!exercise) return exercise;
 
-  const { refinementsJson, quarterlySnapshotsJson, ...rest } = exercise as T & {
+  const { refinementsJson, expenseNarrativesJson, quarterlySnapshotsJson, ...rest } = exercise as T & {
     refinementsJson?: string | null;
+    expenseNarrativesJson?: string | null;
     quarterlySnapshotsJson?: string | null;
   };
   return {
     ...rest,
     refinements: parseRefinementsJson(refinementsJson),
+    expenseNarratives: parseExpenseNarrativesJson(expenseNarrativesJson),
     quarterlySnapshots: parseQuarterlySnapshotsJson(quarterlySnapshotsJson),
   };
 }
@@ -382,6 +420,7 @@ router.post('/', async (req: Request, res: Response) => {
       reportLimfac3,
       reportPreparedBy,
       refinements,
+      expenseNarratives,
     } = req.body;
     const parsedTotalBudget = Number(totalBudget);
     const exercise = await prisma.exercise.create({
@@ -403,6 +442,7 @@ router.post('/', async (req: Request, res: Response) => {
         reportLimfac3: String(reportLimfac3 ?? ''),
         reportPreparedBy: String(reportPreparedBy ?? ''),
         ...(refinements !== undefined ? { refinementsJson: JSON.stringify(normalizeRefinementsInput(refinements)) } : {}),
+        ...(expenseNarratives !== undefined ? { expenseNarrativesJson: JSON.stringify(normalizeExpenseNarrativesInput(expenseNarratives)) } : {}),
       },
     });
     await seedExerciseDefaults(exercise.id);
@@ -452,6 +492,7 @@ router.post('/:id/copy', async (req: Request, res: Response) => {
           reportLimfac3: String(sourceExercise.reportLimfac3 ?? ''),
           reportPreparedBy: String(sourceExercise.reportPreparedBy ?? ''),
           refinementsJson: String(sourceExercise.refinementsJson ?? '[]'),
+          expenseNarrativesJson: String(sourceExercise.expenseNarrativesJson ?? '[]'),
         },
       });
 
@@ -564,6 +605,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       reportLimfac3,
       reportPreparedBy,
       refinements,
+      expenseNarratives,
     } = req.body;
     const data: any = {};
     if (name !== undefined) data.name = name;
@@ -581,6 +623,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (reportLimfac3 !== undefined) data.reportLimfac3 = String(reportLimfac3);
     if (reportPreparedBy !== undefined) data.reportPreparedBy = String(reportPreparedBy);
     if (refinements !== undefined) data.refinementsJson = JSON.stringify(normalizeRefinementsInput(refinements));
+    if (expenseNarratives !== undefined) data.expenseNarrativesJson = JSON.stringify(normalizeExpenseNarrativesInput(expenseNarratives));
     if (totalBudget !== undefined) {
       const parsedTotalBudget = Number(totalBudget);
       if (!Number.isFinite(parsedTotalBudget)) {
@@ -653,6 +696,7 @@ router.put('/:id/restore', async (req: Request, res: Response) => {
           reportLimfac3: String(sourceExercise.reportLimfac3 ?? ''),
           reportPreparedBy: String(sourceExercise.reportPreparedBy ?? ''),
           refinementsJson: JSON.stringify(normalizeRefinementsInput(sourceExercise.refinements)),
+          expenseNarrativesJson: JSON.stringify(normalizeExpenseNarrativesInput(sourceExercise.expenseNarratives)),
         },
       });
 

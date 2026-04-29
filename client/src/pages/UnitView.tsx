@@ -23,14 +23,15 @@ import {
 } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Dayjs } from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import { useApp } from '../components/AppLayout';
 import InlineDateInput from '../components/InlineDateInput';
 import * as api from '../services/api';
 import type { ExerciseDetail, PersonnelEntry, PersonnelGroup, UnitBudget, FundingType, UnitCalc, GroupCalc, PerDiemRate } from '../types';
 import { getUnitDisplayLabel } from '../utils/unitLabels';
 import { getRpaMealsResponsibilityByUnit } from '../utils/budgetSummary';
-import { calculateInclusiveDateRangeDays } from '../utils/dateRanges';
+import { calculateInclusiveDateRangeDays, normalizeDateString } from '../utils/dateRanges';
+import { sortUiPerDiemLocations } from '../utils/perDiemDefaults';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const formatNumberInput = (value: string | number | null | undefined) => {
@@ -84,6 +85,63 @@ function dutyDaysToMonths(dutyDays: number): number {
   return Number((dutyDays / DAYS_PER_MONTH).toFixed(2));
 }
 
+function getInclusiveEndDate(startDate: Dayjs, dutyDays: number): Dayjs {
+  return startDate.add(Math.max(0, dutyDays - 1), 'day');
+}
+
+function normalizePositiveDutyDays(value: number | null | undefined): number | null {
+  if (value === null || value === undefined || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+
+  return Math.max(1, Math.round(value));
+}
+
+function resolveDurationDutyDays(
+  months: number | null | undefined,
+  dutyDays: number | null | undefined,
+): number | null {
+  if (months !== null && months !== undefined && Number.isFinite(months) && months > 0) {
+    return monthsToDutyDays(months);
+  }
+
+  return normalizePositiveDutyDays(dutyDays);
+}
+
+function getDateRangeFromDuration(
+  startDate: Dayjs | null | undefined,
+  months: number | null | undefined,
+  dutyDays: number | null | undefined,
+): [Dayjs, Dayjs] | null {
+  const resolvedDutyDays = resolveDurationDutyDays(months, dutyDays);
+  if (!startDate || !resolvedDutyDays) {
+    return null;
+  }
+
+  return [startDate, getInclusiveEndDate(startDate, resolvedDutyDays)];
+}
+
+function buildPersonnelEntryMonthsPatch(
+  entry: Pick<PersonnelEntry, 'startDate'>,
+  months: number,
+) {
+  const dutyDays = monthsToDutyDays(months);
+  const normalizedStartDate = normalizeDateString(entry.startDate);
+  if (!normalizedStartDate) {
+    return { dutyDays };
+  }
+
+  const startDate = dayjs(normalizedStartDate);
+  if (!startDate.isValid()) {
+    return { dutyDays };
+  }
+
+  return {
+    dutyDays,
+    endDate: getInclusiveEndDate(startDate, dutyDays).format('YYYY-MM-DD'),
+  };
+}
+
 function getDateRangePayload(value: [Dayjs | null, Dayjs | null] | null | undefined) {
   const start = value?.[0] ?? null;
   const end = value?.[1] ?? null;
@@ -95,16 +153,23 @@ function getDateRangePayload(value: [Dayjs | null, Dayjs | null] | null | undefi
 }
 
 function buildPersonnelEntryDatePatch(
-  entry: Pick<PersonnelEntry, 'startDate' | 'endDate'>,
+  entry: Pick<PersonnelEntry, 'startDate' | 'endDate' | 'dutyDays'>,
   field: 'startDate' | 'endDate',
   value: string | null,
 ) {
   const nextStartDate = field === 'startDate' ? value : (entry.startDate ?? null);
-  const nextEndDate = field === 'endDate' ? value : (entry.endDate ?? null);
+  const normalizedDutyDays = normalizePositiveDutyDays(entry.dutyDays);
+  const normalizedStartDate = normalizeDateString(nextStartDate);
+  const nextEndDate = field === 'startDate' && normalizedStartDate && normalizedDutyDays
+    ? dayjs(normalizedStartDate).add(normalizedDutyDays - 1, 'day').format('YYYY-MM-DD')
+    : field === 'endDate'
+      ? value
+      : (entry.endDate ?? null);
   const nextDutyDays = calculateInclusiveDateRangeDays(nextStartDate, nextEndDate);
 
   return {
     [field]: value,
+    ...(field === 'startDate' && normalizedStartDate && normalizedDutyDays ? { endDate: nextEndDate } : {}),
     ...(nextDutyDays ? { dutyDays: nextDutyDays } : {}),
   };
 }
@@ -280,13 +345,10 @@ export default function UnitView() {
     queryKey: ['perDiemRates'],
     queryFn: api.getPerDiemRates,
   });
-  const perDiemLocations = useMemo(() => Array.from(
-    new Set(
-      perDiemRates
-        .map((r) => r.location)
-        .filter((location): location is string => typeof location === 'string' && location.trim().length > 0),
-    ),
-  ), [perDiemRates]);
+  const perDiemLocations = useMemo(
+    () => sortUiPerDiemLocations(perDiemRates.map((r) => r.location)),
+    [perDiemRates],
+  );
   const perDiemByLocation = useMemo(() => {
     return perDiemRates.reduce<Record<string, { lodging: number; mie: number }>>((acc, rate: PerDiemRate) => {
       if (rate.location) {
@@ -835,7 +897,10 @@ export default function UnitView() {
                     value={dutyDaysToMonths(value ?? exercise!.defaultDutyDays)}
                     style={{ width: '100%' }}
                     onSave={(nextValue) => {
-                      updateEntryMut.mutate({ id: row.id, data: { dutyDays: monthsToDutyDays(nextValue) } });
+                      updateEntryMut.mutate({
+                        id: row.id,
+                        data: buildPersonnelEntryMonthsPatch(row as PersonnelEntry, nextValue),
+                      });
                     }}
                   />
                 ),
@@ -879,7 +944,19 @@ export default function UnitView() {
                     min={1}
                     value={value ?? exercise!.defaultDutyDays}
                     style={{ width: '100%' }}
-                    onSave={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { dutyDays: nextValue || 1 } })}
+                    onSave={(nextValue) => {
+                      const normalizedDutyDays = normalizePositiveDutyDays(nextValue) ?? 1;
+                      const normalizedStartDate = normalizeDateString((row as PersonnelEntry).startDate);
+                      updateEntryMut.mutate({
+                        id: row.id,
+                        data: {
+                          dutyDays: normalizedDutyDays,
+                          ...(normalizedStartDate
+                            ? { endDate: dayjs(normalizedStartDate).add(normalizedDutyDays - 1, 'day').format('YYYY-MM-DD') }
+                            : {}),
+                        },
+                      });
+                    }}
                   />
                 ),
               },
@@ -1648,8 +1725,14 @@ export default function UnitView() {
                 precision={2}
                 style={{ width: '100%' }}
                 onChange={(value) => {
-                  if (value === null) return;
-                  entryForm.setFieldValue('dutyDays', monthsToDutyDays(value));
+                  const currentDateRange = entryForm.getFieldValue('dateRange') as [Dayjs | null, Dayjs | null] | null | undefined;
+                  const nextDutyDays = resolveDurationDutyDays(value, null);
+                  entryForm.setFieldValue('dutyDays', nextDutyDays ?? undefined);
+
+                  const nextDateRange = getDateRangeFromDuration(currentDateRange?.[0] ?? null, value, nextDutyDays);
+                  if (nextDateRange) {
+                    entryForm.setFieldValue('dateRange', nextDateRange);
+                  }
                 }}
               />
             </Form.Item>
@@ -1657,15 +1740,47 @@ export default function UnitView() {
           <Form.Item name="dateRange" label="Date Range (optional)">
             <DatePicker.RangePicker
               style={{ width: '100%' }}
+              onCalendarChange={(dates, _dateStrings, info) => {
+                if (!dates?.[0] || info?.range !== 'start') return;
+
+                const months = entryForm.getFieldValue('months') as number | null | undefined;
+                const dutyDays = entryForm.getFieldValue('dutyDays') as number | null | undefined;
+                const nextDateRange = getDateRangeFromDuration(dates[0], months, dutyDays);
+                if (!nextDateRange) return;
+
+                entryForm.setFieldValue('dateRange', nextDateRange);
+                entryForm.setFieldValue('dutyDays', resolveDurationDutyDays(months, dutyDays));
+              }}
               onChange={(dates) => {
                 if (dates && dates[0] && dates[1]) {
                   entryForm.setFieldValue('dutyDays', dates[1].diff(dates[0], 'day') + 1);
+                  return;
                 }
+
+                if (!dates?.[0]) return;
+                const months = entryForm.getFieldValue('months') as number | null | undefined;
+                const dutyDays = entryForm.getFieldValue('dutyDays') as number | null | undefined;
+                const nextDateRange = getDateRangeFromDuration(dates[0], months, dutyDays);
+                if (!nextDateRange) return;
+
+                entryForm.setFieldValue('dateRange', nextDateRange);
+                entryForm.setFieldValue('dutyDays', resolveDurationDutyDays(months, dutyDays));
               }}
             />
           </Form.Item>
           <Form.Item name="dutyDays" label="Duty Days" initialValue={exercise.defaultDutyDays} rules={[{ required: true }]}>
-            <InputNumber min={1} style={{ width: '100%' }} />
+            <InputNumber
+              min={1}
+              style={{ width: '100%' }}
+              onChange={(value) => {
+                const currentDateRange = entryForm.getFieldValue('dateRange') as [Dayjs | null, Dayjs | null] | null | undefined;
+                const months = entryForm.getFieldValue('months') as number | null | undefined;
+                const nextDateRange = getDateRangeFromDuration(currentDateRange?.[0] ?? null, months, value);
+                if (nextDateRange) {
+                  entryForm.setFieldValue('dateRange', nextDateRange);
+                }
+              }}
+            />
           </Form.Item>
           {entryModalUsesBinaryRentalCar && (
             <Form.Item

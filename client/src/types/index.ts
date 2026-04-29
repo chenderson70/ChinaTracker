@@ -23,6 +23,13 @@ export interface RefinementItem {
   statusNote: string;
 }
 
+export interface ExpenseNarrativeItem {
+  expenseKey: string;
+  expenseLabel: string;
+  justification: string;
+  impact: string;
+}
+
 // ──────────── Models ────────────
 export interface Exercise {
   id: string;
@@ -43,6 +50,7 @@ export interface Exercise {
   reportLimfac3?: string;
   reportPreparedBy?: string;
   refinements?: RefinementItem[];
+  expenseNarratives?: ExpenseNarrativeItem[];
   createdAt: string;
   updatedAt: string;
 }

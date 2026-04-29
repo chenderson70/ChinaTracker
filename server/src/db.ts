@@ -138,6 +138,7 @@ async function ensureSqliteCompatibilityColumns(): Promise<void> {
 	await ensureSqliteColumn('exercises', 'report_limfac_3', `TEXT NOT NULL DEFAULT ''`);
 	await ensureSqliteColumn('exercises', 'report_prepared_by', `TEXT NOT NULL DEFAULT ''`);
 	await ensureSqliteColumn('exercises', 'refinements_json', `TEXT NOT NULL DEFAULT '[]'`);
+	await ensureSqliteColumn('exercises', 'expense_narratives_json', `TEXT NOT NULL DEFAULT '[]'`);
 	await ensureSqliteColumn('exercises', 'exercise_template', `TEXT NOT NULL DEFAULT 'PATRIOT_MEDIC'`);
 	await ensureSqliteColumn('exercises', 'quarterly_snapshots_json', `TEXT NOT NULL DEFAULT '{}'`);
 }
@@ -237,6 +238,7 @@ const BASE_PER_DIEM = [
 	{ location: 'WARNER_ROBINS', lodgingRate: 110, mieRate: 68 },
 	{ location: 'MARIETTA', lodgingRate: 126, mieRate: 74 },
 ];
+const PER_DIEM_BASELINE_INITIALIZED_KEY = 'PER_DIEM_BASELINE_INITIALIZED';
 
 const BASE_CONFIG: Array<{ key: string; value: string }> = [
 	{ key: 'BREAKFAST_COST', value: '14.00' },
@@ -271,17 +273,21 @@ export async function ensureBaselineData(): Promise<void> {
 
 	await ensureBaselineCpdRates();
 
-	for (const rate of BASE_PER_DIEM) {
-		await prisma.perDiemRate.upsert({
-			where: { location: rate.location },
-			update: {},
-			create: {
-				location: rate.location,
-				lodgingRate: rate.lodgingRate,
-				mieRate: rate.mieRate,
-				effectiveDate: new Date('2025-10-01'),
-			},
-		});
+	const perDiemCount = await prisma.perDiemRate.count();
+	const perDiemBaselineInitialized = await prisma.appConfig.findUnique({
+		where: { key: PER_DIEM_BASELINE_INITIALIZED_KEY },
+	});
+	if (perDiemCount === 0 && !perDiemBaselineInitialized) {
+		for (const rate of BASE_PER_DIEM) {
+			await prisma.perDiemRate.create({
+				data: {
+					location: rate.location,
+					lodgingRate: rate.lodgingRate,
+					mieRate: rate.mieRate,
+					effectiveDate: new Date('2025-10-01'),
+				},
+			});
+		}
 	}
 
 	for (const item of BASE_CONFIG) {
@@ -291,4 +297,10 @@ export async function ensureBaselineData(): Promise<void> {
 			create: { key: item.key, value: item.value },
 		});
 	}
+
+	await prisma.appConfig.upsert({
+		where: { key: PER_DIEM_BASELINE_INITIALIZED_KEY },
+		update: { value: '1' },
+		create: { key: PER_DIEM_BASELINE_INITIALIZED_KEY, value: '1' },
+	});
 }

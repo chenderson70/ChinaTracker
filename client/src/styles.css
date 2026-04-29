@@ -1836,6 +1836,22 @@ body {
   color: #0958d9;
 }
 
+.ct-expense-narratives-section-title.ant-typography {
+  margin-bottom: 12px !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ct-expense-narratives-section-title-rpa.ant-typography {
+  color: var(--ct-primary);
+}
+
+.ct-expense-narratives-section-title-om.ant-typography {
+  color: var(--ct-success);
+}
+
 .ct-inline-om-highlight {
   display: inline-block;
   padding: 1px 8px;

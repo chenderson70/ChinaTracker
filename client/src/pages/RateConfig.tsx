@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, Table, InputNumber, Button, Typography, Row, Col, Divider, Space, message, Spin, Modal, Input, Popconfirm } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '../services/api';
 import { useApp } from '../components/AppLayout';
 import type { RankCpdRate, PerDiemRate } from '../types';
+import { sortUiPerDiemRateRows } from '../utils/perDiemDefaults';
 
 export default function RateConfig() {
   const { exerciseId } = useApp();
@@ -171,6 +172,11 @@ export default function RateConfig() {
     };
   }, [cfgEdits, saveCfgMut.isPending]);
 
+  const sortedPerDiemRates = useMemo(
+    () => sortUiPerDiemRateRows(perDiemRates),
+    [perDiemRates],
+  );
+
   if (cpdLoading || pdLoading || cfgLoading) return <div className="ct-loading"><Spin size="large" /></div>;
 
   const cpdColumns = [
@@ -295,7 +301,7 @@ export default function RateConfig() {
           <Table
             size="small"
             pagination={false}
-            dataSource={perDiemRates.map((r: PerDiemRate) => ({ ...r, key: r.id }))}
+            dataSource={sortedPerDiemRates.map((r: PerDiemRate) => ({ ...r, key: r.id }))}
             columns={pdColumns}
           />
         </div>

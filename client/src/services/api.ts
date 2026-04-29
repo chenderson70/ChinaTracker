@@ -14,6 +14,7 @@ import type {
   PerDiemMasterRecord,
   AuthUser,
   RefinementItem,
+  ExpenseNarrativeItem,
   ExerciseUndoSnapshot,
   ExerciseTemplate,
   QuarterlySnapshotDates,
@@ -220,6 +221,7 @@ export async function createExercise(data: {
   reportLimfac3?: string;
   reportPreparedBy?: string;
   refinements?: RefinementItem[];
+  expenseNarratives?: ExpenseNarrativeItem[];
 }): Promise<ExerciseDetail> {
   return apiRequest<ExerciseDetail>('/exercises', { method: 'POST', body: data });
 }
@@ -634,6 +636,7 @@ export async function importAllData(json: string): Promise<void> {
       reportLimfac3: sourceExercise.reportLimfac3,
       reportPreparedBy: sourceExercise.reportPreparedBy,
       refinements: sourceExercise.refinements,
+      expenseNarratives: sourceExercise.expenseNarratives,
     });
 
     const sourceExerciseUnits = sourceUnits.filter((unit) => unit.exerciseId === sourceExercise.id);

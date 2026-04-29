@@ -12,6 +12,7 @@ import {
 import type { ReactNode } from 'react';
 import { useApp } from '../components/AppLayout';
 import BudgetHeroSummary from '../components/BudgetHeroSummary';
+import ExpenseNarrativesSection from '../components/ExpenseNarrativesSection';
 import { renderCostBarLabel } from '../components/charts/CostBarLabel';
 import { exportElementToPdf } from '../services/pdf';
 import {
@@ -438,6 +439,8 @@ export default function Dashboard() {
           </Col>
         ))}
       </Row>
+
+      <ExpenseNarrativesSection />
 
       {/* Unit table */}
       <Card title="Unit Budget Summary" className="ct-section-card" style={{ marginBottom: 28 }}>

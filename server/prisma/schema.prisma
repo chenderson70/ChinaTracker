@@ -33,6 +33,7 @@ model Exercise {
   reportLimfac3   String         @default("") @map("report_limfac_3")
   reportPreparedBy String        @default("") @map("report_prepared_by")
   refinementsJson String         @default("[]") @map("refinements_json")
+  expenseNarrativesJson String   @default("[]") @map("expense_narratives_json")
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
   unitBudgets     UnitBudget[]
