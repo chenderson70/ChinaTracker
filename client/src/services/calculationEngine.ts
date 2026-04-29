@@ -13,6 +13,50 @@ export interface RateInputs {
   defaultRentalCarDailyRate: number;
 }
 
+function normalizeDateValue(value: unknown): string | null {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
+}
+
+function calculateInclusiveDays(startDate: string | null, endDate: string | null): number | null {
+  if (!startDate || !endDate) return null;
+
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() < start.getTime()) {
+    return null;
+  }
+
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  return Math.round((end.getTime() - start.getTime()) / millisecondsPerDay) + 1;
+}
+
+function getPlayerExecutionExerciseDutyDays(exercise: Pick<ExerciseDetail, 'startDate' | 'endDate' | 'defaultDutyDays'>): number | null {
+  const normalizedStartDate = normalizeDateValue(exercise.startDate);
+  const normalizedEndDate = normalizeDateValue(exercise.endDate);
+  return calculateInclusiveDays(normalizedStartDate, normalizedEndDate)
+    ?? (exercise.defaultDutyDays ? Math.max(1, Number(exercise.defaultDutyDays || 1)) : null);
+}
+
+function resolveEntryDutyDays(params: {
+  exercise: Pick<ExerciseDetail, 'startDate' | 'endDate' | 'defaultDutyDays'>;
+  group: { role?: string; dutyDays?: number | null };
+  entry: { startDate?: string | null; endDate?: string | null; dutyDays?: number | null };
+  defaultDays: number;
+}): number {
+  const { exercise, group, entry, defaultDays } = params;
+  const normalizedStartDate = normalizeDateValue(entry.startDate);
+  const normalizedEndDate = normalizeDateValue(entry.endDate);
+
+  if (group.role === 'PLAYER' && !normalizedStartDate && !normalizedEndDate) {
+    return getPlayerExecutionExerciseDutyDays(exercise) ?? defaultDays;
+  }
+
+  return Number(entry.dutyDays || group.dutyDays || defaultDays || 1);
+}
+
 function emptyGroup(pax = 0, days = 0): GroupCalc {
   return { paxCount: pax, dutyDays: days, milPay: 0, perDiem: 0, meals: 0, travel: 0, billeting: 0, subtotal: 0 };
 }
@@ -183,7 +227,12 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
 
       for (const entry of calcEntries) {
         const entryCount = entry.count || 0;
-        const entryDays = entry.dutyDays || pg.dutyDays || defaultDays;
+        const entryDays = resolveEntryDutyDays({
+          exercise,
+          group: pg,
+          entry,
+          defaultDays,
+        });
         const entryLoc = entry.location || pg.location || 'FORT_HUNTER_LIGGETT';
         const entryIsLocal = isLocalFlag(entry.isLocal) || isLocalFlag(pg.isLocal);
         const entryTravelOnly = allowsTravelOnly && isTravelOnlyFlag(entry.travelOnly);

@@ -1,7 +1,7 @@
 import { Card, Typography, Button, Row, Col, Table, Descriptions, Space, Spin, InputNumber, Form, message, Input } from 'antd';
 import { FileExcelOutlined, PrinterOutlined, EditOutlined, SaveOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { cloneElement, isValidElement, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { useApp } from '../components/AppLayout';
 import QuarterlyBudgetAllocationSection from '../components/QuarterlyBudgetAllocationSection';
@@ -12,13 +12,7 @@ import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
 import { ANNUAL_TOUR_BILLETING_LABEL, ANNUAL_TOUR_MEALS_LABEL, ANNUAL_TOUR_MIL_PAY_LABEL, ANNUAL_TOUR_TRAVEL_PAY_LABEL, getAnnualTourBilletingOmTotal, getAnnualTourRpaMealsTotal, getPlayerOmResponsibilityByUnit, getRpaCategoryTotals, getRpaMealsResponsibilityByUnit, getUnitRpaCategoryTotals } from '../utils/budgetSummary';
 import { getExerciseTemplateLabel } from '../utils/exerciseTemplates';
-import {
-  buildAllQuarterlySnapshotNoteLine,
-  buildQuarterlySnapshotNoteLine,
-  getFiscalYearForExercise,
-  getQuarterlySnapshotEntries,
-} from '../utils/quarterlySnapshots';
-import type { BudgetResult, ExerciseDetail, QuarterlySnapshotKey } from '../types';
+import type { BudgetResult, ExerciseDetail } from '../types';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const DAYS_PER_MONTH = 30;
@@ -40,17 +34,52 @@ const LEGACY_REPORT_ASSUMPTIONS: ReportAssumptions = [
   '',
 ];
 
+const DEPRECATED_QUARTERLY_SNAPSHOT_NOTE_SEGMENT = /^Q[1-4]: \d{2} [A-Z][a-z]{2} \d{4} - \d{2} [A-Z][a-z]{2} \d{4}$/;
+
 function normalizeLegacyReportAssumption(value: unknown, legacyValue: string): string {
   const nextValue = String(value ?? '');
   return nextValue === legacyValue ? '' : nextValue;
 }
 
-function getReportAssumptions(exercise: ExerciseDetail): ReportAssumptions {
+function stripDeprecatedQuarterlySnapshotNotes(value: unknown): string {
+  const normalizedValue = String(value ?? '').trim();
+  if (!normalizedValue) return '';
+
+  if (DEPRECATED_QUARTERLY_SNAPSHOT_NOTE_SEGMENT.test(normalizedValue)) {
+    return '';
+  }
+
+  const segments = normalizedValue
+    .split('|')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  if (segments.length === 0) return '';
+
+  const nextSegments = segments.filter((segment) => !DEPRECATED_QUARTERLY_SNAPSHOT_NOTE_SEGMENT.test(segment));
+  if (nextSegments.length === segments.length) {
+    return normalizedValue;
+  }
+
+  return nextSegments.join(' | ');
+}
+
+function getRawReportAssumptions(exercise: ExerciseDetail): ReportAssumptions {
   return [
     normalizeLegacyReportAssumption(exercise.reportAssumption1, LEGACY_REPORT_ASSUMPTIONS[0]),
     normalizeLegacyReportAssumption(exercise.reportAssumption2, LEGACY_REPORT_ASSUMPTIONS[1]),
     normalizeLegacyReportAssumption(exercise.reportAssumption3, LEGACY_REPORT_ASSUMPTIONS[2]),
     String(exercise.reportAssumption4 ?? DEFAULT_REPORT_ASSUMPTIONS[3]),
+  ];
+}
+
+function getReportAssumptions(exercise: ExerciseDetail): ReportAssumptions {
+  const rawAssumptions = getRawReportAssumptions(exercise);
+  return [
+    stripDeprecatedQuarterlySnapshotNotes(rawAssumptions[0]),
+    stripDeprecatedQuarterlySnapshotNotes(rawAssumptions[1]),
+    stripDeprecatedQuarterlySnapshotNotes(rawAssumptions[2]),
+    stripDeprecatedQuarterlySnapshotNotes(rawAssumptions[3]),
   ];
 }
 
@@ -242,12 +271,7 @@ interface ReportsPageProps {
   showTravelConfiguration?: boolean;
   beforeBudgetBreakdownSection?: ReactNode;
   extraSections?: ReactNode;
-  moveQuarterlySnapshotsToBudgetOverview?: boolean;
 }
-
-type BudgetOverviewInjectionProps = {
-  quarterlySnapshotsSection?: ReactNode;
-};
 
 type PrintBudgetFieldKey =
   | 'rpaMilPay'
@@ -297,7 +321,6 @@ export function ReportsPage({
   showTravelConfiguration = true,
   beforeBudgetBreakdownSection,
   extraSections,
-  moveQuarterlySnapshotsToBudgetOverview = false,
 }: ReportsPageProps) {
   const { exercise, budget, exerciseId, pushUndoSnapshot } = useApp();
   const queryClient = useQueryClient();
@@ -325,6 +348,7 @@ export function ReportsPage({
   const skipReportAssumptionsSaveRef = useRef(true);
   const skipReportLimfacsSaveRef = useRef(true);
   const skipReportPreparedBySaveRef = useRef(true);
+  const cleanedReportAssumptionsSignatureRef = useRef<string | null>(null);
 
   const travelMut = useMutation({
     mutationFn: async (data: any) => {
@@ -473,13 +497,15 @@ export function ReportsPage({
 
   const travel = activeExercise.travelConfig;
   const currentReportAssumptions = getReportAssumptions(activeExercise);
+  const rawReportAssumptions = getRawReportAssumptions(activeExercise);
   const [currentReportAssumption1, currentReportAssumption2, currentReportAssumption3, currentReportAssumption4] = currentReportAssumptions;
   const currentReportLimfacs = getReportLimfacs(activeExercise);
   const [currentReportLimfac1, currentReportLimfac2, currentReportLimfac3] = currentReportLimfacs;
   const currentReportPreparedBy = String(activeExercise.reportPreparedBy ?? '');
   const reportPreparedByDraftStorageKey = exerciseId ? `chinaTracker.reportPreparedByDraft.${exerciseId}` : null;
-  const quarterlySnapshotEntries = getQuarterlySnapshotEntries(activeExercise);
-  const fiscalYear = getFiscalYearForExercise(activeExercise);
+  const hasDeprecatedQuarterSnapshotAssumptions = rawReportAssumptions.some(
+    (line, index) => stripDeprecatedQuarterlySnapshotNotes(line) !== currentReportAssumptions[index],
+  );
 
   const persistPreparedBy = (value: string) => {
     const nextPreparedBy = value.trim();
@@ -727,116 +753,7 @@ export function ReportsPage({
     },
   ];
 
-  const insertReportAssumptionLines = (lines: string[]) => {
-    const sanitizedLines = lines.map((line) => line.trim()).filter(Boolean);
-    if (sanitizedLines.length === 0) {
-      message.warning('Unable to insert quarterly snapshot notes.');
-      return;
-    }
-
-    setDraftReportAssumptions((current) => {
-      const next = [...current] as ReportAssumptions;
-      let preferredStartIndex = 0;
-
-      for (const line of sanitizedLines) {
-        let targetIndex = next.findIndex((existing, index) => index >= preferredStartIndex && !existing.trim());
-        if (targetIndex === -1) {
-          targetIndex = next.findIndex((existing) => !existing.trim());
-        }
-        if (targetIndex === -1) {
-          targetIndex = next.length - 1;
-        }
-
-        next[targetIndex] = next[targetIndex].trim()
-          ? `${next[targetIndex]} | ${line}`
-          : line;
-        preferredStartIndex = Math.min(next.length - 1, targetIndex + 1);
-      }
-
-      return next;
-    });
-  };
-
-  const handleInsertSnapshotNote = (key: QuarterlySnapshotKey) => {
-    insertReportAssumptionLines([buildQuarterlySnapshotNoteLine(key, activeExercise)]);
-  };
-
-  const handleInsertAllSnapshotNotes = () => {
-    const summaryLine = buildAllQuarterlySnapshotNoteLine(activeExercise);
-    if (!summaryLine) {
-      message.warning('Unable to insert quarterly snapshot notes.');
-      return;
-    }
-
-    insertReportAssumptionLines(
-      quarterlySnapshotEntries.map((entry) => buildQuarterlySnapshotNoteLine(entry.key, activeExercise)),
-    );
-  };
-
-  const quarterlySnapshotsSection = (
-    <Card title="Standard Fiscal Quarter Windows" className="ct-section-card" style={{ marginBottom: 24 }}>
-      <div style={{ display: 'grid', gap: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <Typography.Text type="secondary">
-            Derived automatically from the exercise fiscal year (FY{fiscalYear}) and available for report notes and PM27 planning.
-          </Typography.Text>
-          <Space wrap>
-            <Button size="small" onClick={() => handleInsertSnapshotNote('q1')}>
-              Insert Q1 Note
-            </Button>
-            <Button size="small" onClick={() => handleInsertSnapshotNote('q2')}>
-              Insert Q2 Note
-            </Button>
-            <Button size="small" onClick={() => handleInsertSnapshotNote('q3')}>
-              Insert Q3 Note
-            </Button>
-            <Button size="small" onClick={() => handleInsertSnapshotNote('q4')}>
-              Insert Q4 Note
-            </Button>
-            <Button size="small" type="primary" onClick={handleInsertAllSnapshotNotes}>
-              Insert All Snapshot Notes
-            </Button>
-          </Space>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-          {quarterlySnapshotEntries.map((entry) => (
-            <div
-              key={entry.key}
-              style={{
-                border: '1px solid #e8ecf1',
-                borderRadius: 12,
-                padding: '12px 14px',
-                background: '#fafcff',
-              }}
-            >
-              <Typography.Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
-                {entry.label}
-              </Typography.Text>
-              <Typography.Text strong style={{ fontSize: 15, color: '#102039' }}>
-                {entry.rangeLabel}
-              </Typography.Text>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Card>
-  );
-
-  const resolvedBeforeBudgetBreakdownSection = moveQuarterlySnapshotsToBudgetOverview
-    ? (
-      isValidElement(beforeBudgetBreakdownSection)
-        ? cloneElement(
-            beforeBudgetBreakdownSection as ReactElement<BudgetOverviewInjectionProps>,
-            { quarterlySnapshotsSection },
-          )
-        : (
-          <>
-            {quarterlySnapshotsSection}
-            {beforeBudgetBreakdownSection}
-          </>
-        )
-    )
-    : beforeBudgetBreakdownSection;
+  const resolvedBeforeBudgetBreakdownSection = beforeBudgetBreakdownSection;
 
   useEffect(() => {
     skipBudgetTargetsSaveRef.current = true;
@@ -858,6 +775,27 @@ export function ReportsPage({
     currentReportAssumption2,
     currentReportAssumption3,
     currentReportAssumption4,
+  ]);
+
+  useEffect(() => {
+    if (!exerciseId || reportAssumptionsMut.isPending || !hasDeprecatedQuarterSnapshotAssumptions) return;
+
+    const rawSignature = JSON.stringify(rawReportAssumptions);
+    if (cleanedReportAssumptionsSignatureRef.current === rawSignature) return;
+
+    cleanedReportAssumptionsSignatureRef.current = rawSignature;
+    reportAssumptionsMut.mutate({
+      reportAssumption1: currentReportAssumptions[0],
+      reportAssumption2: currentReportAssumptions[1],
+      reportAssumption3: currentReportAssumptions[2],
+      reportAssumption4: currentReportAssumptions[3],
+    });
+  }, [
+    currentReportAssumptions,
+    exerciseId,
+    hasDeprecatedQuarterSnapshotAssumptions,
+    rawReportAssumptions,
+    reportAssumptionsMut,
   ]);
 
   useEffect(() => {
@@ -1157,55 +1095,6 @@ export function ReportsPage({
             />
           </Descriptions.Item>
         </Descriptions>
-        {!moveQuarterlySnapshotsToBudgetOverview ? (
-          <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid #eef2f6' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
-              <div>
-                <Typography.Text strong>Standard Fiscal Quarter Windows</Typography.Text>
-                <Typography.Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
-                  Derived automatically from the exercise fiscal year (FY{fiscalYear}) and available for report notes and PM27 planning.
-                </Typography.Text>
-              </div>
-              <Space wrap>
-                <Button size="small" onClick={() => handleInsertSnapshotNote('q1')}>
-                  Insert Q1 Note
-                </Button>
-                <Button size="small" onClick={() => handleInsertSnapshotNote('q2')}>
-                  Insert Q2 Note
-                </Button>
-                <Button size="small" onClick={() => handleInsertSnapshotNote('q3')}>
-                  Insert Q3 Note
-                </Button>
-                <Button size="small" onClick={() => handleInsertSnapshotNote('q4')}>
-                  Insert Q4 Note
-                </Button>
-                <Button size="small" type="primary" onClick={handleInsertAllSnapshotNotes}>
-                  Insert All Snapshot Notes
-                </Button>
-              </Space>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-              {quarterlySnapshotEntries.map((entry) => (
-                <div
-                  key={entry.key}
-                  style={{
-                    border: '1px solid #e8ecf1',
-                    borderRadius: 12,
-                    padding: '12px 14px',
-                    background: '#fafcff',
-                  }}
-                >
-                  <Typography.Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
-                    {entry.label}
-                  </Typography.Text>
-                  <Typography.Text strong style={{ fontSize: 15, color: '#102039' }}>
-                    {entry.rangeLabel}
-                  </Typography.Text>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
         <div className="ct-report-notes-layout">
           <div className="ct-report-notes-section">
             <Typography.Text strong>Estimations include:</Typography.Text>

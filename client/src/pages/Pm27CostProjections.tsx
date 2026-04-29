@@ -472,8 +472,8 @@ export default function Pm27CostProjections() {
       title="PM 27 Cost Projections"
       showBudgetDetails={false}
       showGrandTotals={false}
+      showQuarterlyBudgetAllocation={false}
       beforeBudgetBreakdownSection={<BudgetOverviewSection />}
-      moveQuarterlySnapshotsToBudgetOverview
       extraSections={(
         <>
           <A7RpaFundingSummary />

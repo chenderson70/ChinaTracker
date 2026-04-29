@@ -15,6 +15,7 @@ import { TeamOutlined, UserOutlined, DollarOutlined, RocketOutlined, SafetyCerti
 import { useApp } from './AppLayout';
 import BudgetHeroSummary from './BudgetHeroSummary';
 import ExpenseNarrativesSection from './ExpenseNarrativesSection';
+import QuarterlyBudgetAllocationSection from './QuarterlyBudgetAllocationSection';
 import { renderCostBarLabel } from './charts/CostBarLabel';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { formatFundingPaxBreakdown, getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
@@ -43,11 +44,7 @@ type DetailCard = {
   note?: string;
 };
 
-type BudgetOverviewSectionProps = {
-  quarterlySnapshotsSection?: ReactNode;
-};
-
-export default function BudgetOverviewSection({ quarterlySnapshotsSection }: BudgetOverviewSectionProps) {
+export default function BudgetOverviewSection() {
   const { exercise, budget } = useApp();
 
   if (!exercise || !budget) return null;
@@ -72,26 +69,35 @@ export default function BudgetOverviewSection({ quarterlySnapshotsSection }: Bud
   const allExecutionOmLines = (exercise.unitBudgets || [])
     .flatMap((u) => u.executionCostLines || [])
     .filter((line) => line.fundingType === 'OM');
+  const allExerciseOmLines = exercise.omCostLines || [];
 
-  const omWrmTotal = allExecutionOmLines
+  const getExerciseOmCategoryTotal = (category: string) => allExerciseOmLines
+    .filter((line) => String(line.category || '').toUpperCase() === category)
+    .reduce((sum, line) => sum + (line.amount || 0), 0);
+
+  const executionOmWrmTotal = allExecutionOmLines
     .filter((line) => {
       const category = String(line.category || '').toUpperCase();
       return category === 'WRM' || category === 'UFR';
     })
     .reduce((sum, line) => sum + (line.amount || 0), 0);
+  const omWrmTotal = executionOmWrmTotal + getExerciseOmCategoryTotal('WRM');
 
-  const omContractsTotal = allExecutionOmLines
+  const executionOmContractsTotal = allExecutionOmLines
     .filter((line) => String(line.category || '').toUpperCase() === 'TITLE_CONTRACTS')
     .reduce((sum, line) => sum + (line.amount || 0), 0);
+  const omContractsTotal = executionOmContractsTotal + getExerciseOmCategoryTotal('CONTRACT');
 
-  const omGpcPurchasesTotal = allExecutionOmLines
+  const executionOmGpcPurchasesTotal = allExecutionOmLines
     .filter((line) => String(line.category || '').toUpperCase() === 'GPC_PURCHASES')
     .reduce((sum, line) => sum + (line.amount || 0), 0);
+  const omGpcPurchasesTotal = executionOmGpcPurchasesTotal + getExerciseOmCategoryTotal('GPC_PURCHASES');
 
-  const omBilletingTotal = Object.values(budget.units)
+  const personnelOmBilletingTotal = Object.values(budget.units)
     .reduce((sum, unit) => sum + (unit.planningOm.billeting || 0) + (unit.whiteCellOm.billeting || 0) + (unit.playerOm.billeting || 0), 0);
+  const omBilletingTotal = personnelOmBilletingTotal + getExerciseOmCategoryTotal('BILLETING');
 
-  const omTravelTotal = Object.values(budget.units)
+  const personnelOmTravelTotal = Object.values(budget.units)
     .reduce(
       (sum, unit) =>
         sum +
@@ -103,14 +109,24 @@ export default function BudgetOverviewSection({ quarterlySnapshotsSection }: Bud
         (unit.playerOm.perDiem || 0),
       0,
     );
-  const allOtherOmCostsTotal = budget.totalOm - omTravelTotal;
+  const omTravelTotal = personnelOmTravelTotal + getExerciseOmCategoryTotal('TRANSPORTATION');
+
+  const otherExecutionOmTotal = allExecutionOmLines
+    .filter((line) => !['WRM', 'UFR', 'TITLE_CONTRACTS', 'GPC_PURCHASES'].includes(String(line.category || '').toUpperCase()))
+    .reduce((sum, line) => sum + (line.amount || 0), 0);
+  const otherExerciseOmTotal = allExerciseOmLines
+    .filter((line) => !['WRM', 'CONTRACT', 'GPC_PURCHASES', 'BILLETING', 'TRANSPORTATION'].includes(String(line.category || '').toUpperCase()))
+    .reduce((sum, line) => sum + (line.amount || 0), 0);
+  const otherOmBreakdownTotal = otherExecutionOmTotal + otherExerciseOmTotal;
+  const allOtherOmCostsTotal = Math.max(0, budget.totalOm - omTravelTotal);
 
   const unitOmBreakdownTotal =
     omWrmTotal +
     omContractsTotal +
     omGpcPurchasesTotal +
     omBilletingTotal +
-    omTravelTotal;
+    omTravelTotal +
+    otherOmBreakdownTotal;
 
   const rpaMilPayTotal = Object.values(budget.units)
     .reduce(
@@ -481,7 +497,7 @@ export default function BudgetOverviewSection({ quarterlySnapshotsSection }: Bud
         ))}
       </Row>
 
-      {quarterlySnapshotsSection}
+      <QuarterlyBudgetAllocationSection />
 
       <ExpenseNarrativesSection />
 
@@ -544,6 +560,7 @@ export default function BudgetOverviewSection({ quarterlySnapshotsSection }: Bud
                   <div>GPC Purchases: {fmt(omGpcPurchasesTotal)}</div>
                   {omBilletingTotal > 0 && <div>Billeting: {fmt(omBilletingTotal)}</div>}
                   <div>Travel: {fmt(omTravelTotal)}</div>
+                  {otherOmBreakdownTotal > 0 && <div>All Other O&amp;M: {fmt(otherOmBreakdownTotal)}</div>}
                 </div>
               </div>
 

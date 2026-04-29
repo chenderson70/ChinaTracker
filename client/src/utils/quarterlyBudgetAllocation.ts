@@ -10,20 +10,21 @@ import type {
   PersonnelGroup,
   RankCpdRate,
 } from '../types';
-import { formatDateRange, normalizeDateString } from './dateRanges';
+import { calculateInclusiveDateRangeDays, formatDateRange, normalizeDateString } from './dateRanges';
 
 export type QuarterlyBudgetCategoryKey =
+  | 'omWrm'
+  | 'omContracts'
+  | 'omGpcPurchases'
+  | 'omBilleting'
+  | 'omTravel'
+  | 'otherOm'
   | 'rpaMilPay'
   | 'rpaTravelAndPerDiem'
   | 'rpaMeals'
   | 'annualTour'
-  | 'planningOm'
-  | 'wcExecOm'
-  | 'playerOm'
-  | 'exerciseOm'
   | 'totalRpa'
-  | 'totalOm'
-  | 'grandTotal';
+  | 'totalOm';
 
 export type QuarterlyBudgetCategoryTotals = Record<QuarterlyBudgetCategoryKey, number>;
 
@@ -57,42 +58,70 @@ type ResolvedDateRange = {
 export const QUARTERLY_BUDGET_ROW_META: Array<{
   key: QuarterlyBudgetCategoryKey;
   label: string;
-  tone?: 'rpa' | 'om' | 'grand';
+  tone?: 'rpa' | 'om' | 'annualTour';
+  alwaysShow?: boolean;
 }> = [
-  { key: 'rpaMilPay', label: 'RPA Mil Pay', tone: 'rpa' },
-  { key: 'rpaTravelAndPerDiem', label: 'RPA Travel & Per Diem', tone: 'rpa' },
-  { key: 'rpaMeals', label: 'RPA Meals', tone: 'rpa' },
-  { key: 'annualTour', label: 'Annual Tour' },
-  { key: 'planningOm', label: 'Planning O&M', tone: 'om' },
-  { key: 'wcExecOm', label: 'White Cell + Execution O&M', tone: 'om' },
-  { key: 'playerOm', label: 'Player O&M', tone: 'om' },
-  { key: 'exerciseOm', label: 'Exercise O&M', tone: 'om' },
-  { key: 'totalRpa', label: 'Total RPA', tone: 'rpa' },
-  { key: 'totalOm', label: 'Total O&M', tone: 'om' },
-  { key: 'grandTotal', label: 'Grand Total', tone: 'grand' },
+  { key: 'omWrm', label: 'WRM', tone: 'om', alwaysShow: true },
+  { key: 'omContracts', label: 'Contracts', tone: 'om', alwaysShow: true },
+  { key: 'omGpcPurchases', label: 'GPC Purchases', tone: 'om', alwaysShow: true },
+  { key: 'omBilleting', label: 'Billeting', tone: 'om', alwaysShow: true },
+  { key: 'omTravel', label: 'Travel', tone: 'om', alwaysShow: true },
+  { key: 'otherOm', label: 'Other O&M', tone: 'om' },
+  { key: 'totalOm', label: 'Total O&M', tone: 'om', alwaysShow: true },
+  { key: 'rpaMilPay', label: 'RPA Mil Pay', tone: 'rpa', alwaysShow: true },
+  { key: 'rpaTravelAndPerDiem', label: 'RPA Travel & Per Diem', tone: 'rpa', alwaysShow: true },
+  { key: 'rpaMeals', label: 'RPA Meals', tone: 'rpa', alwaysShow: true },
+  { key: 'totalRpa', label: 'Total RPA', tone: 'rpa', alwaysShow: true },
+  { key: 'annualTour', label: 'Annual Tour', tone: 'annualTour' },
+];
+
+export const QUARTERLY_BUDGET_SECTION_META: Array<{
+  key: 'om' | 'rpa' | 'annualTour';
+  label: string;
+  tone: 'om' | 'rpa' | 'annualTour';
+  rowKeys: QuarterlyBudgetCategoryKey[];
+}> = [
+  {
+    key: 'om',
+    label: 'O&M',
+    tone: 'om',
+    rowKeys: ['omWrm', 'omContracts', 'omGpcPurchases', 'omBilleting', 'omTravel', 'otherOm', 'totalOm'],
+  },
+  {
+    key: 'rpa',
+    label: 'RPA',
+    tone: 'rpa',
+    rowKeys: ['rpaMilPay', 'rpaTravelAndPerDiem', 'rpaMeals', 'totalRpa'],
+  },
+  {
+    key: 'annualTour',
+    label: 'Annual Tour',
+    tone: 'annualTour',
+    rowKeys: ['annualTour'],
+  },
 ];
 
 function createEmptyTotals(): QuarterlyBudgetCategoryTotals {
   return {
+    omWrm: 0,
+    omContracts: 0,
+    omGpcPurchases: 0,
+    omBilleting: 0,
+    omTravel: 0,
+    otherOm: 0,
     rpaMilPay: 0,
     rpaTravelAndPerDiem: 0,
     rpaMeals: 0,
     annualTour: 0,
-    planningOm: 0,
-    wcExecOm: 0,
-    playerOm: 0,
-    exerciseOm: 0,
     totalRpa: 0,
     totalOm: 0,
-    grandTotal: 0,
   };
 }
 
 function finalizeTotals(totals: QuarterlyBudgetCategoryTotals): QuarterlyBudgetCategoryTotals {
   const next = { ...totals };
   next.totalRpa = next.rpaMilPay + next.rpaTravelAndPerDiem + next.rpaMeals;
-  next.totalOm = next.planningOm + next.wcExecOm + next.playerOm + next.exerciseOm;
-  next.grandTotal = next.totalRpa + next.annualTour + next.totalOm;
+  next.totalOm = next.omWrm + next.omContracts + next.omGpcPurchases + next.omBilleting + next.omTravel + next.otherOm;
   return next;
 }
 
@@ -213,15 +242,37 @@ function getExerciseDateContext(exercise: Pick<ExerciseDetail, 'startDate' | 'en
   return { startDate, endDate };
 }
 
+function getExerciseRangeDutyDays(exercise: Pick<ExerciseDetail, 'startDate' | 'endDate'>): number | null {
+  const exerciseDates = getExerciseDateContext(exercise);
+  if (!exerciseDates.startDate || !exerciseDates.endDate) return null;
+  return calculateInclusiveDateRangeDays(exerciseDates.startDate, exerciseDates.endDate);
+}
+
+function resolvePersonnelDutyDays(
+  exercise: Pick<ExerciseDetail, 'startDate' | 'endDate'>,
+  group: Pick<PersonnelGroup, 'role' | 'dutyDays'>,
+  entry: Pick<PersonnelEntry, 'startDate' | 'endDate' | 'dutyDays'>,
+  defaultDays: number,
+): number {
+  const entryStartDate = normalizeDateString(entry.startDate);
+  const entryEndDate = normalizeDateString(entry.endDate);
+
+  if (group.role === 'PLAYER' && !entryStartDate && !entryEndDate) {
+    return Math.max(1, getExerciseRangeDutyDays(exercise) ?? defaultDays);
+  }
+
+  return Math.max(1, Math.round(Number((entry.dutyDays ?? group.dutyDays ?? defaultDays) || 1)));
+}
+
 function resolvePersonnelDateRange(
   exercise: Pick<ExerciseDetail, 'startDate' | 'endDate'>,
-  group: Pick<PersonnelGroup, 'dutyDays'>,
+  group: Pick<PersonnelGroup, 'role' | 'dutyDays'>,
   entry: Pick<PersonnelEntry, 'startDate' | 'endDate' | 'dutyDays'>,
   defaultDays: number,
 ): ResolvedDateRange | null {
   const entryStartDate = normalizeDateString(entry.startDate);
   const entryEndDate = normalizeDateString(entry.endDate);
-  const durationDays = Math.max(1, Math.round(Number((entry.dutyDays ?? group.dutyDays ?? defaultDays) || 1)));
+  const durationDays = resolvePersonnelDutyDays(exercise, group, entry, defaultDays);
   const exerciseDates = getExerciseDateContext(exercise);
 
   if (entryStartDate && entryEndDate) {
@@ -232,6 +283,9 @@ function resolvePersonnelDateRange(
   }
   if (entryEndDate) {
     return buildRange(deriveStartDate(entryEndDate, durationDays), entryEndDate, true);
+  }
+  if (group.role === 'PLAYER' && exerciseDates.startDate && exerciseDates.endDate) {
+    return buildRange(exerciseDates.startDate, exerciseDates.endDate, true);
   }
   if (exerciseDates.startDate) {
     return buildRange(exerciseDates.startDate, deriveEndDate(exerciseDates.startDate, durationDays), true);
@@ -382,7 +436,7 @@ function createFallbackEntry(
 
 function resolveGroupDateRange(
   exercise: Pick<ExerciseDetail, 'startDate' | 'endDate'>,
-  group: Pick<PersonnelGroup, 'dutyDays' | 'personnelEntries'>,
+  group: Pick<PersonnelGroup, 'role' | 'dutyDays' | 'personnelEntries'>,
   defaultDays: number,
 ): ResolvedDateRange | null {
   const ranges = (group.personnelEntries || [])
@@ -453,6 +507,28 @@ function getFundingType(value: FundingType | string): FundingType {
   return String(value || '').toUpperCase() === 'OM' ? 'OM' : 'RPA';
 }
 
+function getExecutionOmCategoryKey(category: string | null | undefined): QuarterlyBudgetCategoryKey {
+  const normalized = String(category || '').trim().toUpperCase();
+
+  if (normalized === 'WRM' || normalized === 'UFR') return 'omWrm';
+  if (normalized === 'TITLE_CONTRACTS') return 'omContracts';
+  if (normalized === 'GPC_PURCHASES') return 'omGpcPurchases';
+
+  return 'otherOm';
+}
+
+function getExerciseOmCategoryKey(category: string | null | undefined): QuarterlyBudgetCategoryKey {
+  const normalized = String(category || '').trim().toUpperCase();
+
+  if (normalized === 'WRM') return 'omWrm';
+  if (normalized === 'CONTRACT') return 'omContracts';
+  if (normalized === 'GPC_PURCHASES') return 'omGpcPurchases';
+  if (normalized === 'BILLETING') return 'omBilleting';
+  if (normalized === 'TRANSPORTATION') return 'omTravel';
+
+  return 'otherOm';
+}
+
 export function buildQuarterlyBudgetAllocation(
   exercise: ExerciseDetail,
   rates: RateInputs,
@@ -499,7 +575,7 @@ export function buildQuarterlyBudgetAllocation(
         const entryCount = Number(entry.count || 0);
         if (entryCount <= 0) continue;
 
-        const entryDays = Math.max(1, Math.round(Number((entry.dutyDays ?? group.dutyDays ?? defaultDays) || 1)));
+        const entryDays = resolvePersonnelDutyDays(exercise, group, entry, defaultDays);
         const entryLocation = String(entry.location ?? group.location ?? 'FORT_HUNTER_LIGGETT').trim() || 'FORT_HUNTER_LIGGETT';
         const entryIsLocal = isLocalFlag(entry.isLocal) || isLocalFlag(group.isLocal);
         const entryTravelOnly = allowsTravelOnly && isTravelOnlyFlag(entry.travelOnly);
@@ -541,7 +617,7 @@ export function buildQuarterlyBudgetAllocation(
           );
           if (isPlayerGroup) {
             allocateAmount(totalsByBucket, buckets, resolvedRange, 'rpaMeals', meals);
-            allocateAmount(totalsByBucket, buckets, resolvedRange, 'playerOm', billeting);
+            allocateAmount(totalsByBucket, buckets, resolvedRange, 'omBilleting', billeting);
           }
         } else if (fundingType === 'RPA' && isAnnualTourGroup) {
           allocateAmount(
@@ -552,13 +628,13 @@ export function buildQuarterlyBudgetAllocation(
             milPay + playerPerDiem + airfare,
           );
           allocateAmount(totalsByBucket, buckets, resolvedRange, 'rpaMeals', meals);
-          allocateAmount(totalsByBucket, buckets, resolvedRange, 'playerOm', billeting);
+          allocateAmount(totalsByBucket, buckets, resolvedRange, 'omBilleting', billeting);
         } else if (fundingType === 'OM' && isPlanningGroup) {
           allocateAmount(
             totalsByBucket,
             buckets,
             resolvedRange,
-            'planningOm',
+            'omTravel',
             locationPerDiem + airfare + rental,
           );
         } else if (fundingType === 'OM' && isWhiteCellGroup) {
@@ -566,23 +642,24 @@ export function buildQuarterlyBudgetAllocation(
             totalsByBucket,
             buckets,
             resolvedRange,
-            'wcExecOm',
+            'omTravel',
             locationPerDiem + airfare + rental,
           );
-        } else if (fundingType === 'OM' && isPlayerGroup) {
+        } else if (fundingType === 'OM' && isPlayerLikeGroup) {
           allocateAmount(
             totalsByBucket,
             buckets,
             resolvedRange,
-            'playerOm',
-            playerPerDiem + airfare + billeting,
+            'omTravel',
+            playerPerDiem + airfare,
           );
+          allocateAmount(totalsByBucket, buckets, resolvedRange, 'omBilleting', billeting);
         }
       }
 
       if (hasLegacyGroupRental && !usesEntryLevelRental) {
         const legacyRentalCategoryKey = fundingType === 'OM'
-          ? (isPlanningGroup ? 'planningOm' : 'wcExecOm')
+          ? 'omTravel'
           : 'rpaTravelAndPerDiem';
 
         const shouldAllocateLegacyRental = fundingType === 'OM'
@@ -613,7 +690,9 @@ export function buildQuarterlyBudgetAllocation(
         totalsByBucket,
         buckets,
         resolvedRange,
-        getFundingType(line.fundingType) === 'RPA' ? 'rpaTravelAndPerDiem' : 'wcExecOm',
+        getFundingType(line.fundingType) === 'RPA'
+          ? 'rpaTravelAndPerDiem'
+          : getExecutionOmCategoryKey(line.category),
         Number(line.amount || 0),
       );
     }
@@ -624,7 +703,13 @@ export function buildQuarterlyBudgetAllocation(
     if (resolvedRange?.usedFallback) {
       fallbackDateUsage.exerciseOmCostLines += 1;
     }
-    allocateAmount(totalsByBucket, buckets, resolvedRange, 'exerciseOm', Number(line.amount || 0));
+    allocateAmount(
+      totalsByBucket,
+      buckets,
+      resolvedRange,
+      getExerciseOmCategoryKey(line.category),
+      Number(line.amount || 0),
+    );
   }
 
   for (const bucket of buckets) {

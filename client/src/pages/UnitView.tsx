@@ -152,6 +152,56 @@ function getDateRangePayload(value: [Dayjs | null, Dayjs | null] | null | undefi
   };
 }
 
+function getExerciseDateDefaults(
+  exercise: Pick<ExerciseDetail, 'startDate' | 'endDate' | 'defaultDutyDays'> | null | undefined,
+): {
+  startDate: string | null;
+  endDate: string | null;
+  dutyDays: number;
+  dateRange: [Dayjs, Dayjs] | null;
+} {
+  const normalizedStartDate = normalizeDateString(exercise?.startDate);
+  const normalizedEndDate = normalizeDateString(exercise?.endDate);
+  const exerciseDutyDays = calculateInclusiveDateRangeDays(normalizedStartDate, normalizedEndDate)
+    ?? Math.max(1, Number(exercise?.defaultDutyDays || 1));
+
+  if (!normalizedStartDate || !normalizedEndDate) {
+    return {
+      startDate: normalizedStartDate,
+      endDate: normalizedEndDate,
+      dutyDays: exerciseDutyDays,
+      dateRange: null,
+    };
+  }
+
+  return {
+    startDate: normalizedStartDate,
+    endDate: normalizedEndDate,
+    dutyDays: exerciseDutyDays,
+    dateRange: [dayjs(normalizedStartDate), dayjs(normalizedEndDate)],
+  };
+}
+
+function buildPlayerExecutionEntryDefaults(
+  entry: PersonnelEntry,
+  exerciseDefaults: ReturnType<typeof getExerciseDateDefaults>,
+): PersonnelEntry {
+  const normalizedStartDate = normalizeDateString(entry.startDate);
+  const normalizedEndDate = normalizeDateString(entry.endDate);
+  const hasExplicitDateRange = !!normalizedStartDate || !!normalizedEndDate;
+
+  if (hasExplicitDateRange || !exerciseDefaults.startDate || !exerciseDefaults.endDate) {
+    return entry;
+  }
+
+  return {
+    ...entry,
+    startDate: exerciseDefaults.startDate,
+    endDate: exerciseDefaults.endDate,
+    dutyDays: exerciseDefaults.dutyDays,
+  };
+}
+
 function buildPersonnelEntryDatePatch(
   entry: Pick<PersonnelEntry, 'startDate' | 'endDate' | 'dutyDays'>,
   field: 'startDate' | 'endDate',
@@ -359,6 +409,10 @@ export default function UnitView() {
   }, [perDiemRates]);
   const defaultAirfare = Number(appConfig.DEFAULT_AIRFARE ?? 400);
   const defaultRentalCarDailyRate = Number(appConfig.DEFAULT_RENTAL_CAR_DAILY ?? 50);
+  const exerciseDateDefaults = useMemo(
+    () => getExerciseDateDefaults(exercise),
+    [exercise?.defaultDutyDays, exercise?.endDate, exercise?.startDate],
+  );
   const [entryModal, setEntryModal] = useState<{ groupId: string } | null>(null);
   const [entryModalNoteDraft, setEntryModalNoteDraft] = useState('');
   const [entryModalTravelOnlyDraft, setEntryModalTravelOnlyDraft] = useState(false);
@@ -576,6 +630,7 @@ export default function UnitView() {
   const entryModalGroup = entryModal ? personnelGroups.find((group) => group.id === entryModal.groupId) : null;
   const entryModalIsPlanning = entryModalGroup?.role === 'PLANNING';
   const entryModalIsWhiteCell = entryModalGroup?.role === 'WHITE_CELL';
+  const entryModalIsPlayerExecution = entryModalGroup?.role === 'PLAYER';
   const entryModalSupportsRentalCars =
     entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'WHITE_CELL' || entryModalGroup?.role === 'SUPPORT';
   const entryModalUsesBinaryRentalCar = entryModalGroup?.role === 'PLANNING';
@@ -626,8 +681,8 @@ export default function UnitView() {
     entryForm.setFieldsValue({
       rankCode: undefined,
       count: 1,
-      dateRange: null,
-      dutyDays: exercise?.defaultDutyDays ?? 1,
+      dateRange: entryModalIsPlayerExecution ? exerciseDateDefaults.dateRange : null,
+      dutyDays: entryModalIsPlayerExecution ? exerciseDateDefaults.dutyDays : (exercise?.defaultDutyDays ?? 1),
       hasRentalCar: false,
       rentalCarCount: 0,
       months: undefined,
@@ -637,7 +692,17 @@ export default function UnitView() {
     setEntryModalNoteDraft('');
     setEntryModalTravelOnlyDraft(false);
     setEntryModalLongTermA7PlannerDraft(false);
-  }, [entryModal, entryForm, entryModalGroup?.isLocal, entryModalGroup?.location, exercise?.defaultDutyDays, perDiemLocations]);
+  }, [
+    entryForm,
+    entryModal,
+    entryModalGroup?.isLocal,
+    entryModalGroup?.location,
+    entryModalIsPlayerExecution,
+    exercise?.defaultDutyDays,
+    exerciseDateDefaults.dateRange,
+    exerciseDateDefaults.dutyDays,
+    perDiemLocations,
+  ]);
 
   const roleSections = ['PLANNING', 'PLAYER', 'ANNUAL_TOUR', 'WHITE_CELL', 'SUPPORT'].filter((role) => hasRole(role));
 
@@ -680,6 +745,7 @@ export default function UnitView() {
     const isPlayer = role === 'PLAYER';
     const isAnnualTour = role === 'ANNUAL_TOUR';
     const isPlayerLike = isPlayer || isAnnualTour;
+    const usesExerciseDateDefaults = role === 'PLAYER';
     const isPlanning = role === 'PLANNING';
     const isWhiteCell = role === 'WHITE_CELL';
     const supportsRentalCars = role === 'PLANNING' || role === 'WHITE_CELL' || role === 'SUPPORT';
@@ -809,6 +875,11 @@ export default function UnitView() {
         {` \u2022 Total: ${fmt(calc.subtotal)}`}
       </>
     );
+    const personnelEntriesForDisplay = group.personnelEntries.map((entry) => (
+      usesExerciseDateDefaults
+        ? buildPlayerExecutionEntryDefaults(entry, exerciseDateDefaults)
+        : entry
+    ));
 
     return (
       <Card
@@ -856,7 +927,7 @@ export default function UnitView() {
             size="small"
             pagination={false}
             scroll={{ x: 'max-content' }}
-            dataSource={group.personnelEntries.map((e) => ({ ...e, key: e.id }))}
+            dataSource={personnelEntriesForDisplay.map((e) => ({ ...e, key: e.id }))}
             columns={[
               {
                 title: 'Rank',
