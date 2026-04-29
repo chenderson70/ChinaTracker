@@ -257,6 +257,7 @@ export default function Sustainment() {
       showGrandTotals={false}
       showExerciseDetails={false}
       showQuickPlanningSummary={false}
+      showQuarterlyBudgetAllocation={false}
       showFullBudgetBreakdown={false}
       showTravelConfiguration={false}
       extraSections={<SustainmentWorkspace />}

@@ -3,7 +3,6 @@ import { useApp } from '../components/AppLayout';
 import BudgetOverviewSection from '../components/BudgetOverviewSection';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { ANNUAL_TOUR_MEALS_LABEL, ANNUAL_TOUR_MIL_PAY_LABEL, ANNUAL_TOUR_TRAVEL_PAY_LABEL, getPlayerOmResponsibilityByUnit, getRpaCategoryTotals, getUnitRpaCategoryTotals } from '../utils/budgetSummary';
-import { getFiscalYearForExercise, getQuarterlySnapshotEntries } from '../utils/quarterlySnapshots';
 import { ReportsPage } from './Reports';
 import type { ExecutionCostLine, FundingType, PersonnelEntry, PersonnelGroup, UnitBudget, UnitCalc } from '../types';
 
@@ -370,45 +369,6 @@ function A7RpaFundingSummary() {
   );
 }
 
-function QuarterlySnapshotScheduleCard() {
-  const { exercise } = useApp();
-
-  if (!exercise) return null;
-
-  const snapshotEntries = getQuarterlySnapshotEntries(exercise);
-  const fiscalYear = getFiscalYearForExercise(exercise);
-
-  return (
-    <Card title="Standard Fiscal Quarter Schedule" className="ct-section-card" style={{ marginBottom: 16 }}>
-      <div style={{ display: 'grid', gap: 14 }}>
-        <Typography.Text type="secondary">
-          These quarter windows are derived automatically from FY{fiscalYear} and can be reused in report notes and quarterly planning discussions.
-        </Typography.Text>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-          {snapshotEntries.map((entry) => (
-            <div
-              key={entry.key}
-              style={{
-                border: '1px solid #e8ecf1',
-                borderRadius: 12,
-                padding: '12px 14px',
-                background: '#fafcff',
-              }}
-            >
-              <Typography.Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
-                {entry.label}
-              </Typography.Text>
-              <Typography.Text strong style={{ fontSize: 16, color: '#102039' }}>
-                {entry.rangeLabel}
-              </Typography.Text>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
 function Pm27UnitProjectionTables() {
   const { exercise, budget } = useApp();
 
@@ -513,9 +473,9 @@ export default function Pm27CostProjections() {
       showBudgetDetails={false}
       showGrandTotals={false}
       beforeBudgetBreakdownSection={<BudgetOverviewSection />}
+      moveQuarterlySnapshotsToBudgetOverview
       extraSections={(
         <>
-          <QuarterlySnapshotScheduleCard />
           <A7RpaFundingSummary />
           <Pm27UnitProjectionTables />
         </>

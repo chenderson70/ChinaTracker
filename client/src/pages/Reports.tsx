@@ -1,9 +1,10 @@
 import { Card, Typography, Button, Row, Col, Table, Descriptions, Space, Spin, InputNumber, Form, message, Input } from 'antd';
 import { FileExcelOutlined, PrinterOutlined, EditOutlined, SaveOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { cloneElement, isValidElement, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { useApp } from '../components/AppLayout';
+import QuarterlyBudgetAllocationSection from '../components/QuarterlyBudgetAllocationSection';
 import * as api from '../services/api';
 import dayjs from 'dayjs';
 import { exportElementToPdf } from '../services/pdf';
@@ -236,11 +237,17 @@ interface ReportsPageProps {
   showGrandTotals?: boolean;
   showExerciseDetails?: boolean;
   showQuickPlanningSummary?: boolean;
+  showQuarterlyBudgetAllocation?: boolean;
   showFullBudgetBreakdown?: boolean;
   showTravelConfiguration?: boolean;
   beforeBudgetBreakdownSection?: ReactNode;
   extraSections?: ReactNode;
+  moveQuarterlySnapshotsToBudgetOverview?: boolean;
 }
+
+type BudgetOverviewInjectionProps = {
+  quarterlySnapshotsSection?: ReactNode;
+};
 
 type PrintBudgetFieldKey =
   | 'rpaMilPay'
@@ -285,10 +292,12 @@ export function ReportsPage({
   showGrandTotals = true,
   showExerciseDetails = true,
   showQuickPlanningSummary = true,
+  showQuarterlyBudgetAllocation = true,
   showFullBudgetBreakdown = true,
   showTravelConfiguration = true,
   beforeBudgetBreakdownSection,
   extraSections,
+  moveQuarterlySnapshotsToBudgetOverview = false,
 }: ReportsPageProps) {
   const { exercise, budget, exerciseId, pushUndoSnapshot } = useApp();
   const queryClient = useQueryClient();
@@ -764,6 +773,71 @@ export function ReportsPage({
     );
   };
 
+  const quarterlySnapshotsSection = (
+    <Card title="Standard Fiscal Quarter Windows" className="ct-section-card" style={{ marginBottom: 24 }}>
+      <div style={{ display: 'grid', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <Typography.Text type="secondary">
+            Derived automatically from the exercise fiscal year (FY{fiscalYear}) and available for report notes and PM27 planning.
+          </Typography.Text>
+          <Space wrap>
+            <Button size="small" onClick={() => handleInsertSnapshotNote('q1')}>
+              Insert Q1 Note
+            </Button>
+            <Button size="small" onClick={() => handleInsertSnapshotNote('q2')}>
+              Insert Q2 Note
+            </Button>
+            <Button size="small" onClick={() => handleInsertSnapshotNote('q3')}>
+              Insert Q3 Note
+            </Button>
+            <Button size="small" onClick={() => handleInsertSnapshotNote('q4')}>
+              Insert Q4 Note
+            </Button>
+            <Button size="small" type="primary" onClick={handleInsertAllSnapshotNotes}>
+              Insert All Snapshot Notes
+            </Button>
+          </Space>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+          {quarterlySnapshotEntries.map((entry) => (
+            <div
+              key={entry.key}
+              style={{
+                border: '1px solid #e8ecf1',
+                borderRadius: 12,
+                padding: '12px 14px',
+                background: '#fafcff',
+              }}
+            >
+              <Typography.Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
+                {entry.label}
+              </Typography.Text>
+              <Typography.Text strong style={{ fontSize: 15, color: '#102039' }}>
+                {entry.rangeLabel}
+              </Typography.Text>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+
+  const resolvedBeforeBudgetBreakdownSection = moveQuarterlySnapshotsToBudgetOverview
+    ? (
+      isValidElement(beforeBudgetBreakdownSection)
+        ? cloneElement(
+            beforeBudgetBreakdownSection as ReactElement<BudgetOverviewInjectionProps>,
+            { quarterlySnapshotsSection },
+          )
+        : (
+          <>
+            {quarterlySnapshotsSection}
+            {beforeBudgetBreakdownSection}
+          </>
+        )
+    )
+    : beforeBudgetBreakdownSection;
+
   useEffect(() => {
     skipBudgetTargetsSaveRef.current = true;
     skipTotalBudgetSaveRef.current = true;
@@ -1083,53 +1157,55 @@ export function ReportsPage({
             />
           </Descriptions.Item>
         </Descriptions>
-        <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid #eef2f6' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
-            <div>
-              <Typography.Text strong>Standard Fiscal Quarter Windows</Typography.Text>
-              <Typography.Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
-                Derived automatically from the exercise fiscal year (FY{fiscalYear}) and available for report notes and PM27 planning.
-              </Typography.Text>
-            </div>
-            <Space wrap>
-              <Button size="small" onClick={() => handleInsertSnapshotNote('q1')}>
-                Insert Q1 Note
-              </Button>
-              <Button size="small" onClick={() => handleInsertSnapshotNote('q2')}>
-                Insert Q2 Note
-              </Button>
-              <Button size="small" onClick={() => handleInsertSnapshotNote('q3')}>
-                Insert Q3 Note
-              </Button>
-              <Button size="small" onClick={() => handleInsertSnapshotNote('q4')}>
-                Insert Q4 Note
-              </Button>
-              <Button size="small" type="primary" onClick={handleInsertAllSnapshotNotes}>
-                Insert All Snapshot Notes
-              </Button>
-            </Space>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-            {quarterlySnapshotEntries.map((entry) => (
-              <div
-                key={entry.key}
-                style={{
-                  border: '1px solid #e8ecf1',
-                  borderRadius: 12,
-                  padding: '12px 14px',
-                  background: '#fafcff',
-                }}
-              >
-                <Typography.Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
-                  {entry.label}
-                </Typography.Text>
-                <Typography.Text strong style={{ fontSize: 15, color: '#102039' }}>
-                  {entry.rangeLabel}
+        {!moveQuarterlySnapshotsToBudgetOverview ? (
+          <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid #eef2f6' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
+              <div>
+                <Typography.Text strong>Standard Fiscal Quarter Windows</Typography.Text>
+                <Typography.Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
+                  Derived automatically from the exercise fiscal year (FY{fiscalYear}) and available for report notes and PM27 planning.
                 </Typography.Text>
               </div>
-            ))}
+              <Space wrap>
+                <Button size="small" onClick={() => handleInsertSnapshotNote('q1')}>
+                  Insert Q1 Note
+                </Button>
+                <Button size="small" onClick={() => handleInsertSnapshotNote('q2')}>
+                  Insert Q2 Note
+                </Button>
+                <Button size="small" onClick={() => handleInsertSnapshotNote('q3')}>
+                  Insert Q3 Note
+                </Button>
+                <Button size="small" onClick={() => handleInsertSnapshotNote('q4')}>
+                  Insert Q4 Note
+                </Button>
+                <Button size="small" type="primary" onClick={handleInsertAllSnapshotNotes}>
+                  Insert All Snapshot Notes
+                </Button>
+              </Space>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+              {quarterlySnapshotEntries.map((entry) => (
+                <div
+                  key={entry.key}
+                  style={{
+                    border: '1px solid #e8ecf1',
+                    borderRadius: 12,
+                    padding: '12px 14px',
+                    background: '#fafcff',
+                  }}
+                >
+                  <Typography.Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
+                    {entry.label}
+                  </Typography.Text>
+                  <Typography.Text strong style={{ fontSize: 15, color: '#102039' }}>
+                    {entry.rangeLabel}
+                  </Typography.Text>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
         <div className="ct-report-notes-layout">
           <div className="ct-report-notes-section">
             <Typography.Text strong>Estimations include:</Typography.Text>
@@ -1190,7 +1266,7 @@ export function ReportsPage({
       </Card>
       ) : null}
 
-      {beforeBudgetBreakdownSection}
+      {resolvedBeforeBudgetBreakdownSection}
 
       {showQuickPlanningSummary ? (
       <Card title="Quick Planning Summary" className="ct-section-card ct-quick-summary-card" style={{ marginBottom: 24 }}>
@@ -1228,6 +1304,10 @@ export function ReportsPage({
           </div>
         </div>
       </Card>
+      ) : null}
+
+      {showQuarterlyBudgetAllocation ? (
+        <QuarterlyBudgetAllocationSection appConfig={appConfig} />
       ) : null}
 
       {/* Full budget table */}

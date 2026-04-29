@@ -43,7 +43,11 @@ type DetailCard = {
   note?: string;
 };
 
-export default function BudgetOverviewSection() {
+type BudgetOverviewSectionProps = {
+  quarterlySnapshotsSection?: ReactNode;
+};
+
+export default function BudgetOverviewSection({ quarterlySnapshotsSection }: BudgetOverviewSectionProps) {
   const { exercise, budget } = useApp();
 
   if (!exercise || !budget) return null;
@@ -476,6 +480,8 @@ export default function BudgetOverviewSection() {
           </Col>
         ))}
       </Row>
+
+      {quarterlySnapshotsSection}
 
       <ExpenseNarrativesSection />
 
