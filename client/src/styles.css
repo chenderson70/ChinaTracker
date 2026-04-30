@@ -1532,7 +1532,7 @@ body {
 
 .ct-refinement-row-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) 180px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(320px, 1.35fr) minmax(160px, 0.45fr) 180px minmax(260px, 1fr) auto;
   gap: 16px;
   align-items: start;
 }
@@ -1555,6 +1555,11 @@ body {
   min-height: 128px !important;
   border-radius: 12px !important;
   resize: vertical;
+}
+
+.ct-refinement-input {
+  min-height: 44px;
+  border-radius: 12px !important;
 }
 
 .ct-refinement-status-field .ant-select {

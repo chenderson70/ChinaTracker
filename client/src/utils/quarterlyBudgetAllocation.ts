@@ -70,7 +70,7 @@ export const QUARTERLY_BUDGET_ROW_META: Array<{
   { key: 'totalOm', label: 'Total O&M', tone: 'om', alwaysShow: true },
   { key: 'rpaMilPay', label: 'RPA Mil Pay', tone: 'rpa', alwaysShow: true },
   { key: 'rpaTravelAndPerDiem', label: 'RPA Travel & Per Diem', tone: 'rpa', alwaysShow: true },
-  { key: 'rpaMeals', label: 'RPA Meals', tone: 'rpa', alwaysShow: true },
+  { key: 'rpaMeals', label: 'RPA Meals - Players', tone: 'rpa', alwaysShow: true },
   { key: 'totalRpa', label: 'Total RPA', tone: 'rpa', alwaysShow: true },
   { key: 'annualTour', label: 'Annual Tour', tone: 'annualTour' },
 ];
@@ -361,12 +361,20 @@ function getBucketLabel(fiscalYear: number, quarter: number): string {
   return `FY${String(fiscalYear).slice(-2)} Q${quarter}`;
 }
 
-export function getFiscalQuarterBucketsForExercise(
+function getFiscalQuarterBuckets(
   exercise: Pick<ExerciseDetail, 'startDate' | 'endDate'>,
+  dateRanges: Array<{ startDate: string; endDate: string }> = [],
 ): FiscalQuarterBucket[] {
   const exerciseDates = getExerciseDateContext(exercise);
-  const referenceStart = exerciseDates.startDate || exerciseDates.endDate || dayjs().format('YYYY-MM-DD');
-  const referenceEnd = exerciseDates.endDate || exerciseDates.startDate || referenceStart;
+  const dateAnchors = [
+    exerciseDates.startDate,
+    exerciseDates.endDate,
+    ...dateRanges.flatMap((range) => [range.startDate, range.endDate]),
+  ]
+    .map((dateValue) => normalizeDateString(dateValue))
+    .filter((dateValue): dateValue is string => !!dateValue);
+  const referenceStart = dateAnchors.length > 0 ? dateAnchors.sort()[0] : dayjs().format('YYYY-MM-DD');
+  const referenceEnd = dateAnchors.length > 0 ? [...dateAnchors].sort().slice(-1)[0] : referenceStart;
   const normalizedStart = dayjs(referenceStart);
   const normalizedEnd = dayjs(referenceEnd);
   const startDate = normalizedStart.isBefore(normalizedEnd, 'day') ? normalizedStart : normalizedEnd;
@@ -392,6 +400,12 @@ export function getFiscalQuarterBucketsForExercise(
   }
 
   return buckets;
+}
+
+export function getFiscalQuarterBucketsForExercise(
+  exercise: Pick<ExerciseDetail, 'startDate' | 'endDate'>,
+): FiscalQuarterBucket[] {
+  return getFiscalQuarterBuckets(exercise);
 }
 
 export function buildQuarterlyBudgetRateInputs(params: {
@@ -529,11 +543,51 @@ function getExerciseOmCategoryKey(category: string | null | undefined): Quarterl
   return 'otherOm';
 }
 
+function getAllocationDateRanges(exercise: ExerciseDetail, defaultDays: number): ResolvedDateRange[] {
+  const ranges: ResolvedDateRange[] = [];
+
+  for (const unitBudget of exercise.unitBudgets || []) {
+    for (const group of unitBudget.personnelGroups || []) {
+      const entries = (group.personnelEntries || []).length > 0
+        ? group.personnelEntries
+        : [createFallbackEntry(group)];
+
+      for (const entry of entries) {
+        if (Number(entry.count || 0) <= 0) continue;
+        const range = resolvePersonnelDateRange(exercise, group, entry, defaultDays);
+        if (range) ranges.push(range);
+      }
+
+      const hasLegacyGroupRental = (group.rentalCarCount || 0) > 0 || (group.rentalCarDays || 0) > 0;
+      if (hasLegacyGroupRental) {
+        const groupRange = resolveGroupDateRange(exercise, group, defaultDays);
+        if (groupRange) ranges.push(groupRange);
+      }
+    }
+
+    for (const line of unitBudget.executionCostLines || []) {
+      if (!Number(line.amount || 0)) continue;
+      const range = resolveCostLineDateRange(line, exercise);
+      if (range) ranges.push(range);
+    }
+  }
+
+  for (const line of exercise.omCostLines || []) {
+    if (!Number(line.amount || 0)) continue;
+    const range = resolveCostLineDateRange(line, exercise);
+    if (range) ranges.push(range);
+  }
+
+  return ranges;
+}
+
 export function buildQuarterlyBudgetAllocation(
   exercise: ExerciseDetail,
   rates: RateInputs,
 ): QuarterlyBudgetAllocationResult {
-  const buckets = getFiscalQuarterBucketsForExercise(exercise);
+  const defaultDays = exercise.defaultDutyDays || 1;
+  const dateRangesForBuckets = getAllocationDateRanges(exercise, defaultDays);
+  const buckets = getFiscalQuarterBuckets(exercise, dateRangesForBuckets);
   const totalsByBucket = Object.fromEntries(
     buckets.map((bucket) => [bucket.key, createEmptyTotals()]),
   ) as Record<string, QuarterlyBudgetCategoryTotals>;
@@ -542,8 +596,6 @@ export function buildQuarterlyBudgetAllocation(
     executionCostLines: 0,
     exerciseOmCostLines: 0,
   };
-
-  const defaultDays = exercise.defaultDutyDays || 1;
   const travel = exercise.travelConfig || {
     airfarePerPerson: rates.defaultAirfare,
     rentalCarDailyRate: rates.defaultRentalCarDailyRate,

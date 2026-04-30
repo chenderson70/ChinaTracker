@@ -87,6 +87,10 @@ type UndoEntry = {
   snapshot: ExerciseUndoSnapshot;
 };
 
+function normalizeUnitCodeInput(value: unknown): string {
+  return String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
 function toOptionalDateRangePayload(
   value: [Dayjs | null, Dayjs | null] | null | undefined,
 ): { startDate: string; endDate: string } {
@@ -349,7 +353,7 @@ export default function AppLayout() {
   const handleAddUnit = () => {
     unitForm.validateFields().then((values) => {
       addUnitMut.mutate({
-        unitCode: values.unitCode,
+        unitCode: normalizeUnitCodeInput(values.unitCode),
         template: values.template,
       });
     });
@@ -952,10 +956,18 @@ export default function AppLayout() {
             label="Unit Code"
             rules={[
               { required: true, message: 'Enter a unit code' },
-              { pattern: /^[A-Za-z0-9_-]{2,16}$/, message: 'Use 2-16 characters: letters, numbers, _ or -' },
+              {
+                validator: async (_rule, value) => {
+                  const normalized = normalizeUnitCodeInput(value);
+                  if (!normalized) throw new Error('Enter a unit code');
+                  if (!/^[A-Z0-9 _-]{2,32}$/.test(normalized)) {
+                    throw new Error('Use 2-32 characters: letters, numbers, spaces, _ or -');
+                  }
+                },
+              },
             ]}
           >
-            <Input placeholder="e.g., MED, J7, OPS-1" onChange={(e) => unitForm.setFieldValue('unitCode', e.target.value.toUpperCase())} />
+            <Input placeholder="e.g., 452 AMDS, MED, J7, OPS-1" onChange={(e) => unitForm.setFieldValue('unitCode', e.target.value.toUpperCase())} />
           </Form.Item>
           <Form.Item name="template" label="Personnel Template" rules={[{ required: true }]}>
             <Select

@@ -105,7 +105,7 @@ export default function Balance() {
   const rpaBreakdownData = [
     { key: 'milpay', category: 'RPA Mil Pay', amount: rpaMilPayTotal },
     { key: 'travel', category: 'RPA Travel & Per Diem', amount: rpaTravelAndPerDiemTotal },
-    { key: 'meals', category: 'RPA Meals', amount: rpaRationsTotal },
+    { key: 'meals', category: 'RPA Meals - Players', amount: rpaRationsTotal },
     { key: 'at-milpay', category: 'Annual Tour Mil Pay', amount: annualTourMilPay },
     { key: 'at-travel', category: 'Annual Tour Travel', amount: annualTourTravel },
   ].filter((row) => row.amount > 0);

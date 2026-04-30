@@ -73,7 +73,7 @@ async function seedExerciseDefaults(exerciseId: string) {
       ];
       for (const g of groups) {
         await prisma.personnelGroup.create({
-          data: { unitBudgetId: ub.id, role: g.role, fundingType: g.fundingType, location: 'GULFPORT' },
+          data: { unitBudgetId: ub.id, role: g.role, fundingType: g.fundingType, location: 'FORT_HUNTER_LIGGETT' },
         });
       }
     } else {
@@ -85,7 +85,7 @@ async function seedExerciseDefaults(exerciseId: string) {
       ];
       for (const g of groups) {
         await prisma.personnelGroup.create({
-          data: { unitBudgetId: ub.id, role: g.role, fundingType: g.fundingType, location: 'GULFPORT' },
+          data: { unitBudgetId: ub.id, role: g.role, fundingType: g.fundingType, location: 'FORT_HUNTER_LIGGETT' },
         });
       }
     }
@@ -337,7 +337,7 @@ router.post('/:id/units', async (req: Request, res: Response) => {
             unitBudgetId: ub.id,
             role,
             fundingType,
-            location: 'GULFPORT',
+            location: 'FORT_HUNTER_LIGGETT',
           },
         });
       }

@@ -10,7 +10,7 @@ datasource db {
 // UnitCode: SG | AE | CAB | A7
 // PersonnelRole: PLAYER | WHITE_CELL | PLANNING | SUPPORT
 // FundingType: RPA | OM
-// Location: GULFPORT | CAMP_SHELBY
+// Location: configurable per diem location code
 // OmCategory: CONTRACT | TRANSPORTATION | BILLETING | PORT_A_POTTY | RENTALS_VSCOS | CONSUMABLES | WRM | OTHER
 
 model Exercise {

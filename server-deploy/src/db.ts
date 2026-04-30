@@ -33,8 +33,9 @@ const BASE_CPD_RATES = [
 ];
 
 const BASE_PER_DIEM = [
-	{ location: 'GULFPORT', lodgingRate: 98, mieRate: 64 },
-	{ location: 'CAMP_SHELBY', lodgingRate: 96, mieRate: 59 },
+	{ location: 'FORT_HUNTER_LIGGETT', lodgingRate: 209, mieRate: 92 },
+	{ location: 'WARNER_ROBINS', lodgingRate: 110, mieRate: 68 },
+	{ location: 'MARIETTA', lodgingRate: 126, mieRate: 74 },
 ];
 
 const BASE_CONFIG: Array<{ key: string; value: string }> = [

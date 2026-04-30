@@ -634,7 +634,7 @@ export function ReportsPage({
       fields: [
         { key: 'rpaMilPay', label: 'RPA Mil Pay' },
         { key: 'rpaTravelAndPerDiem', label: 'RPA Travel & Per Diem' },
-        { key: 'rpaMeals', label: 'RPA Meals' },
+        { key: 'rpaMeals', label: 'RPA Meals - Players' },
       ],
     },
     {
@@ -660,7 +660,7 @@ export function ReportsPage({
     { title: 'Unit', dataIndex: 'unit', width: 60, render: renderBudgetLabel, align: 'center' as const },
     { title: 'RPA Mil Pay', dataIndex: 'rpaMilPay', render: renderBudgetAmount, align: 'center' as const },
     { title: 'RPA Travel & Per Diem', dataIndex: 'rpaTravelAndPerDiem', render: renderBudgetAmount, align: 'center' as const },
-    { title: 'RPA Meals', dataIndex: 'rpaMeals', render: renderBudgetMealsAmount, align: 'center' as const },
+    { title: 'RPA Meals - Players', dataIndex: 'rpaMeals', render: renderBudgetMealsAmount, align: 'center' as const },
     { title: 'Total RPA', dataIndex: 'totalRpa', render: renderBudgetAmount, align: 'center' as const },
     { title: 'O&M', dataIndex: 'totalOm', render: renderBudgetAmount, align: 'center' as const },
     { title: 'Total', dataIndex: 'total', render: renderBudgetAmount, align: 'center' as const },

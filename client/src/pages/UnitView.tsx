@@ -668,6 +668,8 @@ export default function UnitView() {
   const entryModalIsPlanning = entryModalGroup?.role === 'PLANNING';
   const entryModalIsWhiteCell = entryModalGroup?.role === 'WHITE_CELL';
   const entryModalIsPlayerExecution = entryModalGroup?.role === 'PLAYER';
+  const entryModalUsesExerciseDates =
+    entryModalGroup?.role === 'PLAYER' || entryModalGroup?.role === 'ANNUAL_TOUR';
   const entryModalSupportsRentalCars =
     entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'WHITE_CELL' || entryModalGroup?.role === 'SUPPORT';
   const entryModalUsesBinaryRentalCar = entryModalGroup?.role === 'PLANNING';
@@ -732,8 +734,8 @@ export default function UnitView() {
     entryForm.setFieldsValue({
       rankCode: undefined,
       count: 1,
-      dateRange: entryModalIsPlayerExecution ? exerciseDateDefaults.dateRange : null,
-      dutyDays: entryModalIsPlayerExecution ? exerciseDateDefaults.dutyDays : (exercise?.defaultDutyDays ?? 1),
+      dateRange: entryModalUsesExerciseDates ? exerciseDateDefaults.dateRange : null,
+      dutyDays: entryModalUsesExerciseDates ? exerciseDateDefaults.dutyDays : (exercise?.defaultDutyDays ?? 1),
       hasRentalCar: false,
       rentalCarCount: 0,
       months: undefined,
@@ -748,7 +750,7 @@ export default function UnitView() {
     entryModal,
     entryModalGroup?.isLocal,
     entryModalGroup?.location,
-    entryModalIsPlayerExecution,
+    entryModalUsesExerciseDates,
     exercise?.defaultDutyDays,
     exerciseDateDefaults.dateRange,
     exerciseDateDefaults.dutyDays,
@@ -1285,7 +1287,7 @@ export default function UnitView() {
     ? {
         id: '__derived_player_meals__',
         key: '__derived_player_meals__',
-        category: 'RPA Meals',
+        category: 'RPA Meals - Players',
         fundingType: 'RPA',
         amount: currentUnitRpaMealsResponsibility,
         notes: 'Auto-populated from exercise-wide RPA meal responsibility',
@@ -1791,7 +1793,10 @@ export default function UnitView() {
         onOk={async () => {
           try {
             const values = await entryForm.validateFields();
-            const { startDate, endDate } = getDateRangePayload(values.dateRange);
+            const submittedDateRange = values.dateRange ?? (
+              entryModalUsesExerciseDates ? exerciseDateDefaults.dateRange : null
+            );
+            const { startDate, endDate } = getDateRangePayload(submittedDateRange);
             const dateRangeDutyDays = calculateInclusiveDateRangeDays(startDate, endDate);
             const calculatedDutyDays = entryModalIsPlanning && values.months !== undefined && values.months !== null
               ? monthsToDutyDays(values.months)

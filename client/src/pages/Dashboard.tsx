@@ -215,7 +215,7 @@ export default function Dashboard() {
       detailLines: [
         { label: 'RPA Mil Pay', value: fmt(rpaMilPayTotal) },
         { label: 'RPA Travel & Per Diem', value: fmt(rpaTravelAndPerDiemTotal) },
-        { label: 'RPA Meals', value: fmt(rpaRationsTotal) },
+        { label: 'RPA Meals - Players', value: fmt(rpaRationsTotal) },
       ],
     },
     {
@@ -263,7 +263,7 @@ export default function Dashboard() {
       detailLines: [
         { label: 'RPA Mil Pay', value: fmt(applyPlusUp(rpaMilPayTotal)) },
         { label: 'RPA Travel & Per Diem', value: fmt(applyPlusUp(rpaTravelAndPerDiemTotal)) },
-        { label: 'RPA Meals', value: fmt(applyPlusUp(rpaRationsTotal)) },
+        { label: 'RPA Meals - Players', value: fmt(applyPlusUp(rpaRationsTotal)) },
       ],
     },
     {
@@ -528,7 +528,7 @@ export default function Dashboard() {
                 <div style={{ marginTop: 10, fontSize: 15, color: '#596577', lineHeight: 1.45 }}>
                   <div>RPA Mil Pay: {fmt(rpaMilPayTotal)}</div>
                   <div>RPA Travel &amp; Per Diem: {fmt(rpaTravelAndPerDiemTotal)}</div>
-                  <div>RPA Meals: {fmt(rpaRationsTotal)}</div>
+                  <div>RPA Meals - Players: {fmt(rpaRationsTotal)}</div>
                 </div>
               </div>
             </div>

@@ -198,7 +198,7 @@ const projectionSections: Array<{ key: ProjectionFieldKey; label: string }> = [
   { key: 'rpaMilPay', label: 'RPA Mil Pay' },
   { key: 'planningOm', label: 'Planning O&M' },
   { key: 'rpaTravelAndPerDiem', label: 'RPA Travel & Per Diem' },
-  { key: 'rpaMeals', label: 'RPA Meals' },
+  { key: 'rpaMeals', label: 'RPA Meals - Players' },
   { key: 'annualTour', label: 'Annual Tour' },
   { key: 'playerOm', label: 'Player O&M' },
   { key: 'executionOm', label: 'Execution O&M' },
@@ -324,7 +324,7 @@ function A7RpaFundingSummary() {
   const summaryItems = [
     { label: 'RPA Mil Pay', value: rpaCategoryTotals.milPay },
     { label: 'RPA Travel & Per Diem', value: rpaCategoryTotals.travelAndPerDiem },
-    { label: 'RPA Meals', value: rpaCategoryTotals.meals },
+    { label: 'RPA Meals - Players', value: rpaCategoryTotals.meals },
   ];
 
   return (
@@ -392,7 +392,7 @@ function Pm27UnitProjectionTables() {
     { title: 'RPA Mil Pay', dataIndex: 'rpaMilPay', key: 'rpaMilPay', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Planning O&M', dataIndex: 'planningOm', key: 'planningOm', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'RPA Travel & Per Diem', dataIndex: 'rpaTravelAndPerDiem', key: 'rpaTravelAndPerDiem', width: 260, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
-    { title: 'RPA Meals', dataIndex: 'rpaMeals', key: 'rpaMeals', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
+    { title: 'RPA Meals - Players', dataIndex: 'rpaMeals', key: 'rpaMeals', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Annual Tour', dataIndex: 'annualTour', key: 'annualTour', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Player O&M', dataIndex: 'playerOm', key: 'playerOm', width: 240, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },
     { title: 'Execution O&M', dataIndex: 'executionOm', key: 'executionOm', width: 260, render: renderProjectionCell, onCell: () => ({ style: { verticalAlign: 'top' } }) },

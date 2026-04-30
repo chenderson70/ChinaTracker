@@ -84,7 +84,7 @@ router.post('/personnel-groups/:groupId/clear', async (req: Request, res: Respon
         data: {
           paxCount: 0,
           dutyDays: null,
-          location: 'GULFPORT',
+          location: 'FORT_HUNTER_LIGGETT',
           isLongTour: false,
           isLocal: false,
           airfarePerPerson: null,

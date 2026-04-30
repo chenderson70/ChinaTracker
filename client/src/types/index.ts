@@ -20,6 +20,7 @@ export type RefinementStatus = 'IN_PROGRESS' | 'COMPLETE';
 export interface RefinementItem {
   id: string;
   improvementNote: string;
+  requestor: string;
   status: RefinementStatus;
   statusNote: string;
 }

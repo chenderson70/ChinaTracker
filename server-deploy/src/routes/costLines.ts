@@ -75,7 +75,7 @@ router.post('/units/:unitId/clear', async (req: Request, res: Response) => {
         data: {
           paxCount: 0,
           dutyDays: null,
-          location: 'GULFPORT',
+          location: 'FORT_HUNTER_LIGGETT',
           isLongTour: false,
           isLocal: false,
           airfarePerPerson: null,

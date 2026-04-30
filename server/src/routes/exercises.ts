@@ -11,6 +11,7 @@ type RefinementStatus = 'IN_PROGRESS' | 'COMPLETE';
 type RefinementItem = {
   id: string;
   improvementNote: string;
+  requestor: string;
   status: RefinementStatus;
   statusNote: string;
 };
@@ -140,6 +141,10 @@ function parseOptionalDateField(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function normalizeUnitCodeInput(value: unknown): string {
+  return String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
 function createFallbackRefinementId(index: number): string {
   return `refinement-${Date.now()}-${index}-${Math.random().toString(16).slice(2, 10)}`;
 }
@@ -151,12 +156,14 @@ function normalizeRefinementsInput(value: unknown): RefinementItem[] {
     .map((item, index) => {
       const candidate = item && typeof item === 'object' ? item as Record<string, unknown> : {};
       const improvementNote = String(candidate.improvementNote ?? '');
+      const requestor = String(candidate.requestor ?? '');
       const statusNote = String(candidate.statusNote ?? '');
 
       const rawId = String(candidate.id || '').trim();
       return {
         id: rawId || createFallbackRefinementId(index),
         improvementNote,
+        requestor,
         status: String(candidate.status || '').toUpperCase() === 'COMPLETE' ? 'COMPLETE' : 'IN_PROGRESS',
         statusNote,
       } satisfies RefinementItem;
@@ -1061,7 +1068,7 @@ router.post('/:id/units', async (req: Request, res: Response) => {
     const exercise = await prisma.exercise.findFirst({ where: { id: req.params.id, ownerUserId: userId } });
     if (!exercise) return res.status(404).json({ error: 'Exercise not found' });
 
-    const unitCodeRaw = String(req.body?.unitCode || '').trim().toUpperCase();
+    const unitCodeRaw = normalizeUnitCodeInput(req.body?.unitCode);
     if (!unitCodeRaw) return res.status(400).json({ error: 'Unit code is required' });
 
     const existing = await prisma.unitBudget.findFirst({ where: { exerciseId: req.params.id, unitCode: unitCodeRaw } });

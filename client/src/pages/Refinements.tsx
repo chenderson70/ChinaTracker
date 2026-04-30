@@ -23,6 +23,7 @@ function createBlankRefinement(): RefinementItem {
   return {
     id: createRefinementId(),
     improvementNote: '',
+    requestor: '',
     status: 'IN_PROGRESS',
     statusNote: '',
   };
@@ -34,6 +35,7 @@ function normalizeRefinements(items: RefinementItem[] | undefined | null): Refin
   return items.map((item) => ({
     id: String(item?.id || createRefinementId()),
     improvementNote: String(item?.improvementNote ?? ''),
+    requestor: String(item?.requestor ?? ''),
     status: item?.status === 'COMPLETE' ? 'COMPLETE' : 'IN_PROGRESS',
     statusNote: String(item?.statusNote ?? ''),
   }));
@@ -116,7 +118,7 @@ export default function Refinements() {
 
   const handleRefinementChange = (
     refinementId: string,
-    field: keyof Pick<RefinementItem, 'improvementNote' | 'status' | 'statusNote'>,
+    field: keyof Pick<RefinementItem, 'improvementNote' | 'requestor' | 'status' | 'statusNote'>,
     value: string,
   ) => {
     setDraftRefinements((current) =>
@@ -167,6 +169,18 @@ export default function Refinements() {
                       onChange={(event) => handleRefinementChange(refinement.id, 'improvementNote', event.target.value)}
                       autoSize={{ minRows: 5, maxRows: 10 }}
                       placeholder="Enter an improvement note or refinement item"
+                    />
+                  </div>
+
+                  <div className="ct-refinement-field">
+                    <Typography.Text className="ct-refinement-field-label">
+                      Requestor
+                    </Typography.Text>
+                    <Input
+                      className="ct-refinement-input"
+                      value={refinement.requestor}
+                      onChange={(event) => handleRefinementChange(refinement.id, 'requestor', event.target.value)}
+                      placeholder="Enter requestor"
                     />
                   </div>
 

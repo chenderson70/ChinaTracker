@@ -155,7 +155,7 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
       for (const entry of calcEntries) {
         const entryCount = entry.count || 0;
         const entryDays = entry.dutyDays || pg.dutyDays || defaultDays;
-        const entryLoc = entry.location || pg.location || 'GULFPORT';
+        const entryLoc = entry.location || pg.location || 'FORT_HUNTER_LIGGETT';
         const entryIsLocal = isLocalFlag(entry.isLocal) || isLocalFlag(pg.isLocal);
         const pdRates = rates.perDiemRates[entryLoc] || { lodging: 0, mie: 0 };
 
