@@ -140,6 +140,7 @@ async function ensureSqliteCompatibilityColumns(): Promise<void> {
 	await ensureSqliteColumn('exercises', 'refinements_json', `TEXT NOT NULL DEFAULT '[]'`);
 	await ensureSqliteColumn('exercises', 'expense_narratives_json', `TEXT NOT NULL DEFAULT '[]'`);
 	await ensureSqliteColumn('exercises', 'exercise_template', `TEXT NOT NULL DEFAULT 'PATRIOT_MEDIC'`);
+	await ensureSqliteColumn('exercises', 'planning_conference_dates_json', `TEXT NOT NULL DEFAULT '{}'`);
 	await ensureSqliteColumn('exercises', 'quarterly_snapshots_json', `TEXT NOT NULL DEFAULT '{}'`);
 }
 

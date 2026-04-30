@@ -34,13 +34,14 @@ import {
   RollbackOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import * as api from '../services/api';
 import type {
   Exercise,
   ExerciseDetail,
   BudgetResult,
   ExerciseTemplate,
+  PlanningConferenceDates,
   ExerciseUndoSnapshot,
 } from '../types';
 import { getStoredUser } from '../services/auth';
@@ -51,6 +52,10 @@ import {
   EXERCISE_TEMPLATE_OPTIONS,
   normalizeExerciseTemplate,
 } from '../utils/exerciseTemplates';
+import {
+  getEmptyPlanningConferenceDates,
+  normalizePlanningConferenceDates,
+} from '../utils/planningConferenceDates';
 
 const { Header, Sider, Content } = Layout;
 
@@ -81,6 +86,54 @@ type UndoEntry = {
   serialized: string;
   snapshot: ExerciseUndoSnapshot;
 };
+
+function toOptionalDateRangePayload(
+  value: [Dayjs | null, Dayjs | null] | null | undefined,
+): { startDate: string; endDate: string } {
+  return {
+    startDate: value?.[0] ? value[0].format('YYYY-MM-DD') : '',
+    endDate: value?.[1] ? value[1].format('YYYY-MM-DD') : '',
+  };
+}
+
+function getPlanningConferenceDatesPayload(
+  value: {
+    initial?: [Dayjs | null, Dayjs | null] | null;
+    mid?: [Dayjs | null, Dayjs | null] | null;
+    final?: [Dayjs | null, Dayjs | null] | null;
+  } | null | undefined,
+): PlanningConferenceDates {
+  return {
+    initial: toOptionalDateRangePayload(value?.initial),
+    mid: toOptionalDateRangePayload(value?.mid),
+    final: toOptionalDateRangePayload(value?.final),
+  };
+}
+
+function toFormDateRange(
+  startDate: string | null | undefined,
+  endDate: string | null | undefined,
+): [Dayjs, Dayjs] | null {
+  if (!startDate || !endDate) return null;
+  const start = dayjs(startDate);
+  const end = dayjs(endDate);
+  return start.isValid() && end.isValid() ? [start, end] : null;
+}
+
+function getPlanningConferenceDateFormValues(
+  value: PlanningConferenceDates | null | undefined,
+): {
+  initial: [Dayjs, Dayjs] | null;
+  mid: [Dayjs, Dayjs] | null;
+  final: [Dayjs, Dayjs] | null;
+} {
+  const normalized = normalizePlanningConferenceDates(value);
+  return {
+    initial: toFormDateRange(normalized.initial.startDate, normalized.initial.endDate),
+    mid: toFormDateRange(normalized.mid.startDate, normalized.mid.endDate),
+    final: toFormDateRange(normalized.final.startDate, normalized.final.endDate),
+  };
+}
 
 function cloneUndoSnapshot(exercise: ExerciseDetail, appConfig: Record<string, string>): ExerciseUndoSnapshot {
   return JSON.parse(JSON.stringify({
@@ -231,6 +284,7 @@ export default function AppLayout() {
       createMut.mutate({
         name: vals.name,
         exerciseTemplate: vals.exerciseTemplate,
+        planningConferenceDates: getPlanningConferenceDatesPayload(vals.planningConferenceDates),
         startDate: vals.dates[0].format('YYYY-MM-DD'),
         endDate: vals.dates[1].format('YYYY-MM-DD'),
         defaultDutyDays: vals.defaultDutyDays,
@@ -242,6 +296,7 @@ export default function AppLayout() {
     mutationFn: async (data: {
       name: string;
       exerciseTemplate: ExerciseTemplate;
+      planningConferenceDates: PlanningConferenceDates;
       startDate: string;
       endDate: string;
       defaultDutyDays: number;
@@ -266,6 +321,7 @@ export default function AppLayout() {
       editExerciseMut.mutate({
         name: vals.name,
         exerciseTemplate: vals.exerciseTemplate,
+        planningConferenceDates: getPlanningConferenceDatesPayload(vals.planningConferenceDates),
         startDate: vals.dates[0].format('YYYY-MM-DD'),
         endDate: vals.dates[1].format('YYYY-MM-DD'),
         defaultDutyDays: vals.defaultDutyDays,
@@ -553,6 +609,7 @@ export default function AppLayout() {
       name: exercise.name,
       exerciseTemplate: normalizeExerciseTemplate(exercise.exerciseTemplate),
       dates: [dayjs(exercise.startDate), dayjs(exercise.endDate)],
+      planningConferenceDates: getPlanningConferenceDateFormValues(exercise.planningConferenceDates),
       defaultDutyDays: exercise.defaultDutyDays,
     });
   }, [editExerciseOpen, exercise, editExerciseForm]);
@@ -786,6 +843,7 @@ export default function AppLayout() {
           initialValues={{
             defaultDutyDays: 14,
             exerciseTemplate: DEFAULT_EXERCISE_TEMPLATE,
+            planningConferenceDates: getPlanningConferenceDateFormValues(getEmptyPlanningConferenceDates()),
           }}
         >
           <Form.Item name="name" label="Exercise Name" rules={[{ required: true }]}>
@@ -809,6 +867,15 @@ export default function AppLayout() {
                 }
               }}
             />
+          </Form.Item>
+          <Form.Item name={['planningConferenceDates', 'initial']} label="Initial Planning Conference">
+            <DatePicker.RangePicker style={{ width: '100%' }} size="large" />
+          </Form.Item>
+          <Form.Item name={['planningConferenceDates', 'mid']} label="Mid Planning Conference">
+            <DatePicker.RangePicker style={{ width: '100%' }} size="large" />
+          </Form.Item>
+          <Form.Item name={['planningConferenceDates', 'final']} label="Final Planning Conference">
+            <DatePicker.RangePicker style={{ width: '100%' }} size="large" />
           </Form.Item>
           <Form.Item name="defaultDutyDays" label="Default Duty Days">
             <InputNumber min={1} max={365} style={{ width: '100%' }} size="large" />
@@ -851,6 +918,15 @@ export default function AppLayout() {
                 }
               }}
             />
+          </Form.Item>
+          <Form.Item name={['planningConferenceDates', 'initial']} label="Initial Planning Conference">
+            <DatePicker.RangePicker style={{ width: '100%' }} size="large" />
+          </Form.Item>
+          <Form.Item name={['planningConferenceDates', 'mid']} label="Mid Planning Conference">
+            <DatePicker.RangePicker style={{ width: '100%' }} size="large" />
+          </Form.Item>
+          <Form.Item name={['planningConferenceDates', 'final']} label="Final Planning Conference">
+            <DatePicker.RangePicker style={{ width: '100%' }} size="large" />
           </Form.Item>
           <Form.Item name="defaultDutyDays" label="Default Duty Days" rules={[{ required: true }]}>
             <InputNumber min={1} max={365} style={{ width: '100%' }} size="large" />

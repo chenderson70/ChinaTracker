@@ -27,11 +27,25 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { useApp } from '../components/AppLayout';
 import InlineDateInput from '../components/InlineDateInput';
 import * as api from '../services/api';
-import type { ExerciseDetail, PersonnelEntry, PersonnelGroup, UnitBudget, FundingType, UnitCalc, GroupCalc, PerDiemRate } from '../types';
+import type {
+  ExerciseDetail,
+  PersonnelEntry,
+  PersonnelGroup,
+  UnitBudget,
+  FundingType,
+  UnitCalc,
+  GroupCalc,
+  PerDiemRate,
+  PlanningConferenceDates,
+} from '../types';
 import { getUnitDisplayLabel } from '../utils/unitLabels';
 import { getRpaMealsResponsibilityByUnit } from '../utils/budgetSummary';
 import { calculateInclusiveDateRangeDays, normalizeDateString } from '../utils/dateRanges';
 import { sortUiPerDiemLocations } from '../utils/perDiemDefaults';
+import {
+  getPlanningConferenceDutyDays,
+  getPlanningConferenceRangeForNote,
+} from '../utils/planningConferenceDates';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const formatNumberInput = (value: string | number | null | undefined) => {
@@ -222,6 +236,29 @@ function buildPersonnelEntryDatePatch(
     ...(field === 'startDate' && normalizedStartDate && normalizedDutyDays ? { endDate: nextEndDate } : {}),
     ...(nextDutyDays ? { dutyDays: nextDutyDays } : {}),
   };
+}
+
+function buildPlanningConferenceEntryPatch(
+  note: string | null | undefined,
+  planningConferenceDates: PlanningConferenceDates | null | undefined,
+) {
+  const normalizedNote = String(note || '').trim();
+  const nextData: Record<string, string | number | null> = {
+    note: normalizedNote || null,
+  };
+  const range = getPlanningConferenceRangeForNote(planningConferenceDates, normalizedNote);
+  if (!range) {
+    return nextData;
+  }
+
+  nextData.startDate = range.startDate;
+  nextData.endDate = range.endDate;
+  const dutyDays = getPlanningConferenceDutyDays(range);
+  if (dutyDays) {
+    nextData.dutyDays = dutyDays;
+  }
+
+  return nextData;
 }
 
 function EntryAutoCompleteInput({
@@ -636,6 +673,20 @@ export default function UnitView() {
   const entryModalUsesBinaryRentalCar = entryModalGroup?.role === 'PLANNING';
   const entryModalAllowsTravelOnly = entryModalGroup?.fundingType === 'RPA'
     && (entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'SUPPORT');
+  const handleEntryModalPlanningNoteChange = useCallback((nextValue: string) => {
+    setEntryModalNoteDraft(nextValue);
+
+    if (!entryModalIsPlanning) return;
+    const range = getPlanningConferenceRangeForNote(exercise?.planningConferenceDates, nextValue);
+    if (!range) return;
+
+    const dutyDays = getPlanningConferenceDutyDays(range);
+    entryForm.setFieldsValue({
+      months: undefined,
+      dateRange: [dayjs(range.startDate), dayjs(range.endDate)],
+      dutyDays: dutyDays ?? undefined,
+    });
+  }, [entryForm, entryModalIsPlanning, exercise?.planningConferenceDates]);
 
   const findGroup = (role: string, ft: FundingType) =>
     personnelGroups.find((g: PersonnelGroup) => g.role === role && g.fundingType === ft);
@@ -1079,7 +1130,10 @@ export default function UnitView() {
                     options={PLANNING_NOTE_OPTIONS}
                     placeholder="Select or type a note"
                     onSave={(nextValue) => {
-                      updateEntryMut.mutate({ id: row.id, data: { note: nextValue } });
+                      updateEntryMut.mutate({
+                        id: row.id,
+                        data: buildPlanningConferenceEntryPatch(nextValue, exercise?.planningConferenceDates),
+                      });
                     }}
                   />
                 ),
@@ -1882,8 +1936,8 @@ export default function UnitView() {
                 filterOption={(inputValue, option) =>
                   String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
                 }
-                onChange={setEntryModalNoteDraft}
-                onSelect={setEntryModalNoteDraft}
+                onChange={entryModalIsPlanning ? handleEntryModalPlanningNoteChange : setEntryModalNoteDraft}
+                onSelect={entryModalIsPlanning ? handleEntryModalPlanningNoteChange : setEntryModalNoteDraft}
               >
                 <Input />
               </AutoComplete>

@@ -19,6 +19,7 @@ model Exercise {
   ownerUserId     String         @map("owner_user_id")
   name            String
   exerciseTemplate String        @default("PATRIOT_MEDIC") @map("exercise_template")
+  planningConferenceDatesJson String @default("{}") @map("planning_conference_dates_json")
   quarterlySnapshotsJson String  @default("{}") @map("quarterly_snapshots_json")
   totalBudget     Float          @default(0) @map("total_budget")
   startDate       DateTime       @map("start_date")

@@ -17,6 +17,7 @@ import type {
   ExpenseNarrativeItem,
   ExerciseUndoSnapshot,
   ExerciseTemplate,
+  PlanningConferenceDates,
   QuarterlySnapshotDates,
 } from '../types';
 import { clearAuthSession, getAuthToken, getRefreshToken, setAuthSession } from './auth';
@@ -207,6 +208,7 @@ export async function getExercise(id: string): Promise<ExerciseDetail> {
 export async function createExercise(data: {
   name: string;
   exerciseTemplate?: ExerciseTemplate;
+  planningConferenceDates?: PlanningConferenceDates;
   quarterlySnapshots?: QuarterlySnapshotDates;
   totalBudget?: number;
   startDate: string;
@@ -622,6 +624,7 @@ export async function importAllData(json: string): Promise<void> {
     let created = await createExercise({
       name: sourceExercise.name,
       exerciseTemplate: sourceExercise.exerciseTemplate,
+      planningConferenceDates: sourceExercise.planningConferenceDates,
       quarterlySnapshots: sourceExercise.quarterlySnapshots,
       totalBudget: sourceExercise.totalBudget ?? 0,
       startDate: sourceExercise.startDate,

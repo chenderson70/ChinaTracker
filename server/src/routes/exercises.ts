@@ -29,6 +29,15 @@ type QuarterlySnapshotDates = {
   q4: string;
 };
 
+type PlanningConferenceKey = 'initial' | 'mid' | 'final';
+
+type PlanningConferenceDateRange = {
+  startDate: string;
+  endDate: string;
+};
+
+type PlanningConferenceDates = Record<PlanningConferenceKey, PlanningConferenceDateRange>;
+
 type ExerciseTemplate = 'PATRIOT_MEDIC' | 'PATRIOT_PHOENIX' | 'PATRIOT_FORGE';
 
 const DEFAULT_EXERCISE_TEMPLATE: ExerciseTemplate = 'PATRIOT_MEDIC';
@@ -43,6 +52,12 @@ const EMPTY_QUARTERLY_SNAPSHOTS: QuarterlySnapshotDates = {
   q2: '',
   q3: '',
   q4: '',
+};
+
+const EMPTY_PLANNING_CONFERENCE_DATES: PlanningConferenceDates = {
+  initial: { startDate: '', endDate: '' },
+  mid: { startDate: '', endDate: '' },
+  final: { startDate: '', endDate: '' },
 };
 
 function normalizeExerciseTemplate(value: unknown): ExerciseTemplate {
@@ -61,6 +76,29 @@ function normalizeQuarterlySnapshotsInput(value: unknown): QuarterlySnapshotDate
   };
 }
 
+function normalizePlanningConferenceDateRangeInput(value: unknown): PlanningConferenceDateRange {
+  const candidate = value && typeof value === 'object'
+    ? value as Partial<Record<keyof PlanningConferenceDateRange, unknown>>
+    : {};
+
+  return {
+    startDate: String(candidate.startDate ?? '').trim(),
+    endDate: String(candidate.endDate ?? '').trim(),
+  };
+}
+
+function normalizePlanningConferenceDatesInput(value: unknown): PlanningConferenceDates {
+  const candidate = value && typeof value === 'object'
+    ? value as Partial<Record<PlanningConferenceKey, unknown>>
+    : {};
+
+  return {
+    initial: normalizePlanningConferenceDateRangeInput(candidate.initial),
+    mid: normalizePlanningConferenceDateRangeInput(candidate.mid),
+    final: normalizePlanningConferenceDateRangeInput(candidate.final),
+  };
+}
+
 function parseQuarterlySnapshotsJson(value: unknown): QuarterlySnapshotDates {
   if (typeof value !== 'string' || value.trim().length === 0) {
     return { ...EMPTY_QUARTERLY_SNAPSHOTS };
@@ -70,6 +108,26 @@ function parseQuarterlySnapshotsJson(value: unknown): QuarterlySnapshotDates {
     return normalizeQuarterlySnapshotsInput(JSON.parse(value));
   } catch {
     return { ...EMPTY_QUARTERLY_SNAPSHOTS };
+  }
+}
+
+function parsePlanningConferenceDatesJson(value: unknown): PlanningConferenceDates {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return {
+      initial: { ...EMPTY_PLANNING_CONFERENCE_DATES.initial },
+      mid: { ...EMPTY_PLANNING_CONFERENCE_DATES.mid },
+      final: { ...EMPTY_PLANNING_CONFERENCE_DATES.final },
+    };
+  }
+
+  try {
+    return normalizePlanningConferenceDatesInput(JSON.parse(value));
+  } catch {
+    return {
+      initial: { ...EMPTY_PLANNING_CONFERENCE_DATES.initial },
+      mid: { ...EMPTY_PLANNING_CONFERENCE_DATES.mid },
+      final: { ...EMPTY_PLANNING_CONFERENCE_DATES.final },
+    };
   }
 }
 
@@ -148,15 +206,17 @@ function parseExpenseNarrativesJson(value: unknown): ExpenseNarrativeItem[] {
 function serializeExercise<T extends { refinementsJson?: string | null }>(exercise: T | null) {
   if (!exercise) return exercise;
 
-  const { refinementsJson, expenseNarrativesJson, quarterlySnapshotsJson, ...rest } = exercise as T & {
+  const { refinementsJson, expenseNarrativesJson, planningConferenceDatesJson, quarterlySnapshotsJson, ...rest } = exercise as T & {
     refinementsJson?: string | null;
     expenseNarrativesJson?: string | null;
+    planningConferenceDatesJson?: string | null;
     quarterlySnapshotsJson?: string | null;
   };
   return {
     ...rest,
     refinements: parseRefinementsJson(refinementsJson),
     expenseNarratives: parseExpenseNarrativesJson(expenseNarrativesJson),
+    planningConferenceDates: parsePlanningConferenceDatesJson(planningConferenceDatesJson),
     quarterlySnapshots: parseQuarterlySnapshotsJson(quarterlySnapshotsJson),
   };
 }
@@ -410,6 +470,7 @@ router.post('/', async (req: Request, res: Response) => {
       defaultDutyDays,
       totalBudget,
       exerciseTemplate,
+      planningConferenceDates,
       quarterlySnapshots,
       reportAssumption1,
       reportAssumption2,
@@ -428,6 +489,7 @@ router.post('/', async (req: Request, res: Response) => {
         ownerUserId: userId,
         name,
         exerciseTemplate: normalizeExerciseTemplate(exerciseTemplate),
+        planningConferenceDatesJson: JSON.stringify(normalizePlanningConferenceDatesInput(planningConferenceDates)),
         quarterlySnapshotsJson: JSON.stringify(normalizeQuarterlySnapshotsInput(quarterlySnapshots)),
         totalBudget: Number.isFinite(parsedTotalBudget) ? parsedTotalBudget : 0,
         startDate: new Date(startDate),
@@ -478,6 +540,7 @@ router.post('/:id/copy', async (req: Request, res: Response) => {
           ownerUserId: userId,
           name: `${sourceExercise.name}_Copy`,
           exerciseTemplate: normalizeExerciseTemplate(sourceExercise.exerciseTemplate),
+          planningConferenceDatesJson: String(sourceExercise.planningConferenceDatesJson ?? '{}'),
           quarterlySnapshotsJson: String(sourceExercise.quarterlySnapshotsJson ?? '{}'),
           totalBudget: Number(sourceExercise.totalBudget || 0),
           startDate: sourceExercise.startDate,
@@ -595,6 +658,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       defaultDutyDays,
       totalBudget,
       exerciseTemplate,
+      planningConferenceDates,
       quarterlySnapshots,
       reportAssumption1,
       reportAssumption2,
@@ -610,6 +674,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     const data: any = {};
     if (name !== undefined) data.name = name;
     if (exerciseTemplate !== undefined) data.exerciseTemplate = normalizeExerciseTemplate(exerciseTemplate);
+    if (planningConferenceDates !== undefined) data.planningConferenceDatesJson = JSON.stringify(normalizePlanningConferenceDatesInput(planningConferenceDates));
     if (quarterlySnapshots !== undefined) data.quarterlySnapshotsJson = JSON.stringify(normalizeQuarterlySnapshotsInput(quarterlySnapshots));
     if (startDate !== undefined) data.startDate = new Date(startDate);
     if (endDate !== undefined) data.endDate = new Date(endDate);
@@ -682,6 +747,7 @@ router.put('/:id/restore', async (req: Request, res: Response) => {
         data: {
           name: String(sourceExercise.name || existing.name),
           exerciseTemplate: normalizeExerciseTemplate(sourceExercise.exerciseTemplate),
+          planningConferenceDatesJson: JSON.stringify(normalizePlanningConferenceDatesInput(sourceExercise.planningConferenceDates)),
           quarterlySnapshotsJson: JSON.stringify(normalizeQuarterlySnapshotsInput(sourceExercise.quarterlySnapshots)),
           totalBudget: Number.isFinite(Number(sourceExercise.totalBudget)) ? Number(sourceExercise.totalBudget) : 0,
           startDate: new Date(String(sourceExercise.startDate || existing.startDate)),

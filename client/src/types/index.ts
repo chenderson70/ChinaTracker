@@ -5,6 +5,7 @@ export type FundingType = 'RPA' | 'OM';
 export type Location = string;
 export type ExerciseTemplate = 'PATRIOT_MEDIC' | 'PATRIOT_PHOENIX' | 'PATRIOT_FORGE';
 export type QuarterlySnapshotKey = 'q1' | 'q2' | 'q3' | 'q4';
+export type PlanningConferenceKey = 'initial' | 'mid' | 'final';
 export type OmCategory =
   | 'CONTRACT'
   | 'TRANSPORTATION'
@@ -36,6 +37,7 @@ export interface Exercise {
   ownerUserId?: string;
   name: string;
   exerciseTemplate?: ExerciseTemplate;
+  planningConferenceDates?: PlanningConferenceDates;
   quarterlySnapshots?: QuarterlySnapshotDates;
   totalBudget: number;
   startDate: string;
@@ -66,6 +68,17 @@ export interface QuarterlySnapshotDates {
   q2: string;
   q3: string;
   q4: string;
+}
+
+export interface PlanningConferenceDateRange {
+  startDate: string;
+  endDate: string;
+}
+
+export interface PlanningConferenceDates {
+  initial: PlanningConferenceDateRange;
+  mid: PlanningConferenceDateRange;
+  final: PlanningConferenceDateRange;
 }
 
 export interface ExerciseUndoBudgetTargets {
