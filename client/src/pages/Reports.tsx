@@ -361,6 +361,8 @@ export function ReportsPage({
   const skipReportLimfacsSaveRef = useRef(true);
   const skipReportPreparedBySaveRef = useRef(true);
   const cleanedReportAssumptionsSignatureRef = useRef<string | null>(null);
+  const printableReportAssumptions = draftReportAssumptions.filter((line) => String(line || '').trim().length > 0);
+  const printableReportLimfacs = draftReportLimfacs.filter((line) => String(line || '').trim().length > 0);
 
   const travelMut = useMutation({
     mutationFn: async (data: any) => {
@@ -1114,7 +1116,7 @@ export function ReportsPage({
               {draftReportAssumptions.map((line, index) => (
                 <div
                   key={`report-assumption-${index + 1}`}
-                  className="ct-report-notes-row"
+                  className="ct-report-notes-row ct-screen-only"
                 >
                   <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
                   <Input.TextArea
@@ -1130,9 +1132,21 @@ export function ReportsPage({
                     bordered={false}
                     style={{ color: '#596577', paddingInline: 0, background: 'transparent', resize: 'none' }}
                   />
-                  <span className="ct-report-notes-text ct-print-only">{line}</span>
                 </div>
               ))}
+              {printableReportAssumptions.length === 0 ? null : (
+                <div className="ct-print-only">
+                  {printableReportAssumptions.map((line, index) => (
+                    <div
+                      key={`print-report-assumption-${index + 1}`}
+                      className="ct-report-notes-row"
+                    >
+                      <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
+                      <span className="ct-report-notes-text">{line}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1142,7 +1156,7 @@ export function ReportsPage({
               {draftReportLimfacs.map((line, index) => (
                 <div
                   key={`report-limfac-${index + 1}`}
-                  className="ct-report-notes-row"
+                  className="ct-report-notes-row ct-screen-only"
                 >
                   <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
                   <Input.TextArea
@@ -1158,9 +1172,21 @@ export function ReportsPage({
                     bordered={false}
                     style={{ color: '#596577', paddingInline: 0, background: 'transparent', resize: 'none' }}
                   />
-                  <span className="ct-report-notes-text ct-print-only">{line}</span>
                 </div>
               ))}
+              {printableReportLimfacs.length === 0 ? null : (
+                <div className="ct-print-only">
+                  {printableReportLimfacs.map((line, index) => (
+                    <div
+                      key={`print-report-limfac-${index + 1}`}
+                      className="ct-report-notes-row"
+                    >
+                      <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
+                      <span className="ct-report-notes-text">{line}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

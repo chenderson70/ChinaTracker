@@ -856,6 +856,30 @@ export default function UnitView() {
   const entryModalNoteLabel = getPersonnelEntryNoteLabel(entryModalGroup?.role);
   const entryModalNoteOptions = getPersonnelEntryNoteOptions(entryModalGroup?.role);
   const entryModalNotePlaceholder = getPersonnelEntryNotePlaceholder(entryModalGroup?.role);
+  const insertExerciseDatesIntoEntryModal = useCallback(() => {
+    if (!exerciseDateDefaults.dateRange) return;
+
+    entryForm.setFieldsValue({
+      dateRange: exerciseDateDefaults.dateRange,
+      dutyDays: exerciseDateDefaults.dutyDays,
+      ...(entryModalIsPlanning
+        ? {
+            months: getMonthsFromDateRange(
+              exerciseDateDefaults.startDate,
+              exerciseDateDefaults.endDate,
+              exerciseDateDefaults.dutyDays,
+            ),
+          }
+        : {}),
+    });
+  }, [
+    entryForm,
+    entryModalIsPlanning,
+    exerciseDateDefaults.dateRange,
+    exerciseDateDefaults.dutyDays,
+    exerciseDateDefaults.endDate,
+    exerciseDateDefaults.startDate,
+  ]);
   const handleEntryModalPlanningNoteChange = useCallback((nextValue: string) => {
     setEntryModalNoteDraft(nextValue);
 
@@ -1498,16 +1522,7 @@ export default function UnitView() {
       if (left > right) return 1;
       return String(a.id).localeCompare(String(b.id));
     });
-  const contractLinesForDisplay = [
-    {
-      id: '__derived_player_billeting__',
-      key: '__derived_player_billeting__',
-      notes: 'Player Billeting',
-      amount: sgAeCabPlayerBilletingTotal,
-      isDerived: true,
-    },
-    ...userContractLines.map((line) => ({ ...line, key: line.id, isDerived: false })),
-  ];
+  const contractLinesForDisplay = userContractLines.map((line) => ({ ...line, key: line.id, isDerived: false }));
   const gpcLinesForDisplay = gpcPurchaseLines
     .slice()
     .sort((a, b) => {
@@ -1752,6 +1767,24 @@ export default function UnitView() {
                   </Button>
                 }
               >
+                {sgAeCabPlayerBilletingTotal > 0 && (
+                  <div
+                    style={{
+                      marginBottom: 12,
+                      padding: '10px 12px',
+                      borderRadius: 12,
+                      border: '1px solid rgba(82, 196, 26, 0.18)',
+                      background: 'rgba(82, 196, 26, 0.06)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
+                    <span style={{ color: '#1f2937', fontWeight: 600 }}>Player Billeting (auto)</span>
+                    <span style={{ color: '#52c41a', fontWeight: 700 }}>{fmt(sgAeCabPlayerBilletingTotal)}</span>
+                  </div>
+                )}
                 <div className="ct-table">
                   <Table
                     size="small"
@@ -1764,15 +1797,11 @@ export default function UnitView() {
                         title: 'Type',
                         dataIndex: 'notes',
                         render: (value: string | null, row: any) => (
-                          row.isDerived
-                            ? (value || '-')
-                            : (
-                              <DraftTextInput
-                                value={value}
-                                placeholder="Contract type"
-                                onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { notes: nextValue } })}
-                              />
-                            )
+                          <DraftTextInput
+                            value={value}
+                            placeholder="Contract type"
+                            onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { notes: nextValue } })}
+                          />
                         ),
                       },
                       {
@@ -1780,15 +1809,11 @@ export default function UnitView() {
                         dataIndex: 'startDate',
                         width: 140,
                         render: (value: string | null, row: any) => (
-                          row.isDerived
-                            ? <Typography.Text type="secondary">Auto</Typography.Text>
-                            : (
-                              <InlineDateInput
-                                value={value}
-                                style={{ width: '100%' }}
-                                onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { startDate: nextValue } })}
-                              />
-                            )
+                          <InlineDateInput
+                            value={value}
+                            style={{ width: '100%' }}
+                            onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { startDate: nextValue } })}
+                          />
                         ),
                       },
                       {
@@ -1796,15 +1821,11 @@ export default function UnitView() {
                         dataIndex: 'endDate',
                         width: 140,
                         render: (value: string | null, row: any) => (
-                          row.isDerived
-                            ? <Typography.Text type="secondary">Auto</Typography.Text>
-                            : (
-                              <InlineDateInput
-                                value={value}
-                                style={{ width: '100%' }}
-                                onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { endDate: nextValue } })}
-                              />
-                            )
+                          <InlineDateInput
+                            value={value}
+                            style={{ width: '100%' }}
+                            onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { endDate: nextValue } })}
+                          />
                         ),
                       },
                       {
@@ -1812,32 +1833,24 @@ export default function UnitView() {
                         dataIndex: 'amount',
                         width: 140,
                         render: (value: number, row: any) => (
-                          row.isDerived
-                            ? fmt(value || 0)
-                            : (
-                              <DraftNumberInput
-                                value={value || 0}
-                                min={0}
-                                style={{ width: '100%' }}
-                                prefix="$"
-                                formatter={formatNumberInput}
-                                parser={parseNumberInput}
-                                onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { amount: nextValue } })}
-                              />
-                            )
+                          <DraftNumberInput
+                            value={value || 0}
+                            min={0}
+                            style={{ width: '100%' }}
+                            prefix="$"
+                            formatter={formatNumberInput}
+                            parser={parseNumberInput}
+                            onSave={(nextValue) => updateExecMut.mutate({ id: row.id, data: { amount: nextValue } })}
+                          />
                         ),
                       },
                       {
                         title: '',
                         width: 56,
                         render: (_: any, row: any) => (
-                          row.isDerived
-                            ? null
-                            : (
-                              <Popconfirm title="Remove?" onConfirm={() => deleteExecMut.mutate(row.id)}>
-                                <Button size="small" danger icon={<DeleteOutlined />} />
-                              </Popconfirm>
-                            )
+                          <Popconfirm title="Remove?" onConfirm={() => deleteExecMut.mutate(row.id)}>
+                            <Button size="small" danger icon={<DeleteOutlined />} />
+                          </Popconfirm>
                         ),
                       },
                     ]}
@@ -2053,7 +2066,23 @@ export default function UnitView() {
               />
             </Form.Item>
           )}
-          <Form.Item name="dateRange" label="Date Range (optional)">
+          <Form.Item
+            name="dateRange"
+            label={(
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%' }}>
+                <span>Date Range (optional)</span>
+                <Button
+                  type="link"
+                  size="small"
+                  style={{ paddingInline: 0 }}
+                  disabled={!exerciseDateDefaults.dateRange}
+                  onClick={insertExerciseDatesIntoEntryModal}
+                >
+                  Insert Exercise Dates
+                </Button>
+              </div>
+            )}
+          >
             <DatePicker.RangePicker
               style={{ width: '100%' }}
               onCalendarChange={(dates, _dateStrings, info) => {

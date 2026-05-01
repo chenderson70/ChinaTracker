@@ -196,6 +196,11 @@ function findGroup(unit: UnitBudget, role: string, fundingType: string): Personn
   return unit.personnelGroups.find((group) => group.role === role && group.fundingType === fundingType);
 }
 
+function getUnitBudgetTemplateFromGroups(groups: Array<{ role: string }>): 'STANDARD' | 'A7' {
+  const roles = new Set(groups.map((group) => String(group.role || '').toUpperCase()));
+  return roles.has('SUPPORT') ? 'A7' : 'STANDARD';
+}
+
 // ── Exercises ──
 export async function getExercises(): Promise<Exercise[]> {
   return apiRequest<Exercise[]>('/exercises');
@@ -662,10 +667,9 @@ export async function importAllData(json: string): Promise<void> {
       const exists = created.unitBudgets.some((unit) => unit.unitCode === sourceUnit.unitCode);
       if (!exists) {
         const sourceUnitGroups = sourceGroups.filter((group) => group.unitBudgetId === sourceUnit.id);
-        const wantsA7 = sourceUnitGroups.some((group) => group.role === 'PLANNING' || group.role === 'SUPPORT');
         created = await addUnitBudget(created.id, {
           unitCode: sourceUnit.unitCode,
-          template: wantsA7 ? 'A7' : 'STANDARD',
+          template: getUnitBudgetTemplateFromGroups(sourceUnitGroups),
         });
       }
     }
