@@ -969,6 +969,10 @@ body {
   column-gap: 8px;
 }
 
+.ct-report-notes-row.ct-screen-only {
+  display: grid;
+}
+
 .ct-report-notes-bullet {
   color: #596577;
 }
@@ -998,13 +1002,15 @@ body {
 
 .ct-print-budget-list {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+  align-items: start;
 }
 
 .ct-print-budget-unit {
   border: 1px solid #e8ecf1;
   border-radius: 10px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   background: #fff;
   break-inside: avoid;
 }
@@ -1038,6 +1044,49 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px 56px;
+}
+
+.ct-print-budget-lines {
+  display: grid;
+  gap: 2px;
+}
+
+.ct-print-budget-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 12px;
+  padding: 3px 0;
+  border-bottom: 1px dashed #e8ecf1;
+}
+
+.ct-print-budget-line-total {
+  padding-top: 5px;
+  padding-bottom: 5px;
+  border-bottom-style: solid;
+}
+
+.ct-print-budget-line-label {
+  font-size: 11px;
+  color: #596577;
+  font-weight: 600;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.ct-print-budget-line-total .ct-print-budget-line-label,
+.ct-print-budget-line-total .ct-print-budget-line-value {
+  color: #102039;
+  font-weight: 800;
+}
+
+.ct-print-budget-line-value {
+  font-size: 11px;
+  color: #102039;
+  text-align: right;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  line-height: 1.25;
 }
 
 .ct-print-budget-sections {
@@ -2153,6 +2202,11 @@ body {
     display: block !important;
   }
 
+  .ct-print-budget-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
   .ct-print-budget-sections {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
@@ -2353,6 +2407,10 @@ body {
   .ct-report-notes-layout {
     grid-template-columns: 1fr;
     gap: 18px;
+  }
+
+  .ct-print-budget-list {
+    grid-template-columns: 1fr;
   }
 
   .ct-print-budget-grid {

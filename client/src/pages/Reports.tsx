@@ -304,6 +304,13 @@ type PrintBudgetSection = {
   fields: Array<{ key: PrintBudgetFieldKey; label: string }>;
 };
 
+type PrintBudgetLine = {
+  key: string;
+  label: string;
+  value: number;
+  isSectionTotal?: boolean;
+};
+
 type BudgetBreakdownRow = {
   key: string;
   unit: string;
@@ -669,6 +676,28 @@ export function ReportsPage({
       ],
     },
   ];
+  const getPrintBudgetLines = (row: BudgetBreakdownRow): PrintBudgetLine[] =>
+    printBudgetSections.flatMap((section) => {
+      const sectionLines: PrintBudgetLine[] = [
+        {
+          key: `${section.title}-total`,
+          label: `${section.title} Total`,
+          value: row[section.totalKey],
+          isSectionTotal: true,
+        },
+      ];
+
+      section.fields.forEach((field) => {
+        if (!row.showRpaMeals && field.key === 'rpaMeals') return;
+        sectionLines.push({
+          key: String(field.key),
+          label: field.label,
+          value: row[field.key],
+        });
+      });
+
+      return sectionLines;
+    });
 
   const columns = [
     { title: 'Unit', dataIndex: 'unit', width: 60, render: renderBudgetLabel, align: 'center' as const },
@@ -1253,23 +1282,14 @@ export function ReportsPage({
                 <div className="ct-print-budget-unit-name">{row.unit}</div>
                 <div className="ct-print-budget-unit-total-value">Total: {fmt(row.total)}</div>
               </div>
-              <div className="ct-print-budget-sections">
-                {printBudgetSections.map((section) => (
-                  <div key={section.title} className="ct-print-budget-section">
-                    <div className="ct-print-budget-section-header">
-                      <div className="ct-print-budget-section-title">{section.title}</div>
-                      <div className="ct-print-budget-section-total">{fmt(row[section.totalKey])}</div>
-                    </div>
-                    <div className="ct-print-budget-grid">
-                      {section.fields
-                        .filter((field) => row.showRpaMeals || field.key !== 'rpaMeals')
-                        .map((field) => (
-                        <div key={field.key} className="ct-print-budget-item">
-                          <div className="ct-print-budget-item-label">{field.label}</div>
-                          <div className="ct-print-budget-item-value">{fmt(row[field.key])}</div>
-                        </div>
-                      ))}
-                    </div>
+              <div className="ct-print-budget-lines">
+                {getPrintBudgetLines(row).map((line) => (
+                  <div
+                    key={`${row.key}-${line.key}`}
+                    className={`ct-print-budget-line ${line.isSectionTotal ? 'ct-print-budget-line-total' : ''}`}
+                  >
+                    <div className="ct-print-budget-line-label">{line.label}</div>
+                    <div className="ct-print-budget-line-value">{fmt(line.value)}</div>
                   </div>
                 ))}
               </div>

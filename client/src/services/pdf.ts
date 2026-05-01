@@ -50,6 +50,16 @@ export async function exportElementToPdf(title: string, element: HTMLElement): P
       margin: 0 auto;
     }
 
+    .ct-pdf-shell .ct-page-actions,
+    .ct-pdf-shell .ant-card-extra,
+    .ct-pdf-shell .ct-screen-only {
+      display: none !important;
+    }
+
+    .ct-pdf-shell .ct-print-only {
+      display: block !important;
+    }
+
     @page {
       size: auto;
       margin: 10mm;

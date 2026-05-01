@@ -959,6 +959,21 @@ router.get('/:id/export', async (req: Request, res: Response) => {
         (sum, unit) => sum + (unit.whiteCellRpa?.subtotal || 0) + (unit.executionRpa || 0) + (unit.playerRpa?.meals || 0),
         0,
       );
+    const reportAssumptions = [
+      exercise.reportAssumption1,
+      exercise.reportAssumption2,
+      exercise.reportAssumption3,
+      exercise.reportAssumption4,
+    ]
+      .map((line) => String(line ?? '').trim())
+      .filter((line) => line.length > 0);
+    const reportLimfacs = [
+      exercise.reportLimfac1,
+      exercise.reportLimfac2,
+      exercise.reportLimfac3,
+    ]
+      .map((line) => String(line ?? '').trim())
+      .filter((line) => line.length > 0);
 
     const wb = XLSX.utils.book_new();
 
@@ -978,6 +993,20 @@ router.get('/:id/export', async (req: Request, res: Response) => {
       ['Exercise', exercise.name],
       ['Period', `${exercise.startDate.toISOString().slice(0,10)} to ${exercise.endDate.toISOString().slice(0,10)}`],
       ['Duty Days', exercise.defaultDutyDays],
+      ...(reportAssumptions.length > 0
+        ? [
+            [''],
+            ['Estimations include'],
+            ...reportAssumptions.map((line) => ['•', line]),
+          ]
+        : []),
+      ...(reportLimfacs.length > 0
+        ? [
+            [''],
+            ['LIMFACs'],
+            ...reportLimfacs.map((line) => ['•', line]),
+          ]
+        : []),
       [''],
       ['Category', 'Amount'],
       ['Total RPA', budget.totalRpa],
