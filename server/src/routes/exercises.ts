@@ -145,6 +145,11 @@ function normalizeUnitCodeInput(value: unknown): string {
   return String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
 }
 
+function normalizeUnitDisplayNameInput(value: unknown): string | null {
+  const normalized = String(value || '').trim().replace(/\s+/g, ' ');
+  return normalized ? normalized : null;
+}
+
 function createFallbackRefinementId(index: number): string {
   return `refinement-${Date.now()}-${index}-${Math.random().toString(16).slice(2, 10)}`;
 }
@@ -571,6 +576,7 @@ router.post('/:id/copy', async (req: Request, res: Response) => {
           data: {
             exerciseId: createdExercise.id,
             unitCode: unitBudget.unitCode,
+            unitDisplayName: normalizeUnitDisplayNameInput(unitBudget.unitDisplayName),
             executionCostLines: {
               create: (unitBudget.executionCostLines || []).map((line) => ({
                 fundingType: line.fundingType,
@@ -782,6 +788,7 @@ router.put('/:id/restore', async (req: Request, res: Response) => {
           data: {
             exerciseId: req.params.id,
             unitCode: String(sourceUnitBudget.unitCode || '').trim().toUpperCase(),
+            unitDisplayName: normalizeUnitDisplayNameInput(sourceUnitBudget.unitDisplayName),
           },
         });
 
@@ -1123,6 +1130,37 @@ router.delete('/:id/units/:unitCode', async (req: Request, res: Response) => {
     if (!ub) return res.status(404).json({ error: 'Unit not found' });
 
     await prisma.unitBudget.delete({ where: { id: ub.id } });
+    const full = await loadFullExercise(req.params.id);
+    res.json(serializeExercise(full));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/:id/units/:unitBudgetId', async (req: Request, res: Response) => {
+  try {
+    const userId = getRequestUserId(req);
+    const exercise = await prisma.exercise.findFirst({ where: { id: req.params.id, ownerUserId: userId } });
+    if (!exercise) return res.status(404).json({ error: 'Exercise not found' });
+
+    const unitBudgetId = String(req.params.unitBudgetId || '').trim();
+    if (!unitBudgetId) return res.status(400).json({ error: 'Unit id is required' });
+
+    const unitBudget = await prisma.unitBudget.findFirst({
+      where: {
+        id: unitBudgetId,
+        exerciseId: req.params.id,
+      },
+    });
+    if (!unitBudget) return res.status(404).json({ error: 'Unit not found' });
+
+    await prisma.unitBudget.update({
+      where: { id: unitBudget.id },
+      data: {
+        unitDisplayName: normalizeUnitDisplayNameInput(req.body?.unitDisplayName),
+      },
+    });
+
     const full = await loadFullExercise(req.params.id);
     res.json(serializeExercise(full));
   } catch (err: any) {

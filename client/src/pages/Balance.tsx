@@ -76,7 +76,7 @@ export default function Balance() {
     .sort((a, b) => compareUnitCodes(a.unitCode, b.unitCode))
     .map((u) => ({
       key: u.unitCode,
-      unit: getUnitDisplayLabel(u.unitCode),
+      unit: getUnitDisplayLabel(u.unitCode, u.unitDisplayName),
       rpa: u.unitTotalRpa,
       om: u.unitTotalOm,
       total: u.unitTotal,

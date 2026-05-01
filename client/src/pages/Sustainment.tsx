@@ -44,10 +44,15 @@ function getEffectiveEntries(group: PersonnelGroup, defaultDutyDays: number): Ar
   }];
 }
 
-function buildSustainmentRow(groupList: PersonnelGroup[], unitCode: string, defaultDutyDays: number): SustainmentRow {
+function buildSustainmentRow(
+  groupList: PersonnelGroup[],
+  unitCode: string,
+  defaultDutyDays: number,
+  unitDisplayName?: string | null,
+): SustainmentRow {
   const row: SustainmentRow = {
     key: unitCode,
-    unit: getUnitDisplayLabel(unitCode),
+    unit: getUnitDisplayLabel(unitCode, unitDisplayName),
     mresNeeded: 0,
     playerRoomsNeeded: 0,
     playerRoomNights: 0,
@@ -98,7 +103,12 @@ function SustainmentWorkspace() {
 
   const sustainmentRows = [...(exercise.unitBudgets || [])]
     .sort((left, right) => compareUnitCodes(left.unitCode, right.unitCode))
-    .map((unitBudget) => buildSustainmentRow(unitBudget.personnelGroups || [], unitBudget.unitCode, exercise.defaultDutyDays || 1));
+    .map((unitBudget) => buildSustainmentRow(
+      unitBudget.personnelGroups || [],
+      unitBudget.unitCode,
+      exercise.defaultDutyDays || 1,
+      unitBudget.unitDisplayName,
+    ));
 
   const totals = sustainmentRows.reduce(
     (acc, row) => ({

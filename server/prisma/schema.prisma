@@ -78,6 +78,7 @@ model UnitBudget {
   id                 String              @id @default(uuid())
   exerciseId         String              @map("exercise_id")
   unitCode           String              @map("unit_code")
+  unitDisplayName    String?             @map("unit_display_name")
   exercise           Exercise            @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   personnelGroups    PersonnelGroup[]
   executionCostLines ExecutionCostLine[]

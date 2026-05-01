@@ -130,9 +130,7 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
     }
 
     const { rankCode, count, dutyDays, startDate, endDate, rentalCarCount, location, isLocal, note, travelOnly, longTermA7Planner } = req.body;
-    const normalizedRentalCarCount = group.role === 'PLANNING'
-      ? (Number(rentalCarCount || 0) > 0 ? 1 : 0)
-      : (rentalCarCount ?? 0);
+    const normalizedRentalCarCount = Math.max(0, Number(rentalCarCount ?? 0));
     const entry = await prisma.personnelEntry.create({
       data: {
         personnelGroupId: req.params.groupId,
@@ -194,11 +192,7 @@ router.put('/personnel-entries/:entryId', async (req: Request, res: Response) =>
     if (dutyDays !== undefined) data.dutyDays = dutyDays;
     if (startDate !== undefined) data.startDate = parseOptionalDateField(startDate);
     if (endDate !== undefined) data.endDate = parseOptionalDateField(endDate);
-    if (rentalCarCount !== undefined) {
-      data.rentalCarCount = existing.personnelGroup.role === 'PLANNING'
-        ? (Number(rentalCarCount || 0) > 0 ? 1 : 0)
-        : rentalCarCount;
-    }
+    if (rentalCarCount !== undefined) data.rentalCarCount = Math.max(0, Number(rentalCarCount ?? 0));
     if (location !== undefined) data.location = location;
     if (isLocal !== undefined) data.isLocal = isLocal;
     if (note !== undefined) data.note = note ?? null;

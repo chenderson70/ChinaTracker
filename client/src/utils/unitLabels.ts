@@ -1,6 +1,11 @@
 const UNIT_SORT_ORDER = ['A7', 'SG', 'AE', 'CAB'];
 
-export function getUnitDisplayLabel(unitCode: string): string {
+export function getUnitDisplayLabel(unitCode: string, unitDisplayName?: string | null): string {
+  const normalizedDisplayName = String(unitDisplayName || '').trim();
+  if (normalizedDisplayName) {
+    return normalizedDisplayName;
+  }
+
   return String(unitCode || '').toUpperCase() === 'CAB' ? 'Unit of Action' : unitCode;
 }
 

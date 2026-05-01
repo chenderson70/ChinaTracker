@@ -27,6 +27,7 @@ type ExecutionPaxCounts = {
 };
 
 type UnitComparisonMetrics = SustainmentCounts & {
+  unitDisplayName?: string | null;
   totalFunding: number;
   rpaFunding: number;
   omFunding: number;
@@ -266,6 +267,7 @@ function buildExerciseMetrics(exercise: ExerciseDetail, budget: BudgetResult): E
 
     units[normalizedUnitCode] = {
       ...sustainment,
+      unitDisplayName: unitBudgetsByCode.get(normalizedUnitCode)?.unitDisplayName ?? unit.unitDisplayName ?? null,
       totalFunding: Number(unit.unitTotal || 0),
       rpaFunding: Number(unit.unitTotalRpa || 0),
       omFunding: Number(unit.unitTotalOm || 0),
@@ -724,7 +726,10 @@ export default function Comparison() {
 
       return {
         key: unitCode,
-        unit: getUnitDisplayLabel(unitCode),
+        unit: getUnitDisplayLabel(
+          unitCode,
+          currentUnit.unitDisplayName ?? comparisonUnit.unitDisplayName ?? null,
+        ),
         currentFunding: currentUnit.totalFunding,
         comparisonFunding: comparisonUnit.totalFunding,
         fundingDelta: comparisonUnit.totalFunding - currentUnit.totalFunding,

@@ -647,6 +647,7 @@ export default function UnitView() {
   const emptyCalcGroup: GroupCalc = { paxCount: 0, dutyDays: 0, milPay: 0, perDiem: 0, meals: 0, travel: 0, billeting: 0, subtotal: 0 };
   const unitCalcSafe: UnitCalc = unitCalc || {
     unitCode: unitCode || '',
+    unitDisplayName: ub?.unitDisplayName ?? null,
     totalPax: 0,
     planningRpa: { ...emptyCalcGroup },
     planningOm: { ...emptyCalcGroup },
@@ -672,7 +673,6 @@ export default function UnitView() {
     entryModalGroup?.role === 'PLAYER' || entryModalGroup?.role === 'ANNUAL_TOUR';
   const entryModalSupportsRentalCars =
     entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'WHITE_CELL' || entryModalGroup?.role === 'SUPPORT';
-  const entryModalUsesBinaryRentalCar = entryModalGroup?.role === 'PLANNING';
   const entryModalAllowsTravelOnly = entryModalGroup?.fundingType === 'RPA'
     && (entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'SUPPORT');
   const handleEntryModalPlanningNoteChange = useCallback((nextValue: string) => {
@@ -736,7 +736,6 @@ export default function UnitView() {
       count: 1,
       dateRange: entryModalUsesExerciseDates ? exerciseDateDefaults.dateRange : null,
       dutyDays: entryModalUsesExerciseDates ? exerciseDateDefaults.dutyDays : (exercise?.defaultDutyDays ?? 1),
-      hasRentalCar: false,
       rentalCarCount: 0,
       months: undefined,
       location: entryModalGroup?.location || perDiemLocations[0] || 'FORT_HUNTER_LIGGETT',
@@ -802,7 +801,6 @@ export default function UnitView() {
     const isPlanning = role === 'PLANNING';
     const isWhiteCell = role === 'WHITE_CELL';
     const supportsRentalCars = role === 'PLANNING' || role === 'WHITE_CELL' || role === 'SUPPORT';
-    const usesBinaryRentalCar = role === 'PLANNING';
     const usesEntryLevelRental = supportsRentalCars;
     const isPlayerRpa = isPlayerLike && ft === 'RPA';
     const isPlayerOm = isPlayer && ft === 'OM';
@@ -858,9 +856,7 @@ export default function UnitView() {
         const entryDays = entry.dutyDays || group.dutyDays || exercise?.defaultDutyDays || 1;
         const entryLoc = entry.location || group.location || 'FORT_HUNTER_LIGGETT';
         const entryIsLocal = !!(entry.isLocal ?? group.isLocal);
-        const entryRentalCarCount = usesBinaryRentalCar
-          ? ((Number((entry as any).rentalCarCount || 0) > 0) ? 1 : 0)
-          : (Number((entry as any).rentalCarCount || 0) || 0);
+        const entryRentalCarCount = Number((entry as any).rentalCarCount || 0) || 0;
         if (entryIsLocal) {
           if (usesEntryLevelRental) {
             acc.rental += entryRentalCarCount * rentalDaily * entryDays;
@@ -1089,23 +1085,13 @@ export default function UnitView() {
                 dataIndex: 'rentalCarCount',
                 width: 110,
                 render: (value: number, row: { id: string }) => (
-                  usesBinaryRentalCar ? (
-                    <Switch
-                      size="small"
-                      checked={Number(value || 0) > 0}
-                      checkedChildren="Yes"
-                      unCheckedChildren="No"
-                      onChange={(checked) => updateEntryMut.mutate({ id: row.id, data: { rentalCarCount: checked ? 1 : 0 } })}
-                    />
-                  ) : (
-                    <DraftNumberInput
-                      min={0}
-                      precision={0}
-                      value={value || 0}
-                      style={{ width: '100%' }}
-                      onSave={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { rentalCarCount: nextValue || 0 } })}
-                    />
-                  )
+                  <DraftNumberInput
+                    min={0}
+                    precision={0}
+                    value={value || 0}
+                    style={{ width: '100%' }}
+                    onSave={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { rentalCarCount: nextValue || 0 } })}
+                  />
                 ),
               }] : []),
               {
@@ -1434,7 +1420,7 @@ export default function UnitView() {
   return (
     <div>
       <div className="ct-page-header">
-        <Typography.Title level={4} className="ct-page-title">{getUnitDisplayLabel(unitCode)} — Unit Budget</Typography.Title>
+        <Typography.Title level={4} className="ct-page-title">{getUnitDisplayLabel(unitCode, ub?.unitDisplayName)} — Unit Budget</Typography.Title>
         <div className="ct-screen-only ct-unit-clear-banner">
           <div className="ct-unit-clear-banner-copy">
             <Typography.Text className="ct-unit-clear-banner-title">
@@ -1807,11 +1793,9 @@ export default function UnitView() {
               dutyDays: dateRangeDutyDays ?? calculatedDutyDays,
               startDate,
               endDate,
-              rentalCarCount: entryModalUsesBinaryRentalCar
-                ? (values.hasRentalCar ? 1 : 0)
-                : entryModalSupportsRentalCars
-                  ? (values.rentalCarCount || 0)
-                  : 0,
+              rentalCarCount: entryModalSupportsRentalCars
+                ? (values.rentalCarCount || 0)
+                : 0,
               location: values.location,
               note: (entryModalIsPlanning || entryModalIsWhiteCell) ? (entryModalNoteDraft.trim() || null) : null,
               travelOnly: entryModalAllowsTravelOnly ? entryModalTravelOnlyDraft : false,
@@ -1912,18 +1896,7 @@ export default function UnitView() {
               }}
             />
           </Form.Item>
-          {entryModalUsesBinaryRentalCar && (
-            <Form.Item
-              name="hasRentalCar"
-              label="Rental Car"
-              valuePropName="checked"
-              initialValue={false}
-              extra="Uses the default rental car rate from Rate Config."
-            >
-              <Switch checkedChildren="Yes" unCheckedChildren="No" />
-            </Form.Item>
-          )}
-          {!entryModalUsesBinaryRentalCar && entryModalSupportsRentalCars && (
+          {entryModalSupportsRentalCars && (
             <Form.Item name="rentalCarCount" label="Rental Car" initialValue={0}>
               <InputNumber min={0} precision={0} style={{ width: '100%' }} />
             </Form.Item>

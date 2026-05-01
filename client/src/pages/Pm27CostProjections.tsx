@@ -3,6 +3,7 @@ import { useApp } from '../components/AppLayout';
 import BudgetOverviewSection from '../components/BudgetOverviewSection';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { ANNUAL_TOUR_MEALS_LABEL, ANNUAL_TOUR_MIL_PAY_LABEL, ANNUAL_TOUR_TRAVEL_PAY_LABEL, getPlayerOmResponsibilityByUnit, getRpaCategoryTotals, getUnitRpaCategoryTotals } from '../utils/budgetSummary';
+import { getCostProjectionLabel } from '../utils/exerciseTemplates';
 import { ReportsPage } from './Reports';
 import type { ExecutionCostLine, FundingType, PersonnelEntry, PersonnelGroup, UnitBudget, UnitCalc } from '../types';
 
@@ -412,7 +413,7 @@ function Pm27UnitProjectionTables() {
         return (
           <Card
             key={unit.unitCode}
-            title={getUnitDisplayLabel(unit.unitCode)}
+            title={getUnitDisplayLabel(unit.unitCode, unit.unitDisplayName)}
             className="ct-section-card"
             style={{ marginBottom: 16 }}
           >
@@ -467,9 +468,11 @@ function Pm27UnitProjectionTables() {
 }
 
 export default function Pm27CostProjections() {
+  const { exercise } = useApp();
+
   return (
     <ReportsPage
-      title="PM 27 Cost Projections"
+      title={getCostProjectionLabel(exercise?.exerciseTemplate)}
       showBudgetDetails={false}
       showGrandTotals={false}
       showQuarterlyBudgetAllocation={false}

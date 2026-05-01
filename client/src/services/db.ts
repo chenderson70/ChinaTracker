@@ -16,6 +16,7 @@ export interface UnitBudgetRow {
   id: string;
   exerciseId: string;
   unitCode: string;
+  unitDisplayName?: string | null;
 }
 
 export interface PersonnelGroupRow {

@@ -25,3 +25,7 @@ export function normalizeExerciseTemplate(value: string | null | undefined): Exe
 export function getExerciseTemplateLabel(value: string | null | undefined): string {
   return EXERCISE_TEMPLATE_LABELS[normalizeExerciseTemplate(value)];
 }
+
+export function getCostProjectionLabel(value: string | null | undefined): string {
+  return `${getExerciseTemplateLabel(value)} Cost Projections`;
+}

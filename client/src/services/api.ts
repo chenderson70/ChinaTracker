@@ -257,6 +257,17 @@ export async function deleteUnitBudget(exerciseId: string, unitCode: string): Pr
   });
 }
 
+export async function updateUnitBudget(
+  exerciseId: string,
+  unitBudgetId: string,
+  data: { unitDisplayName?: string | null },
+): Promise<ExerciseDetail> {
+  return apiRequest<ExerciseDetail>(`/exercises/${exerciseId}/units/${encodeURIComponent(unitBudgetId)}`, {
+    method: 'PUT',
+    body: data,
+  });
+}
+
 // ── Travel Config ──
 export async function clearUnitBudget(unitId: string): Promise<void> {
   await apiRequest<{ success: boolean }>(`/units/${unitId}/clear`, { method: 'POST' });
@@ -463,6 +474,7 @@ export async function exportAllData(): Promise<string> {
       id: unit.id,
       exerciseId: exercise.id,
       unitCode: unit.unitCode,
+      unitDisplayName: unit.unitDisplayName ?? null,
     })),
   );
 
@@ -533,7 +545,7 @@ export async function exportAllData(): Promise<string> {
 export async function importAllData(json: string): Promise<void> {
   const data = JSON.parse(json) as {
     exercises?: Exercise[];
-    unitBudgets?: Array<{ id: string; exerciseId: string; unitCode: string }>;
+    unitBudgets?: Array<{ id: string; exerciseId: string; unitCode: string; unitDisplayName?: string | null }>;
     personnelGroups?: Array<{
       id: string;
       unitBudgetId: string;
@@ -663,6 +675,12 @@ export async function importAllData(json: string): Promise<void> {
     for (const [unitCode, remoteUnit] of remoteByUnitCode) {
       const sourceUnit = sourceByUnitCode.get(unitCode);
       if (!sourceUnit) continue;
+
+      if ((remoteUnit.unitDisplayName ?? null) !== (sourceUnit.unitDisplayName ?? null)) {
+        await updateUnitBudget(created.id, remoteUnit.id, {
+          unitDisplayName: sourceUnit.unitDisplayName ?? null,
+        });
+      }
 
       const sourceUnitGroups = sourceGroups.filter((group) => group.unitBudgetId === sourceUnit.id);
       const sourceUnitExec = sourceExec.filter((line) => line.unitBudgetId === sourceUnit.id);

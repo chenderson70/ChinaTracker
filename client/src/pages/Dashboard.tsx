@@ -56,13 +56,14 @@ export default function Dashboard() {
     .map((u) => ({
       key: u.unitCode,
       unitCode: u.unitCode,
+      unitDisplayName: u.unitDisplayName ?? null,
       totalPax: getDisplayedPax(u.totalPax, siteVisitPaxExclusions.excludedByUnit[String(u.unitCode || '').toUpperCase()] || 0),
       rpa: u.unitTotalRpa,
       om: u.unitTotalOm,
       total: u.unitTotal,
     }));
 
-  const barData = unitData.map((u) => ({ name: getUnitDisplayLabel(u.unitCode), RPA: u.rpa, 'O&M': u.om }));
+  const barData = unitData.map((u) => ({ name: getUnitDisplayLabel(u.unitCode, u.unitDisplayName), RPA: u.rpa, 'O&M': u.om }));
 
   const allExecutionOmLines = (exercise.unitBudgets || [])
     .flatMap((u) => u.executionCostLines || [])
@@ -195,7 +196,9 @@ export default function Dashboard() {
 
   const columns = [
     { title: 'Unit', dataIndex: 'unitCode', key: 'unitCode', width: 80,
-      render: (v: string) => <span style={{ fontWeight: 600, color: '#1a1a2e' }}>{getUnitDisplayLabel(v)}</span> },
+      render: (_v: string, record: { unitCode: string; unitDisplayName?: string | null }) => (
+        <span style={{ fontWeight: 600, color: '#1a1a2e' }}>{getUnitDisplayLabel(record.unitCode, record.unitDisplayName)}</span>
+      ) },
     { title: 'Total PAX', dataIndex: 'totalPax', key: 'totalPax', width: 100 },
     { title: 'RPA', dataIndex: 'rpa', key: 'rpa', render: (v: number) => <span style={{ color: '#1677ff' }}>{fmt(v)}</span> },
     { title: 'O&M', dataIndex: 'om', key: 'om', render: (v: number) => <span style={{ color: '#52c41a' }}>{fmt(v)}</span> },

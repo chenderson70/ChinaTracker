@@ -48,8 +48,10 @@ import { getStoredUser } from '../services/auth';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
 import {
+  getCostProjectionLabel,
   DEFAULT_EXERCISE_TEMPLATE,
   EXERCISE_TEMPLATE_OPTIONS,
+  getExerciseTemplateLabel,
   normalizeExerciseTemplate,
 } from '../utils/exerciseTemplates';
 import {
@@ -89,6 +91,16 @@ type UndoEntry = {
 
 function normalizeUnitCodeInput(value: unknown): string {
   return String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
+function normalizeUnitDisplayNameInput(value: unknown): string | null {
+  const normalized = String(value || '').trim().replace(/\s+/g, ' ');
+  return normalized ? normalized : null;
+}
+
+function getUnitOptionLabel(unitCode: string, unitDisplayName?: string | null): string {
+  const displayLabel = getUnitDisplayLabel(unitCode, unitDisplayName);
+  return displayLabel !== unitCode ? `${displayLabel} (${unitCode})` : displayLabel;
 }
 
 function toOptionalDateRangePayload(
@@ -160,11 +172,13 @@ export default function AppLayout() {
   const [createOpen, setCreateOpen] = useState(false);
   const [addUnitOpen, setAddUnitOpen] = useState(false);
   const [removeUnitOpen, setRemoveUnitOpen] = useState(false);
+  const [editUnitNamesOpen, setEditUnitNamesOpen] = useState(false);
   const [editExerciseOpen, setEditExerciseOpen] = useState(false);
   const [editBudgetOpen, setEditBudgetOpen] = useState(false);
   const [form] = Form.useForm();
   const [unitForm] = Form.useForm();
   const [removeUnitForm] = Form.useForm();
+  const [editUnitNamesForm] = Form.useForm();
   const [editExerciseForm] = Form.useForm();
   const [editBudgetForm] = Form.useForm();
   const editBudgetDraft = Form.useWatch([], editBudgetForm);
@@ -388,6 +402,56 @@ export default function AppLayout() {
     });
   };
 
+  const editUnitNamesMut = useMutation({
+    mutationFn: async (units: Array<{ id: string; unitDisplayName: string | null }>) => {
+      await pushUndoSnapshot('Edit Unit Names');
+
+      let updatedExercise: ExerciseDetail | null = null;
+      for (const unit of units) {
+        updatedExercise = await api.updateUnitBudget(exerciseId!, unit.id, {
+          unitDisplayName: unit.unitDisplayName,
+        });
+      }
+
+      return updatedExercise;
+    },
+    onSuccess: (updatedExercise) => {
+      if (updatedExercise) {
+        queryClient.setQueryData(['exercise', exerciseId], updatedExercise);
+      }
+      queryClient.invalidateQueries({ queryKey: ['exercise', exerciseId] });
+      queryClient.invalidateQueries({ queryKey: ['budget', exerciseId] });
+      setEditUnitNamesOpen(false);
+      message.success('Unit names updated');
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to update unit names');
+    },
+  });
+
+  const handleEditUnitNames = () => {
+    editUnitNamesForm.validateFields().then((values) => {
+      const currentById = new Map(
+        (exercise?.unitBudgets || []).map((unit) => [unit.id, normalizeUnitDisplayNameInput(unit.unitDisplayName)]),
+      );
+
+      const changes = ((values.units || []) as Array<{ id: string; unitDisplayName?: string | null }>)
+        .map((unit) => ({
+          id: String(unit.id || '').trim(),
+          unitDisplayName: normalizeUnitDisplayNameInput(unit.unitDisplayName),
+        }))
+        .filter((unit) => unit.id && currentById.get(unit.id) !== unit.unitDisplayName);
+
+      if (changes.length === 0) {
+        setEditUnitNamesOpen(false);
+        message.info('No unit name changes to save');
+        return;
+      }
+
+      editUnitNamesMut.mutate(changes);
+    });
+  };
+
   const editBudgetMut = useMutation({
     mutationFn: async ({ rpaBudgetTarget, omBudgetTarget }: { rpaBudgetTarget: number; omBudgetTarget: number }) => {
       await pushUndoSnapshot('Edit Budget');
@@ -528,7 +592,7 @@ export default function AppLayout() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `PATRIOT_MEDIC_Backup_${dayjs().format('YYYY-MM-DD')}.json`;
+    a.download = `${currentExerciseTemplateLabel.replace(/\s+/g, '_')}_Backup_${dayjs().format('YYYY-MM-DD')}.json`;
     a.click();
     URL.revokeObjectURL(url);
     message.success('Backup downloaded');
@@ -556,16 +620,25 @@ export default function AppLayout() {
 
   const fmt = (n: number | undefined) => '$' + (n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   const hasAnyExercise = exercises.length > 0;
+  const currentExerciseTemplateLabel = getExerciseTemplateLabel(exercise?.exerciseTemplate ?? DEFAULT_EXERCISE_TEMPLATE);
+  const currentCostProjectionLabel = getCostProjectionLabel(exercise?.exerciseTemplate ?? DEFAULT_EXERCISE_TEMPLATE);
   const exerciseOptions = exercises.map((item) => ({
     value: item.id,
     label: item.name,
     exerciseName: item.name,
   }));
 
-  const unitChildren = (exercise?.unitBudgets || [])
-    .map((unit) => unit.unitCode)
-    .sort(compareUnitCodes)
-    .map((unitCode) => ({ key: `/units/${unitCode}`, label: getUnitDisplayLabel(unitCode) }));
+  const sortedUnitBudgets = [...(exercise?.unitBudgets || [])]
+    .sort((left, right) => compareUnitCodes(left.unitCode, right.unitCode));
+
+  const unitChildren = sortedUnitBudgets
+    .map((unit) => ({
+      key: `/units/${unit.unitCode}`,
+      unitCode: unit.unitCode,
+      label: getUnitDisplayLabel(unit.unitCode, unit.unitDisplayName),
+      optionLabel: getUnitOptionLabel(unit.unitCode, unit.unitDisplayName),
+      unitDisplayName: unit.unitDisplayName ?? null,
+    }));
 
   const baseMenuItems = [
     { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },
@@ -581,7 +654,7 @@ export default function AppLayout() {
       icon: <FileExcelOutlined />,
       label: 'Reports',
       children: [
-        { key: '/reports/pm-27-cost-projections', label: 'PM 27 Cost Projections' },
+        { key: '/reports/pm-27-cost-projections', label: currentCostProjectionLabel },
         { key: '/reports/sustainment', label: 'Exercise Sustainment' },
         { key: '/reports/balance', label: 'Balance' },
         { key: '/reports/comparison', label: 'Comparison' },
@@ -619,6 +692,19 @@ export default function AppLayout() {
   }, [editExerciseOpen, exercise, editExerciseForm]);
 
   useEffect(() => {
+    if (!editUnitNamesOpen || !exercise) return;
+    editUnitNamesForm.setFieldsValue({
+      units: [...(exercise.unitBudgets || [])]
+        .sort((left, right) => compareUnitCodes(left.unitCode, right.unitCode))
+        .map((unit) => ({
+          id: unit.id,
+          unitCode: unit.unitCode,
+          unitDisplayName: unit.unitDisplayName ?? '',
+        })),
+    });
+  }, [editUnitNamesOpen, exercise, editUnitNamesForm]);
+
+  useEffect(() => {
     if (!editBudgetOpen) return;
     editBudgetForm.setFieldsValue({
       rpaBudgetTarget: Number(appConfig.BUDGET_TARGET_RPA || 0),
@@ -639,7 +725,7 @@ export default function AppLayout() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <ThunderboltOutlined style={{ fontSize: 22, color: '#4096ff' }} />
               <Typography.Title level={4} className="ct-logo-title">
-                PATRIOT MEDIC
+                {currentExerciseTemplateLabel}
               </Typography.Title>
             </div>
             <span className="ct-logo-sub">Budget Management</span>
@@ -740,6 +826,13 @@ export default function AppLayout() {
                 <Tooltip title="Add a new unit to this exercise">
                   <Button icon={<TeamOutlined />} onClick={() => setAddUnitOpen(true)}>
                     Add Unit
+                  </Button>
+                </Tooltip>
+              )}
+              {exerciseId && unitChildren.length > 0 && (
+                <Tooltip title="Edit how unit names appear in the UI and reports">
+                  <Button icon={<EditOutlined />} onClick={() => setEditUnitNamesOpen(true)}>
+                    Edit Unit Names
                   </Button>
                 </Tooltip>
               )}
@@ -981,6 +1074,65 @@ export default function AppLayout() {
       </Modal>
 
       <Modal
+        title="Edit Unit Names"
+        open={editUnitNamesOpen}
+        onOk={handleEditUnitNames}
+        confirmLoading={editUnitNamesMut.isPending}
+        onCancel={() => setEditUnitNamesOpen(false)}
+        okText="Save Unit Names"
+        width={640}
+      >
+        <Form form={editUnitNamesForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.List name="units">
+            {(fields) => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {fields.map((field) => {
+                  const unitCode = String(editUnitNamesForm.getFieldValue(['units', field.name, 'unitCode']) || '');
+                  const defaultLabel = getUnitDisplayLabel(unitCode);
+
+                  return (
+                    <div
+                      key={field.key}
+                      style={{
+                        border: '1px solid #e8ecf1',
+                        borderRadius: 16,
+                        padding: 16,
+                        background: '#fafcff',
+                      }}
+                    >
+                      <Form.Item name={[field.name, 'id']} hidden>
+                        <Input />
+                      </Form.Item>
+                      <Form.Item name={[field.name, 'unitCode']} hidden>
+                        <Input />
+                      </Form.Item>
+                      <Typography.Text strong style={{ display: 'block', fontSize: 16, color: '#1a1a2e', marginBottom: 4 }}>
+                        {unitCode}
+                      </Typography.Text>
+                      <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+                        Default label: {defaultLabel}
+                      </Typography.Text>
+                      <Form.Item
+                        name={[field.name, 'unitDisplayName']}
+                        label="Display Name"
+                        rules={[{ max: 60, message: 'Keep unit names to 60 characters or fewer' }]}
+                        style={{ marginBottom: 0 }}
+                      >
+                        <Input placeholder={defaultLabel} />
+                      </Form.Item>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Form.List>
+          <Typography.Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
+            Leave a display name blank to use the default unit label.
+          </Typography.Text>
+        </Form>
+      </Modal>
+
+      <Modal
         title="Remove Unit"
         open={removeUnitOpen}
         onOk={handleRemoveUnit}
@@ -997,7 +1149,7 @@ export default function AppLayout() {
           >
             <Select
               placeholder="Choose unit"
-              options={unitChildren.map((unit) => ({ value: unit.label, label: unit.label }))}
+              options={unitChildren.map((unit) => ({ value: unit.unitCode, label: unit.optionLabel }))}
             />
           </Form.Item>
           <Typography.Text type="secondary">

@@ -97,6 +97,7 @@ function fmtRate(n: number): string {
 
 type PlanningSummaryEntry = {
   unitCode: string;
+  unitDisplayName?: string | null;
   count: number;
   dutyDays: number;
   isLocal: boolean;
@@ -146,7 +147,12 @@ function formatDutyDayDuration(dutyDays: number): string {
   return pluralize(dutyDays, 'duty day');
 }
 
-function getPlannerUnitLabel(unitCode: string): string {
+function getPlannerUnitLabel(unitCode: string, unitDisplayName?: string | null): string {
+  const normalizedDisplayName = String(unitDisplayName || '').trim();
+  if (normalizedDisplayName) {
+    return normalizedDisplayName;
+  }
+
   return String(unitCode || '').toUpperCase() === 'CAB' ? 'UoA' : getUnitDisplayLabel(unitCode);
 }
 
@@ -180,6 +186,7 @@ function getPlanningSummaryEntries(exercise: ExerciseDetail): PlanningSummaryEnt
 
           return entries.map((entry) => ({
             unitCode: unitBudget.unitCode,
+            unitDisplayName: unitBudget.unitDisplayName ?? null,
             ...entry,
           }));
         }),
@@ -193,16 +200,21 @@ function buildPlannerSummary(entries: PlanningSummaryEntry[]): { count: string; 
   const totalPlanners = entries.reduce((sum, entry) => sum + entry.count, 0);
   const localPlanners = entries.reduce((sum, entry) => sum + (entry.isLocal ? entry.count : 0), 0);
   const nonLocalPlanners = totalPlanners - localPlanners;
-  const unitCounts = entries.reduce<Record<string, number>>((acc, entry) => {
+  const unitCounts = entries.reduce<Record<string, { count: number; unitDisplayName?: string | null }>>((acc, entry) => {
     const normalizedUnitCode = String(entry.unitCode || '').toUpperCase();
-    acc[normalizedUnitCode] = (acc[normalizedUnitCode] || 0) + entry.count;
+    const existing = acc[normalizedUnitCode] || { count: 0, unitDisplayName: entry.unitDisplayName ?? null };
+    existing.count += entry.count;
+    if (!existing.unitDisplayName && entry.unitDisplayName) {
+      existing.unitDisplayName = entry.unitDisplayName;
+    }
+    acc[normalizedUnitCode] = existing;
     return acc;
   }, {});
   const unitBreakdown = Object.entries(unitCounts)
     .sort(([left], [right]) => compareUnitCodes(left, right))
-    .map(([unitCode, count]) => {
-      const label = getPlannerUnitLabel(unitCode);
-      return label === 'A7' ? `${count} A7 planners` : `${count} ${label}`;
+    .map(([unitCode, detail]) => {
+      const label = getPlannerUnitLabel(unitCode, detail.unitDisplayName);
+      return label === 'A7' ? `${detail.count} A7 planners` : `${detail.count} ${label}`;
     })
     .join(' / ');
   const uniqueDutyDays = [...new Set(entries.map((entry) => entry.dutyDays).filter((value) => value > 0))];
@@ -559,7 +571,7 @@ export function ReportsPage({
       const totalOm = u.planningOm.subtotal + u.whiteCellOm.subtotal + u.executionOm + playerOm;
       return {
         key: u.unitCode,
-        unit: getUnitDisplayLabel(u.unitCode),
+        unit: getUnitDisplayLabel(u.unitCode, u.unitDisplayName),
         rpaMilPay: rpaTotals.milPay,
         planningOm: u.planningOm.subtotal,
         rpaTravelAndPerDiem: rpaTotals.travelAndPerDiem,

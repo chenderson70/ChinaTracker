@@ -96,6 +96,7 @@ export interface UnitBudget {
   id: string;
   exerciseId: string;
   unitCode: UnitCode;
+  unitDisplayName?: string | null;
   personnelGroups: PersonnelGroup[];
   executionCostLines: ExecutionCostLine[];
 }
@@ -213,6 +214,7 @@ export interface GroupCalc {
 
 export interface UnitCalc {
   unitCode: string;
+  unitDisplayName?: string | null;
   totalPax: number;
   planningRpa: GroupCalc;
   planningOm: GroupCalc;

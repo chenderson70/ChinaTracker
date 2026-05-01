@@ -24,6 +24,7 @@ export interface GroupCalc {
 
 export interface UnitCalc {
   unitCode: string;
+  unitDisplayName?: string | null;
   totalPax: number;
   planningRpa: GroupCalc;
   planningOm: GroupCalc;
@@ -208,6 +209,7 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
   for (const ub of exercise.unitBudgets || []) {
     const unitCalc: UnitCalc = {
       unitCode: ub.unitCode,
+      unitDisplayName: ub.unitDisplayName || null,
       totalPax: 0,
       planningRpa: emptyGroup(),
       planningOm: emptyGroup(),
@@ -286,9 +288,7 @@ export function calculateBudget(exercise: any, rates: RateInputs): BudgetResult 
         const entryLoc = entry.location || pg.location || 'FORT_HUNTER_LIGGETT';
         const entryIsLocal = isLocalFlag(entry.isLocal) || isLocalFlag(pg.isLocal);
         const entryTravelOnly = allowsTravelOnly && isTravelOnlyFlag(entry.travelOnly);
-        const entryRentalCarCount = isPlanningGroup
-          ? (Math.max(0, Number(entry.rentalCarCount || 0)) > 0 ? 1 : 0)
-          : Math.max(0, Number(entry.rentalCarCount || 0));
+        const entryRentalCarCount = Math.max(0, Number(entry.rentalCarCount || 0));
         const includeEntryInRpaTravel = qualifiesForRpaTravel(pg.fundingType, entryIsLocal, entryTravelOnly);
         const pdRates = rates.perDiemRates[entryLoc] || { lodging: 0, mie: 0 };
 
