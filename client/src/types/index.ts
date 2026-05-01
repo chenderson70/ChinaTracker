@@ -124,6 +124,7 @@ export interface PersonnelEntry {
   personnelGroupId: string;
   rankCode: string;
   count: number;
+  rowOrder?: number;
   dutyDays: number | null;
   startDate: string | null;
   endDate: string | null;

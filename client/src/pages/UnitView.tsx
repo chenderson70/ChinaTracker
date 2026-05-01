@@ -20,8 +20,9 @@ import {
   Spin,
   Popconfirm,
   message,
+  Tooltip,
 } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useApp } from '../components/AppLayout';
@@ -89,14 +90,78 @@ const WHITE_CELL_TYPE_OPTIONS = [
   { value: 'DTT (OC/T)' },
   { value: 'ECG' },
 ];
-const DAYS_PER_MONTH = 30;
+const FALLBACK_DAYS_PER_MONTH = 30;
+const PERSONNEL_ENTRY_ORDER_STEP = 1024;
 
-function monthsToDutyDays(months: number): number {
-  return Math.max(1, Math.round(months * DAYS_PER_MONTH));
+function normalizePositiveMonths(value: number | null | undefined): number | null {
+  if (value === null || value === undefined || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+
+  return Number(value);
 }
 
-function dutyDaysToMonths(dutyDays: number): number {
-  return Number((dutyDays / DAYS_PER_MONTH).toFixed(2));
+function getCalendarDurationFromMonths(startDate: Dayjs, months: number): { dutyDays: number; endDate: Dayjs } {
+  const normalizedMonths = normalizePositiveMonths(months) ?? 0;
+  const wholeMonths = Math.floor(normalizedMonths);
+  const fractionalMonths = normalizedMonths - wholeMonths;
+
+  let exclusiveEndDate = startDate.add(wholeMonths, 'month');
+  if (fractionalMonths > 0) {
+    const fractionalMonthDays = Math.max(0, Math.round(exclusiveEndDate.daysInMonth() * fractionalMonths));
+    exclusiveEndDate = exclusiveEndDate.add(fractionalMonthDays, 'day');
+  }
+
+  if (!exclusiveEndDate.isAfter(startDate)) {
+    exclusiveEndDate = startDate.add(1, 'day');
+  }
+
+  const endDate = exclusiveEndDate.subtract(1, 'day');
+  return {
+    dutyDays: endDate.diff(startDate, 'day') + 1,
+    endDate,
+  };
+}
+
+function monthsToDutyDays(months: number, startDate?: Dayjs | null): number {
+  if (startDate && startDate.isValid()) {
+    return getCalendarDurationFromMonths(startDate, months).dutyDays;
+  }
+
+  return Math.max(1, Math.round(months * FALLBACK_DAYS_PER_MONTH));
+}
+
+function getMonthsFromDateRange(
+  startDate: string | null | undefined,
+  endDate: string | null | undefined,
+  fallbackDutyDays: number,
+): number {
+  const normalizedStartDate = normalizeDateString(startDate);
+  const normalizedEndDate = normalizeDateString(endDate);
+
+  if (!normalizedStartDate || !normalizedEndDate) {
+    return Number((fallbackDutyDays / FALLBACK_DAYS_PER_MONTH).toFixed(2));
+  }
+
+  const start = dayjs(normalizedStartDate);
+  const inclusiveEnd = dayjs(normalizedEndDate);
+  if (!start.isValid() || !inclusiveEnd.isValid() || inclusiveEnd.isBefore(start)) {
+    return Number((fallbackDutyDays / FALLBACK_DAYS_PER_MONTH).toFixed(2));
+  }
+
+  const exclusiveEnd = inclusiveEnd.add(1, 'day');
+  let wholeMonths = 0;
+  let cursor = start;
+
+  while (cursor.add(1, 'month').isSame(exclusiveEnd) || cursor.add(1, 'month').isBefore(exclusiveEnd)) {
+    cursor = cursor.add(1, 'month');
+    wholeMonths += 1;
+  }
+
+  const remainingDays = Math.max(0, exclusiveEnd.diff(cursor, 'day'));
+  const fractionalMonths = cursor.daysInMonth() > 0 ? remainingDays / cursor.daysInMonth() : 0;
+
+  return Number((wholeMonths + fractionalMonths).toFixed(2));
 }
 
 function getInclusiveEndDate(startDate: Dayjs, dutyDays: number): Dayjs {
@@ -114,9 +179,10 @@ function normalizePositiveDutyDays(value: number | null | undefined): number | n
 function resolveDurationDutyDays(
   months: number | null | undefined,
   dutyDays: number | null | undefined,
+  startDate?: Dayjs | null,
 ): number | null {
   if (months !== null && months !== undefined && Number.isFinite(months) && months > 0) {
-    return monthsToDutyDays(months);
+    return monthsToDutyDays(months, startDate);
   }
 
   return normalizePositiveDutyDays(dutyDays);
@@ -127,8 +193,18 @@ function getDateRangeFromDuration(
   months: number | null | undefined,
   dutyDays: number | null | undefined,
 ): [Dayjs, Dayjs] | null {
-  const resolvedDutyDays = resolveDurationDutyDays(months, dutyDays);
-  if (!startDate || !resolvedDutyDays) {
+  if (!startDate || !startDate.isValid()) {
+    return null;
+  }
+
+  const normalizedMonths = normalizePositiveMonths(months);
+  if (normalizedMonths) {
+    const { endDate } = getCalendarDurationFromMonths(startDate, normalizedMonths);
+    return [startDate, endDate];
+  }
+
+  const resolvedDutyDays = resolveDurationDutyDays(months, dutyDays, startDate);
+  if (!resolvedDutyDays) {
     return null;
   }
 
@@ -139,21 +215,69 @@ function buildPersonnelEntryMonthsPatch(
   entry: Pick<PersonnelEntry, 'startDate'>,
   months: number,
 ) {
-  const dutyDays = monthsToDutyDays(months);
   const normalizedStartDate = normalizeDateString(entry.startDate);
   if (!normalizedStartDate) {
-    return { dutyDays };
+    return { dutyDays: monthsToDutyDays(months) };
   }
 
   const startDate = dayjs(normalizedStartDate);
   if (!startDate.isValid()) {
-    return { dutyDays };
+    return { dutyDays: monthsToDutyDays(months) };
   }
+
+  const { dutyDays, endDate } = getCalendarDurationFromMonths(startDate, months);
 
   return {
     dutyDays,
-    endDate: getInclusiveEndDate(startDate, dutyDays).format('YYYY-MM-DD'),
+    endDate: endDate.format('YYYY-MM-DD'),
   };
+}
+
+type OrderedPersonnelEntry = PersonnelEntry & {
+  _effectiveRowOrder: number;
+};
+
+function getOrderedPersonnelEntries(entries: PersonnelEntry[]): OrderedPersonnelEntry[] {
+  return entries
+    .map((entry, index) => {
+      const explicitRowOrder = Number(entry.rowOrder || 0);
+      const effectiveRowOrder = Number.isFinite(explicitRowOrder) && explicitRowOrder > 0
+        ? explicitRowOrder
+        : (index + 1) * PERSONNEL_ENTRY_ORDER_STEP;
+
+      return {
+        ...entry,
+        _effectiveRowOrder: effectiveRowOrder,
+      };
+    })
+    .sort((left, right) => {
+      if (left._effectiveRowOrder !== right._effectiveRowOrder) {
+        return left._effectiveRowOrder - right._effectiveRowOrder;
+      }
+      return String(left.id || '').localeCompare(String(right.id || ''));
+    });
+}
+
+function getNextPersonnelEntryRowOrder(entries: PersonnelEntry[]): number {
+  const orderedEntries = getOrderedPersonnelEntries(entries);
+  const lastEntry = orderedEntries[orderedEntries.length - 1];
+  return lastEntry ? lastEntry._effectiveRowOrder + PERSONNEL_ENTRY_ORDER_STEP : PERSONNEL_ENTRY_ORDER_STEP;
+}
+
+function getDuplicatedPersonnelEntryRowOrder(entries: PersonnelEntry[], sourceEntryId: string): number {
+  const orderedEntries = getOrderedPersonnelEntries(entries);
+  const sourceIndex = orderedEntries.findIndex((entry) => entry.id === sourceEntryId);
+  if (sourceIndex === -1) {
+    return getNextPersonnelEntryRowOrder(entries);
+  }
+
+  const sourceEntry = orderedEntries[sourceIndex];
+  const nextEntry = orderedEntries[sourceIndex + 1];
+  if (!nextEntry) {
+    return sourceEntry._effectiveRowOrder + PERSONNEL_ENTRY_ORDER_STEP;
+  }
+
+  return sourceEntry._effectiveRowOrder + ((nextEntry._effectiveRowOrder - sourceEntry._effectiveRowOrder) / 2);
 }
 
 function getDateRangePayload(value: [Dayjs | null, Dayjs | null] | null | undefined) {
@@ -261,6 +385,36 @@ function buildPlanningConferenceEntryPatch(
   return nextData;
 }
 
+function getPersonnelEntryNoteOptions(role: string | undefined) {
+  if (role === 'PLANNING') return PLANNING_NOTE_OPTIONS;
+  if (role === 'WHITE_CELL') return WHITE_CELL_TYPE_OPTIONS;
+  return [];
+}
+
+function getPersonnelEntryNoteLabel(role: string | undefined) {
+  return role === 'WHITE_CELL' ? 'Type' : 'Note';
+}
+
+function getPersonnelEntryNotePlaceholder(role: string | undefined) {
+  if (role === 'PLANNING') return 'Select or type a note';
+  if (role === 'WHITE_CELL') return 'Select or type a type';
+  return 'Enter a note';
+}
+
+function buildPersonnelEntryNotePatch(
+  role: string | undefined,
+  note: string | null | undefined,
+  planningConferenceDates: PlanningConferenceDates | null | undefined,
+) {
+  if (role === 'PLANNING') {
+    return buildPlanningConferenceEntryPatch(note, planningConferenceDates);
+  }
+
+  return {
+    note: String(note || '').trim() || null,
+  };
+}
+
 function EntryAutoCompleteInput({
   value,
   options,
@@ -278,8 +432,8 @@ function EntryAutoCompleteInput({
     setDraft(String(value || ''));
   }, [value]);
 
-  const commit = () => {
-    const nextValue = draft.trim();
+  const commit = (nextDraft = draft) => {
+    const nextValue = nextDraft.trim();
     const currentValue = String(value || '').trim();
     if (nextValue === currentValue) return;
     onSave(nextValue || null);
@@ -289,24 +443,34 @@ function EntryAutoCompleteInput({
     <AutoComplete
       size="small"
       value={draft}
-      options={options}
+      options={options.map((option) => ({ value: option.value, label: option.value }))}
       style={{ width: '100%' }}
       placeholder={placeholder}
+      allowClear
+      defaultActiveFirstOption={false}
       filterOption={(inputValue, option) =>
         String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
       }
-      onChange={setDraft}
+      onChange={(nextValue) => {
+        setDraft(nextValue);
+      }}
       onSelect={(nextValue) => {
         setDraft(nextValue);
-        onSave(nextValue.trim() || null);
+        commit(nextValue);
       }}
-    >
-      <Input
-        size="small"
-        onBlur={commit}
-        onPressEnter={commit}
-      />
-    </AutoComplete>
+      onBlur={() => commit()}
+      onClear={() => {
+        setDraft('');
+        if (String(value || '').trim()) {
+          onSave(null);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        commit();
+      }}
+    />
   );
 }
 
@@ -581,6 +745,20 @@ export default function UnitView() {
     },
   });
 
+  const duplicateEntryMut = useMutation({
+    mutationFn: async ({ groupId, data }: { groupId: string; data: any }) => {
+      await pushUndoSnapshot('Duplicate Personnel Entry');
+      return api.addPersonnelEntry(groupId, data);
+    },
+    onSuccess: async () => {
+      message.success('Entry duplicated');
+      await refreshExerciseAndBudget();
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to duplicate entry');
+    },
+  });
+
   const deleteEntryMut = useMutation({
     mutationFn: (id: string) => api.deletePersonnelEntry(id),
     onMutate: async (entryId: string) => {
@@ -675,6 +853,9 @@ export default function UnitView() {
     entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'WHITE_CELL' || entryModalGroup?.role === 'SUPPORT';
   const entryModalAllowsTravelOnly = entryModalGroup?.fundingType === 'RPA'
     && (entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'SUPPORT');
+  const entryModalNoteLabel = getPersonnelEntryNoteLabel(entryModalGroup?.role);
+  const entryModalNoteOptions = getPersonnelEntryNoteOptions(entryModalGroup?.role);
+  const entryModalNotePlaceholder = getPersonnelEntryNotePlaceholder(entryModalGroup?.role);
   const handleEntryModalPlanningNoteChange = useCallback((nextValue: string) => {
     setEntryModalNoteDraft(nextValue);
 
@@ -802,6 +983,9 @@ export default function UnitView() {
     const isWhiteCell = role === 'WHITE_CELL';
     const supportsRentalCars = role === 'PLANNING' || role === 'WHITE_CELL' || role === 'SUPPORT';
     const usesEntryLevelRental = supportsRentalCars;
+    const noteLabel = getPersonnelEntryNoteLabel(role);
+    const noteOptions = getPersonnelEntryNoteOptions(role);
+    const notePlaceholder = getPersonnelEntryNotePlaceholder(role);
     const isPlayerRpa = isPlayerLike && ft === 'RPA';
     const isPlayerOm = isPlayer && ft === 'OM';
     const showTravelOnly = ft === 'RPA' && (role === 'PLANNING' || role === 'SUPPORT');
@@ -929,6 +1113,7 @@ export default function UnitView() {
         ? buildPlayerExecutionEntryDefaults(entry, exerciseDateDefaults)
         : entry
     ));
+    const orderedPersonnelEntriesForDisplay = getOrderedPersonnelEntries(personnelEntriesForDisplay);
 
     return (
       <Card
@@ -976,7 +1161,7 @@ export default function UnitView() {
             size="small"
             pagination={false}
             scroll={{ x: 'max-content' }}
-            dataSource={personnelEntriesForDisplay.map((e) => ({ ...e, key: e.id }))}
+            dataSource={orderedPersonnelEntriesForDisplay.map((e) => ({ ...e, key: e.id }))}
             columns={[
               {
                 title: 'Rank',
@@ -1014,7 +1199,11 @@ export default function UnitView() {
                     min={0}
                     step={0.25}
                     precision={2}
-                    value={dutyDaysToMonths(value ?? exercise!.defaultDutyDays)}
+                    value={getMonthsFromDateRange(
+                      (row as PersonnelEntry).startDate,
+                      (row as PersonnelEntry).endDate,
+                      value ?? exercise!.defaultDutyDays,
+                    )}
                     style={{ width: '100%' }}
                     onSave={(nextValue) => {
                       updateEntryMut.mutate({
@@ -1108,39 +1297,24 @@ export default function UnitView() {
                   />
                 ),
               },
-              ...(isPlanning ? [{
-                title: 'Note',
+              {
+                title: noteLabel,
                 dataIndex: 'note',
                 width: 180,
                 render: (value: string | null, row: { id: string }) => (
                   <EntryAutoCompleteInput
                     value={value}
-                    options={PLANNING_NOTE_OPTIONS}
-                    placeholder="Select or type a note"
+                    options={noteOptions}
+                    placeholder={notePlaceholder}
                     onSave={(nextValue) => {
                       updateEntryMut.mutate({
                         id: row.id,
-                        data: buildPlanningConferenceEntryPatch(nextValue, exercise?.planningConferenceDates),
+                        data: buildPersonnelEntryNotePatch(role, nextValue, exercise?.planningConferenceDates),
                       });
                     }}
                   />
                 ),
-              }] : []),
-              ...(isWhiteCell ? [{
-                title: 'Type',
-                dataIndex: 'note',
-                width: 180,
-                render: (value: string | null, row: { id: string }) => (
-                  <EntryAutoCompleteInput
-                    value={value}
-                    options={WHITE_CELL_TYPE_OPTIONS}
-                    placeholder="Select or type a type"
-                    onSave={(nextValue) => {
-                      updateEntryMut.mutate({ id: row.id, data: { note: nextValue } });
-                    }}
-                  />
-                ),
-              }] : []),
+              },
               ...(showTravelOnly ? [{
                 title: 'Travel Only',
                 dataIndex: 'travelOnly',
@@ -1188,11 +1362,38 @@ export default function UnitView() {
               },
               {
                 title: '',
-                width: 50,
-                render: (_, row) => (
-                  <Popconfirm title="Remove?" onConfirm={() => deleteEntryMut.mutate(row.id)}>
-                    <Button size="small" danger icon={<DeleteOutlined />} />
-                  </Popconfirm>
+                width: 90,
+                render: (_: unknown, row: OrderedPersonnelEntry) => (
+                  <Space size={6}>
+                    <Tooltip title="Duplicate row">
+                      <Button
+                        size="small"
+                        icon={<CopyOutlined />}
+                        onClick={() => {
+                          duplicateEntryMut.mutate({
+                            groupId: group.id,
+                            data: {
+                              rankCode: row.rankCode,
+                              count: row.count,
+                              rowOrder: getDuplicatedPersonnelEntryRowOrder(orderedPersonnelEntriesForDisplay, row.id),
+                              dutyDays: row.dutyDays ?? exercise?.defaultDutyDays ?? 1,
+                              startDate: row.startDate ?? null,
+                              endDate: row.endDate ?? null,
+                              rentalCarCount: row.rentalCarCount || 0,
+                              location: row.location ?? group.location ?? null,
+                              isLocal: !!row.isLocal,
+                              note: row.note ?? null,
+                              travelOnly: !!row.travelOnly,
+                              longTermA7Planner: !!row.longTermA7Planner,
+                            },
+                          });
+                        }}
+                      />
+                    </Tooltip>
+                    <Popconfirm title="Remove?" onConfirm={() => deleteEntryMut.mutate(row.id)}>
+                      <Button size="small" danger icon={<DeleteOutlined />} />
+                    </Popconfirm>
+                  </Space>
                 ),
               },
             ]}
@@ -1785,11 +1986,12 @@ export default function UnitView() {
             const { startDate, endDate } = getDateRangePayload(submittedDateRange);
             const dateRangeDutyDays = calculateInclusiveDateRangeDays(startDate, endDate);
             const calculatedDutyDays = entryModalIsPlanning && values.months !== undefined && values.months !== null
-              ? monthsToDutyDays(values.months)
+              ? resolveDurationDutyDays(values.months, values.dutyDays, submittedDateRange?.[0] ?? null)
               : values.dutyDays;
             const payload = {
               rankCode: values.rankCode,
               count: values.count,
+              rowOrder: getNextPersonnelEntryRowOrder(entryModalGroup?.personnelEntries || []),
               dutyDays: dateRangeDutyDays ?? calculatedDutyDays,
               startDate,
               endDate,
@@ -1797,7 +1999,7 @@ export default function UnitView() {
                 ? (values.rentalCarCount || 0)
                 : 0,
               location: values.location,
-              note: (entryModalIsPlanning || entryModalIsWhiteCell) ? (entryModalNoteDraft.trim() || null) : null,
+              note: entryModalNoteDraft.trim() || null,
               travelOnly: entryModalAllowsTravelOnly ? entryModalTravelOnlyDraft : false,
               longTermA7Planner: entryModalIsPlanning ? entryModalLongTermA7PlannerDraft : false,
               isLocal: !!values.isLocal,
@@ -1832,7 +2034,7 @@ export default function UnitView() {
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
           {entryModalIsPlanning && (
-            <Form.Item name="months" label="Months (optional, 30 days/month)">
+          <Form.Item name="months" label="Months (optional, calendar months from start date)">
               <InputNumber
                 min={0}
                 step={0.25}
@@ -1840,7 +2042,7 @@ export default function UnitView() {
                 style={{ width: '100%' }}
                 onChange={(value) => {
                   const currentDateRange = entryForm.getFieldValue('dateRange') as [Dayjs | null, Dayjs | null] | null | undefined;
-                  const nextDutyDays = resolveDurationDutyDays(value, null);
+                  const nextDutyDays = resolveDurationDutyDays(value, null, currentDateRange?.[0] ?? null);
                   entryForm.setFieldValue('dutyDays', nextDutyDays ?? undefined);
 
                   const nextDateRange = getDateRangeFromDuration(currentDateRange?.[0] ?? null, value, nextDutyDays);
@@ -1863,7 +2065,7 @@ export default function UnitView() {
                 if (!nextDateRange) return;
 
                 entryForm.setFieldValue('dateRange', nextDateRange);
-                entryForm.setFieldValue('dutyDays', resolveDurationDutyDays(months, dutyDays));
+                entryForm.setFieldValue('dutyDays', resolveDurationDutyDays(months, dutyDays, dates[0]));
               }}
               onChange={(dates) => {
                 if (dates && dates[0] && dates[1]) {
@@ -1878,7 +2080,7 @@ export default function UnitView() {
                 if (!nextDateRange) return;
 
                 entryForm.setFieldValue('dateRange', nextDateRange);
-                entryForm.setFieldValue('dutyDays', resolveDurationDutyDays(months, dutyDays));
+                entryForm.setFieldValue('dutyDays', resolveDurationDutyDays(months, dutyDays, dates[0]));
               }}
             />
           </Form.Item>
@@ -1904,23 +2106,22 @@ export default function UnitView() {
           <Form.Item name="location" label="Location" initialValue={perDiemLocations[0] || 'FORT_HUNTER_LIGGETT'} rules={[{ required: true }]}>
             <Select options={perDiemLocations.map((loc) => ({ value: loc, label: loc }))} />
           </Form.Item>
-          {(entryModalIsPlanning || entryModalIsWhiteCell) && (
-            <Form.Item label={entryModalIsWhiteCell ? 'Type' : 'Note'}>
-              <AutoComplete
-                value={entryModalNoteDraft}
-                options={entryModalIsWhiteCell ? WHITE_CELL_TYPE_OPTIONS : PLANNING_NOTE_OPTIONS}
-                style={{ width: '100%' }}
-                placeholder={entryModalIsWhiteCell ? 'Select or type a type' : 'Select or type a note'}
-                filterOption={(inputValue, option) =>
-                  String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
-                }
-                onChange={entryModalIsPlanning ? handleEntryModalPlanningNoteChange : setEntryModalNoteDraft}
-                onSelect={entryModalIsPlanning ? handleEntryModalPlanningNoteChange : setEntryModalNoteDraft}
-              >
-                <Input />
-              </AutoComplete>
-            </Form.Item>
-          )}
+          <Form.Item label={entryModalNoteLabel}>
+            <AutoComplete
+              value={entryModalNoteDraft}
+              options={entryModalNoteOptions.map((option) => ({ value: option.value, label: option.value }))}
+              style={{ width: '100%' }}
+              placeholder={entryModalNotePlaceholder}
+              allowClear
+              defaultActiveFirstOption={false}
+              filterOption={(inputValue, option) =>
+                String(option?.value || '').toLowerCase().includes(inputValue.toLowerCase())
+              }
+              onChange={entryModalIsPlanning ? handleEntryModalPlanningNoteChange : setEntryModalNoteDraft}
+              onSelect={entryModalIsPlanning ? handleEntryModalPlanningNoteChange : setEntryModalNoteDraft}
+              onClear={() => setEntryModalNoteDraft('')}
+            />
+          </Form.Item>
           {entryModalAllowsTravelOnly && (
             <Form.Item label="Travel Only">
               <Switch
@@ -1978,7 +2179,23 @@ export default function UnitView() {
           <Form.Item name="type" label="Type" rules={[{ required: true, message: 'Enter contract type' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="dateRange" label="Date Range (optional)">
+          <Form.Item
+            name="dateRange"
+            label={(
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%' }}>
+                <span>Date Range (optional)</span>
+                <Button
+                  type="link"
+                  size="small"
+                  style={{ paddingInline: 0 }}
+                  disabled={!exerciseDateDefaults.dateRange}
+                  onClick={() => contractForm.setFieldValue('dateRange', exerciseDateDefaults.dateRange)}
+                >
+                  Insert Execution Dates
+                </Button>
+              </div>
+            )}
+          >
             <DatePicker.RangePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="cost" label="Cost" rules={[{ required: true, message: 'Enter contract cost' }]}>
@@ -2016,7 +2233,23 @@ export default function UnitView() {
           <Form.Item name="type" label="Type" rules={[{ required: true, message: 'Enter purchase type' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="dateRange" label="Date Range (optional)">
+          <Form.Item
+            name="dateRange"
+            label={(
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%' }}>
+                <span>Date Range (optional)</span>
+                <Button
+                  type="link"
+                  size="small"
+                  style={{ paddingInline: 0 }}
+                  disabled={!exerciseDateDefaults.dateRange}
+                  onClick={() => gpcForm.setFieldValue('dateRange', exerciseDateDefaults.dateRange)}
+                >
+                  Insert Execution Dates
+                </Button>
+              </div>
+            )}
+          >
             <DatePicker.RangePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="cost" label="Cost" rules={[{ required: true, message: 'Enter purchase cost' }]}>
@@ -2057,7 +2290,23 @@ export default function UnitView() {
           <Form.Item name="amount" label="Amount" rules={[{ required: true }]}>
             <InputNumber min={0} style={{ width: '100%' }} prefix="$" />
           </Form.Item>
-          <Form.Item name="dateRange" label="Date Range (optional)">
+          <Form.Item
+            name="dateRange"
+            label={(
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%' }}>
+                <span>Date Range (optional)</span>
+                <Button
+                  type="link"
+                  size="small"
+                  style={{ paddingInline: 0 }}
+                  disabled={!exerciseDateDefaults.dateRange}
+                  onClick={() => execForm.setFieldValue('dateRange', exerciseDateDefaults.dateRange)}
+                >
+                  Insert Execution Dates
+                </Button>
+              </div>
+            )}
+          >
             <DatePicker.RangePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="notes" label="Notes">

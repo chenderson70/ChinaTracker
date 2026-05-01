@@ -112,6 +112,7 @@ model PersonnelEntry {
   personnelGroupId String         @map("personnel_group_id")
   rankCode         String         @map("rank_code")
   count            Int
+  rowOrder         Float          @default(0) @map("row_order")
   dutyDays         Int?           @map("duty_days")
   startDate        DateTime?      @map("start_date")
   endDate          DateTime?      @map("end_date")

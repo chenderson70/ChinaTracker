@@ -161,6 +161,15 @@ function cloneUndoSnapshot(exercise: ExerciseDetail, appConfig: Record<string, s
   })) as ExerciseUndoSnapshot;
 }
 
+function upsertExerciseSummary(
+  current: Exercise[] | undefined,
+  nextExercise: Exercise,
+): Exercise[] {
+  const existing = current || [];
+  const withoutNext = existing.filter((exercise) => exercise.id !== nextExercise.id);
+  return [nextExercise, ...withoutNext];
+}
+
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -286,6 +295,8 @@ export default function AppLayout() {
   const createMut = useMutation({
     mutationFn: api.createExercise,
     onSuccess: (ex) => {
+      queryClient.setQueryData<Exercise[]>(['exercises'], (current) => upsertExerciseSummary(current, ex));
+      queryClient.setQueryData(['exercise', ex.id], ex);
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
       setExerciseId(ex.id);
       setCreateOpen(false);
@@ -511,8 +522,9 @@ export default function AppLayout() {
   const copyExerciseMut = useMutation({
     mutationFn: (id: string) => api.copyExercise(id),
     onSuccess: (copiedExercise) => {
-      queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      queryClient.setQueryData<Exercise[]>(['exercises'], (current) => upsertExerciseSummary(current, copiedExercise));
       queryClient.setQueryData(['exercise', copiedExercise.id], copiedExercise);
+      queryClient.invalidateQueries({ queryKey: ['exercises'] });
       setUndoStacks((current) => ({
         ...current,
         [copiedExercise.id]: [],

@@ -605,6 +605,7 @@ router.post('/:id/copy', async (req: Request, res: Response) => {
                   create: (group.personnelEntries || []).map((entry) => ({
                     rankCode: entry.rankCode,
                     count: Math.max(0, Number(entry.count || 0)),
+                    rowOrder: Number((entry as any).rowOrder || 0),
                     dutyDays: entry.dutyDays == null ? null : Math.max(0, Number(entry.dutyDays || 0)),
                     startDate: entry.startDate == null ? null : entry.startDate,
                     endDate: entry.endDate == null ? null : entry.endDate,
@@ -614,7 +615,7 @@ router.post('/:id/copy', async (req: Request, res: Response) => {
                     note: entry.note,
                     travelOnly: !!entry.travelOnly,
                     longTermA7Planner: !!entry.longTermA7Planner,
-                  })),
+                  }) as any),
                 },
               })),
             },
@@ -828,6 +829,7 @@ router.put('/:id/restore', async (req: Request, res: Response) => {
                 personnelGroupId: createdPersonnelGroup.id,
                 rankCode: String(sourcePersonnelEntry.rankCode || ''),
                 count: Math.max(0, Number(sourcePersonnelEntry.count || 0)),
+                rowOrder: Number(sourcePersonnelEntry.rowOrder || 0),
                 dutyDays: sourcePersonnelEntry.dutyDays == null ? null : Math.max(0, Number(sourcePersonnelEntry.dutyDays || 0)),
                 startDate: parseOptionalDateField(sourcePersonnelEntry.startDate),
                 endDate: parseOptionalDateField(sourcePersonnelEntry.endDate),
@@ -837,7 +839,7 @@ router.put('/:id/restore', async (req: Request, res: Response) => {
                 note: sourcePersonnelEntry.note == null ? null : String(sourcePersonnelEntry.note || ''),
                 travelOnly: !!sourcePersonnelEntry.travelOnly,
                 longTermA7Planner: !!sourcePersonnelEntry.longTermA7Planner,
-              },
+              } as any,
             });
           }
         }

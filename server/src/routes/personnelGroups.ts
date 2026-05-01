@@ -12,6 +12,12 @@ function parseOptionalDateField(value: unknown): Date | null | undefined {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function normalizeRowOrder(value: unknown): number | undefined {
+  if (value === undefined || value === null || String(value).trim() === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 // ─── UPDATE PERSONNEL GROUP ───
 router.put('/personnel-groups/:groupId', async (req: Request, res: Response) => {
   try {
@@ -118,6 +124,7 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
     const group = await prisma.personnelGroup.findUnique({
       where: { id: req.params.groupId },
       include: {
+        personnelEntries: true,
         unitBudget: {
           include: {
             exercise: true,
@@ -129,13 +136,19 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
       return res.status(404).json({ error: 'Personnel group not found' });
     }
 
-    const { rankCode, count, dutyDays, startDate, endDate, rentalCarCount, location, isLocal, note, travelOnly, longTermA7Planner } = req.body;
+    const { rankCode, count, dutyDays, startDate, endDate, rentalCarCount, location, isLocal, note, travelOnly, longTermA7Planner, rowOrder } = req.body;
     const normalizedRentalCarCount = Math.max(0, Number(rentalCarCount ?? 0));
+    const normalizedRowOrder = normalizeRowOrder(rowOrder);
+    const existingEntryCount = Array.isArray(group.personnelEntries) ? group.personnelEntries.length : 0;
+    const maxKnownRowOrder = (group.personnelEntries || [])
+      .reduce((max, entry) => Math.max(max, Number((entry as any).rowOrder || 0)), 0);
+    const defaultRowOrder = normalizedRowOrder ?? ((maxKnownRowOrder > 0 ? maxKnownRowOrder : existingEntryCount * 1024) + 1024);
     const entry = await prisma.personnelEntry.create({
       data: {
         personnelGroupId: req.params.groupId,
         rankCode,
         count,
+        rowOrder: defaultRowOrder,
         dutyDays,
         startDate: parseOptionalDateField(startDate),
         endDate: parseOptionalDateField(endDate),
@@ -145,7 +158,7 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
         note: note ?? null,
         travelOnly: !!travelOnly,
         longTermA7Planner: !!longTermA7Planner,
-      },
+      } as any,
     });
 
     const updatedGroup = await prisma.personnelGroup.findUnique({

@@ -36,6 +36,7 @@ export interface PersonnelEntryRow {
   personnelGroupId: string;
   rankCode: string;
   count: number;
+  rowOrder?: number;
   startDate: string | null;
   endDate: string | null;
 }

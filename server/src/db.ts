@@ -107,6 +107,7 @@ async function ensureSqliteCompatibilityColumns(): Promise<void> {
 	await ensureSqliteColumn('unit_budgets', 'unit_display_name', 'TEXT');
 
 	await ensureSqliteColumn('personnel_entries', 'note', 'TEXT');
+	await ensureSqliteColumn('personnel_entries', 'row_order', 'REAL NOT NULL DEFAULT 0');
 	await ensureSqliteColumn('personnel_entries', 'travel_only', 'BOOLEAN NOT NULL DEFAULT false');
 	await ensureSqliteColumn('personnel_entries', 'rental_car_count', 'INTEGER NOT NULL DEFAULT 0');
 	await ensureSqliteColumn('personnel_entries', 'long_term_a7_planner', 'BOOLEAN NOT NULL DEFAULT false');

@@ -297,6 +297,7 @@ export async function addPersonnelEntry(
   data: {
     rankCode: string;
     count: number;
+    rowOrder?: number;
     dutyDays?: number | null;
     startDate?: string | null;
     endDate?: string | null;
@@ -313,7 +314,7 @@ export async function addPersonnelEntry(
 
 export async function updatePersonnelEntry(
   entryId: string,
-  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'dutyDays' | 'startDate' | 'endDate' | 'rentalCarCount' | 'location' | 'isLocal' | 'note' | 'travelOnly' | 'longTermA7Planner'>>,
+  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'rowOrder' | 'dutyDays' | 'startDate' | 'endDate' | 'rentalCarCount' | 'location' | 'isLocal' | 'note' | 'travelOnly' | 'longTermA7Planner'>>,
 ): Promise<PersonnelEntry> {
   return apiRequest<PersonnelEntry>(`/personnel-entries/${entryId}`, { method: 'PUT', body: data });
 }
@@ -502,6 +503,7 @@ export async function exportAllData(): Promise<string> {
           personnelGroupId: group.id,
           rankCode: entry.rankCode,
           count: entry.count,
+          rowOrder: entry.rowOrder,
           dutyDays: entry.dutyDays,
           startDate: entry.startDate,
           endDate: entry.endDate,
@@ -561,6 +563,7 @@ export async function importAllData(json: string): Promise<void> {
       personnelGroupId: string;
       rankCode: string;
       count: number;
+      rowOrder?: number;
       dutyDays?: number | null;
       startDate?: string | null;
       endDate?: string | null;
@@ -720,6 +723,7 @@ export async function importAllData(json: string): Promise<void> {
         await addPersonnelEntry(mappedGroupId, {
           rankCode: entry.rankCode,
           count: entry.count,
+          rowOrder: entry.rowOrder,
           dutyDays: entry.dutyDays ?? null,
           startDate: entry.startDate ?? null,
           endDate: entry.endDate ?? null,
