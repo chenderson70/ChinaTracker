@@ -40,6 +40,7 @@ type PlanningConferenceDateRange = {
 type PlanningConferenceDates = Record<PlanningConferenceKey, PlanningConferenceDateRange>;
 
 type ExerciseTemplate = 'PATRIOT_MEDIC' | 'PATRIOT_PHOENIX' | 'PATRIOT_FORGE';
+type DefaultUnitCode = 'SG' | 'AE' | 'CAB' | 'A7';
 
 const DEFAULT_EXERCISE_TEMPLATE: ExerciseTemplate = 'PATRIOT_MEDIC';
 const VALID_EXERCISE_TEMPLATES = new Set<ExerciseTemplate>([
@@ -64,6 +65,18 @@ const EMPTY_PLANNING_CONFERENCE_DATES: PlanningConferenceDates = {
 function normalizeExerciseTemplate(value: unknown): ExerciseTemplate {
   const normalized = String(value || '').trim().toUpperCase() as ExerciseTemplate;
   return VALID_EXERCISE_TEMPLATES.has(normalized) ? normalized : DEFAULT_EXERCISE_TEMPLATE;
+}
+
+function getDefaultUnitCodesForTemplate(template: ExerciseTemplate): DefaultUnitCode[] {
+  if (template === 'PATRIOT_PHOENIX') {
+    return ['CAB', 'A7'];
+  }
+
+  return ['SG', 'AE', 'CAB', 'A7'];
+}
+
+function getPersonnelTemplateForUnitCode(unitCode: string): 'STANDARD' | 'A7' {
+  return String(unitCode || '').trim().toUpperCase() === 'A7' ? 'A7' : 'STANDARD';
 }
 
 function normalizeQuarterlySnapshotsInput(value: unknown): QuarterlySnapshotDates {
@@ -397,52 +410,118 @@ async function ensurePlanningGroups(exerciseId: string): Promise<void> {
   }
 }
 
-// Helper: seed default unit budgets and personnel groups for a new exercise
-async function seedExerciseDefaults(exerciseId: string) {
-  const travelDefaults = await loadTravelDefaults();
-  const units: Array<{ code: 'SG' | 'AE' | 'CAB' | 'A7' }> = [
-    { code: 'SG' },
-    { code: 'AE' },
-    { code: 'CAB' },
-    { code: 'A7' },
-  ];
+async function createUnitBudgetWithTemplate(exerciseId: string, unitCodeRaw: string, template: 'STANDARD' | 'A7') {
+  const normalizedUnitCode = normalizeUnitCodeInput(unitCodeRaw);
+  const ub = await prisma.unitBudget.create({
+    data: { exerciseId, unitCode: normalizedUnitCode },
+  });
 
-  for (const u of units) {
-    const ub = await prisma.unitBudget.create({
-      data: { exerciseId, unitCode: u.code },
-    });
+  const roles = template === 'A7' ? ['PLANNING', 'SUPPORT'] : ['PLANNING', 'PLAYER', 'WHITE_CELL'];
+  const fundingTypes = ['RPA', 'OM'];
 
-    if (u.code === 'A7') {
-      // A7 gets Planning + Support instead of Player + WhiteCell
-      const groups = [
-        { role: 'PLANNING' as const, fundingType: 'RPA' as const },
-        { role: 'PLANNING' as const, fundingType: 'OM' as const },
-        { role: 'SUPPORT' as const, fundingType: 'RPA' as const },
-        { role: 'SUPPORT' as const, fundingType: 'OM' as const },
-      ];
-      for (const g of groups) {
-        await prisma.personnelGroup.create({
-          data: { unitBudgetId: ub.id, role: g.role, fundingType: g.fundingType, location: 'FORT_HUNTER_LIGGETT' },
-        });
-      }
-    } else {
-      const groups = [
-        { role: 'PLANNING' as const, fundingType: 'RPA' as const },
-        { role: 'PLANNING' as const, fundingType: 'OM' as const },
-        { role: 'PLAYER' as const, fundingType: 'RPA' as const },
-        { role: 'PLAYER' as const, fundingType: 'OM' as const },
-        { role: 'WHITE_CELL' as const, fundingType: 'RPA' as const },
-        { role: 'WHITE_CELL' as const, fundingType: 'OM' as const },
-        ...(shouldCreateAnnualTourGroup(u.code)
-          ? [{ role: 'ANNUAL_TOUR' as const, fundingType: 'RPA' as const }]
-          : []),
-      ];
-      for (const g of groups) {
-        await prisma.personnelGroup.create({
-          data: { unitBudgetId: ub.id, role: g.role, fundingType: g.fundingType, location: 'FORT_HUNTER_LIGGETT' },
-        });
-      }
+  for (const role of roles) {
+    for (const fundingType of fundingTypes) {
+      await prisma.personnelGroup.create({
+        data: {
+          unitBudgetId: ub.id,
+          role,
+          fundingType,
+          location: 'FORT_HUNTER_LIGGETT',
+        },
+      });
     }
+  }
+
+  if (template !== 'A7' && shouldCreateAnnualTourGroup(normalizedUnitCode)) {
+    await prisma.personnelGroup.create({
+      data: {
+        unitBudgetId: ub.id,
+        role: 'ANNUAL_TOUR',
+        fundingType: 'RPA',
+        location: 'FORT_HUNTER_LIGGETT',
+      },
+    });
+  }
+
+  return ub;
+}
+
+function isUnitBudgetEffectivelyEmpty(unitBudget: {
+  unitDisplayName?: string | null;
+  executionCostLines?: Array<unknown>;
+  personnelGroups?: Array<{
+    paxCount?: number | null;
+    dutyDays?: number | null;
+    isLongTour?: boolean | null;
+    isLocal?: boolean | null;
+    airfarePerPerson?: number | null;
+    rentalCarCount?: number | null;
+    rentalCarDaily?: number | null;
+    rentalCarDays?: number | null;
+    avgCpdOverride?: number | null;
+    personnelEntries?: Array<unknown>;
+  }>;
+}): boolean {
+  if (String(unitBudget.unitDisplayName || '').trim()) return false;
+  if ((unitBudget.executionCostLines || []).length > 0) return false;
+
+  return (unitBudget.personnelGroups || []).every((group) => {
+    if ((group.personnelEntries || []).length > 0) return false;
+    if (Number(group.paxCount || 0) > 0) return false;
+    if (Number(group.dutyDays || 0) > 0) return false;
+    if (Number(group.rentalCarCount || 0) > 0) return false;
+    if (Number(group.rentalCarDays || 0) > 0) return false;
+    if (group.airfarePerPerson != null) return false;
+    if (group.rentalCarDaily != null) return false;
+    if (group.avgCpdOverride != null) return false;
+    if (group.isLongTour) return false;
+    if (group.isLocal) return false;
+    return true;
+  });
+}
+
+async function reconcileExerciseUnitsForTemplate(exerciseId: string, template: ExerciseTemplate): Promise<void> {
+  const desiredUnitCodes = new Set<string>(getDefaultUnitCodesForTemplate(template));
+  const unitBudgets = await prisma.unitBudget.findMany({
+    where: { exerciseId },
+    include: {
+      personnelGroups: {
+        include: {
+          personnelEntries: true,
+        },
+      },
+      executionCostLines: true,
+    },
+  });
+
+  const existingUnitCodes = new Set(
+    unitBudgets.map((unitBudget) => normalizeUnitCodeInput(unitBudget.unitCode)),
+  );
+
+  for (const unitCode of desiredUnitCodes) {
+    if (!existingUnitCodes.has(unitCode)) {
+      await createUnitBudgetWithTemplate(exerciseId, unitCode, getPersonnelTemplateForUnitCode(unitCode));
+    }
+  }
+
+  for (const unitBudget of unitBudgets) {
+    const normalizedUnitCode = normalizeUnitCodeInput(unitBudget.unitCode);
+    if (desiredUnitCodes.has(normalizedUnitCode)) continue;
+    if (!isUnitBudgetEffectivelyEmpty(unitBudget)) continue;
+
+    await prisma.unitBudget.delete({
+      where: { id: unitBudget.id },
+    });
+  }
+}
+
+// Helper: seed default unit budgets and personnel groups for a new exercise
+async function seedExerciseDefaults(exerciseId: string, template: ExerciseTemplate) {
+  const travelDefaults = await loadTravelDefaults();
+  const units = getDefaultUnitCodesForTemplate(template);
+
+  for (const unitCode of units) {
+    await createUnitBudgetWithTemplate(exerciseId, unitCode, getPersonnelTemplateForUnitCode(unitCode));
   }
 
   // Default travel config
@@ -519,7 +598,7 @@ router.post('/', async (req: Request, res: Response) => {
         ...(expenseNarratives !== undefined ? { expenseNarrativesJson: JSON.stringify(normalizeExpenseNarrativesInput(expenseNarratives)) } : {}),
       },
     });
-    await seedExerciseDefaults(exercise.id);
+    await seedExerciseDefaults(exercise.id, normalizeExerciseTemplate(exerciseTemplate));
     const full = await loadFullExercise(exercise.id);
     res.status(201).json(serializeExercise(full));
   } catch (err: any) {
@@ -686,8 +765,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       expenseNarratives,
     } = req.body;
     const data: any = {};
+    const normalizedExerciseTemplate =
+      exerciseTemplate !== undefined
+        ? normalizeExerciseTemplate(exerciseTemplate)
+        : normalizeExerciseTemplate(existing.exerciseTemplate);
     if (name !== undefined) data.name = name;
-    if (exerciseTemplate !== undefined) data.exerciseTemplate = normalizeExerciseTemplate(exerciseTemplate);
+    if (exerciseTemplate !== undefined) data.exerciseTemplate = normalizedExerciseTemplate;
     if (planningConferenceDates !== undefined) data.planningConferenceDatesJson = JSON.stringify(normalizePlanningConferenceDatesInput(planningConferenceDates));
     if (quarterlySnapshots !== undefined) data.quarterlySnapshotsJson = JSON.stringify(normalizeQuarterlySnapshotsInput(quarterlySnapshots));
     if (startDate !== undefined) data.startDate = new Date(startDate);
@@ -711,6 +794,9 @@ router.put('/:id', async (req: Request, res: Response) => {
       data.totalBudget = parsedTotalBudget;
     }
     const exercise = await prisma.exercise.update({ where: { id: req.params.id }, data });
+    if (exerciseTemplate !== undefined) {
+      await reconcileExerciseUnitsForTemplate(req.params.id, normalizedExerciseTemplate);
+    }
     res.json(serializeExercise(exercise));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1112,34 +1198,8 @@ router.post('/:id/units', async (req: Request, res: Response) => {
     const existing = await prisma.unitBudget.findFirst({ where: { exerciseId: req.params.id, unitCode: unitCodeRaw } });
     if (existing) return res.status(409).json({ error: 'Unit already exists for this exercise' });
 
-    const ub = await prisma.unitBudget.create({ data: { exerciseId: req.params.id, unitCode: unitCodeRaw } });
     const template = String(req.body?.template || 'STANDARD').toUpperCase();
-    const roles = template === 'A7' ? ['PLANNING', 'SUPPORT'] : ['PLANNING', 'PLAYER', 'WHITE_CELL'];
-    const fundingTypes = ['RPA', 'OM'];
-
-    for (const role of roles) {
-      for (const fundingType of fundingTypes) {
-        await prisma.personnelGroup.create({
-          data: {
-            unitBudgetId: ub.id,
-            role,
-            fundingType,
-            location: 'FORT_HUNTER_LIGGETT',
-          },
-        });
-      }
-    }
-
-    if (template !== 'A7' && shouldCreateAnnualTourGroup(unitCodeRaw)) {
-      await prisma.personnelGroup.create({
-        data: {
-          unitBudgetId: ub.id,
-          role: 'ANNUAL_TOUR',
-          fundingType: 'RPA',
-          location: 'FORT_HUNTER_LIGGETT',
-        },
-      });
-    }
+    await createUnitBudgetWithTemplate(req.params.id, unitCodeRaw, template === 'A7' ? 'A7' : 'STANDARD');
 
     const full = await loadFullExercise(req.params.id);
     res.status(201).json(serializeExercise(full));

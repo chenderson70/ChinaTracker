@@ -304,13 +304,10 @@ export default function Dashboard() {
       icon: <UserOutlined />,
     },
     {
-      label: 'Players - Annual Tour',
-      value: totalAnnualTour.toString(),
-      icon: <UserOutlined />,
-    },
-    {
-      label: 'Players - RPA',
-      value: totalPlayers.toString(),
+      label: 'Players',
+      value: (totalAnnualTour + totalPlayers).toString(),
+      detail: `(${totalAnnualTour} AT)`,
+      note: `(${totalPlayers} RPA)`,
       icon: <UserOutlined />,
     },
     {
