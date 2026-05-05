@@ -310,6 +310,8 @@ export async function addPersonnelEntry(
     location?: string | null;
     isLocal?: boolean;
     note?: string | null;
+    utcCode?: string | null;
+    utcTitle?: string | null;
     travelOnly?: boolean;
     longTermA7Planner?: boolean;
   },
@@ -319,7 +321,7 @@ export async function addPersonnelEntry(
 
 export async function updatePersonnelEntry(
   entryId: string,
-  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'rowOrder' | 'dutyDays' | 'startDate' | 'endDate' | 'rentalCarCount' | 'location' | 'isLocal' | 'note' | 'travelOnly' | 'longTermA7Planner'>>,
+  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'rowOrder' | 'dutyDays' | 'startDate' | 'endDate' | 'rentalCarCount' | 'location' | 'isLocal' | 'note' | 'utcCode' | 'utcTitle' | 'travelOnly' | 'longTermA7Planner'>>,
 ): Promise<PersonnelEntry> {
   return apiRequest<PersonnelEntry>(`/personnel-entries/${entryId}`, { method: 'PUT', body: data });
 }
@@ -516,6 +518,8 @@ export async function exportAllData(): Promise<string> {
           location: entry.location,
           isLocal: entry.isLocal,
           note: entry.note,
+          utcCode: entry.utcCode,
+          utcTitle: entry.utcTitle,
           travelOnly: entry.travelOnly,
           longTermA7Planner: entry.longTermA7Planner,
         })),
@@ -576,6 +580,8 @@ export async function importAllData(json: string): Promise<void> {
       location?: string | null;
       isLocal?: boolean;
       note?: string | null;
+      utcCode?: string | null;
+      utcTitle?: string | null;
       travelOnly?: boolean;
       longTermA7Planner?: boolean;
     }>;
@@ -735,6 +741,8 @@ export async function importAllData(json: string): Promise<void> {
           location: entry.location ?? null,
           isLocal: !!entry.isLocal,
           note: entry.note ?? null,
+          utcCode: entry.utcCode ?? null,
+          utcTitle: entry.utcTitle ?? null,
           travelOnly: !!entry.travelOnly,
           longTermA7Planner: !!entry.longTermA7Planner,
         });

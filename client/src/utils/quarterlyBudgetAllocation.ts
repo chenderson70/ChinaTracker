@@ -443,6 +443,8 @@ function createFallbackEntry(
     location: group.location ?? null,
     isLocal: !!group.isLocal,
     note: null,
+    utcCode: null,
+    utcTitle: null,
     travelOnly: false,
     longTermA7Planner: false,
   };

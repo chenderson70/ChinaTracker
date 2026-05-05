@@ -132,6 +132,8 @@ export interface PersonnelEntry {
   location: Location | null;
   isLocal: boolean;
   note: string | null;
+  utcCode: string | null;
+  utcTitle: string | null;
   travelOnly: boolean;
   longTermA7Planner: boolean;
 }

@@ -9,7 +9,7 @@ const PRISMA_SCHEMA_ROOT = path.resolve(SERVER_ROOT, 'prisma');
 dotenv.config({ path: path.resolve(SERVER_ROOT, '.env') });
 
 if (!process.env.DATABASE_URL) {
-	process.env.DATABASE_URL = 'file:./prisma/prod.db';
+	process.env.DATABASE_URL = 'file:./prod.db';
 }
 
 function resolveSqlitePath(databaseUrl: string | undefined): string | null {
@@ -24,7 +24,7 @@ function bootstrapSqliteFileIfMissing(): void {
 	const targetDbPath = resolveSqlitePath(process.env.DATABASE_URL);
 	if (!targetDbPath) return;
 
-	const seededDbPath = resolveSqlitePath('file:./prisma/prod.db');
+	const seededDbPath = resolveSqlitePath('file:./prod.db');
 	const targetDir = path.dirname(targetDbPath);
 	fs.mkdirSync(targetDir, { recursive: true });
 
@@ -107,6 +107,8 @@ async function ensureSqliteCompatibilityColumns(): Promise<void> {
 	await ensureSqliteColumn('unit_budgets', 'unit_display_name', 'TEXT');
 
 	await ensureSqliteColumn('personnel_entries', 'note', 'TEXT');
+	await ensureSqliteColumn('personnel_entries', 'utc_code', 'TEXT');
+	await ensureSqliteColumn('personnel_entries', 'utc_title', 'TEXT');
 	await ensureSqliteColumn('personnel_entries', 'row_order', 'REAL NOT NULL DEFAULT 0');
 	await ensureSqliteColumn('personnel_entries', 'travel_only', 'BOOLEAN NOT NULL DEFAULT false');
 	await ensureSqliteColumn('personnel_entries', 'rental_car_count', 'INTEGER NOT NULL DEFAULT 0');

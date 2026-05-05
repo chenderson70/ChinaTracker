@@ -472,7 +472,7 @@ export default function Pm27CostProjections() {
 
   return (
     <ReportsPage
-      title={getCostProjectionLabel(exercise?.exerciseTemplate)}
+      title={exercise?.name || getCostProjectionLabel(exercise?.exerciseTemplate)}
       showBudgetDetails={false}
       showGrandTotals={false}
       showQuarterlyBudgetAllocation={false}

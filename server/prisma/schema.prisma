@@ -120,6 +120,8 @@ model PersonnelEntry {
   location         String?
   isLocal          Boolean        @default(false) @map("is_local")
   note             String?
+  utcCode          String?        @map("utc_code")
+  utcTitle         String?        @map("utc_title")
   travelOnly       Boolean        @default(false) @map("travel_only")
   longTermA7Planner Boolean       @default(false) @map("long_term_a7_planner")
   personnelGroup   PersonnelGroup @relation(fields: [personnelGroupId], references: [id], onDelete: Cascade)

@@ -136,7 +136,7 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
       return res.status(404).json({ error: 'Personnel group not found' });
     }
 
-    const { rankCode, count, dutyDays, startDate, endDate, rentalCarCount, location, isLocal, note, travelOnly, longTermA7Planner, rowOrder } = req.body;
+    const { rankCode, count, dutyDays, startDate, endDate, rentalCarCount, location, isLocal, note, utcCode, utcTitle, travelOnly, longTermA7Planner, rowOrder } = req.body;
     const normalizedRentalCarCount = Math.max(0, Number(rentalCarCount ?? 0));
     const normalizedRowOrder = normalizeRowOrder(rowOrder);
     const existingEntryCount = Array.isArray(group.personnelEntries) ? group.personnelEntries.length : 0;
@@ -156,6 +156,8 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
         location,
         isLocal,
         note: note ?? null,
+        utcCode: utcCode ? String(utcCode).trim().toUpperCase() : null,
+        utcTitle: utcTitle ? String(utcTitle).trim() : null,
         travelOnly: !!travelOnly,
         longTermA7Planner: !!longTermA7Planner,
       } as any,
@@ -198,7 +200,7 @@ router.put('/personnel-entries/:entryId', async (req: Request, res: Response) =>
       return res.status(404).json({ error: 'Personnel entry not found' });
     }
 
-    const { rankCode, count, dutyDays, startDate, endDate, rentalCarCount, location, isLocal, note, travelOnly, longTermA7Planner } = req.body;
+    const { rankCode, count, dutyDays, startDate, endDate, rentalCarCount, location, isLocal, note, utcCode, utcTitle, travelOnly, longTermA7Planner } = req.body;
     const data: Record<string, unknown> = {};
     if (rankCode !== undefined) data.rankCode = rankCode;
     if (count !== undefined) data.count = count;
@@ -209,6 +211,8 @@ router.put('/personnel-entries/:entryId', async (req: Request, res: Response) =>
     if (location !== undefined) data.location = location;
     if (isLocal !== undefined) data.isLocal = isLocal;
     if (note !== undefined) data.note = note ?? null;
+    if (utcCode !== undefined) data.utcCode = utcCode ? String(utcCode).trim().toUpperCase() : null;
+    if (utcTitle !== undefined) data.utcTitle = utcTitle ? String(utcTitle).trim() : null;
     if (travelOnly !== undefined) data.travelOnly = !!travelOnly;
     if (longTermA7Planner !== undefined) data.longTermA7Planner = !!longTermA7Planner;
 

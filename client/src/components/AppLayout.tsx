@@ -176,6 +176,7 @@ export default function AppLayout() {
   const queryClient = useQueryClient();
   const currentUser = getStoredUser();
   const apiErrorNotifiedRef = useRef(false);
+  const pendingSelectedExerciseIdRef = useRef<string | null>(null);
   const [exerciseId, setExerciseId] = useState<string | null>(localStorage.getItem('exerciseId'));
   const [undoStacks, setUndoStacks] = useState<Record<string, UndoEntry[]>>({});
   const [createOpen, setCreateOpen] = useState(false);
@@ -224,6 +225,13 @@ export default function AppLayout() {
   const currentUndoStack = exerciseId ? (undoStacks[exerciseId] || []) : [];
   const currentUndoEntry = currentUndoStack[currentUndoStack.length - 1];
 
+  const selectExercise = useCallback((id: string | null) => {
+    pendingSelectedExerciseIdRef.current = id;
+    if (id) localStorage.setItem('exerciseId', id);
+    else localStorage.removeItem('exerciseId');
+    setExerciseId(id);
+  }, []);
+
   const pushUndoSnapshot = useCallback(async (label = 'Change') => {
     if (!exerciseId || !exercise) return;
 
@@ -257,28 +265,36 @@ export default function AppLayout() {
   useEffect(() => {
     if (exercises.length === 0) {
       if (exercisesFetched && exerciseId) {
-        setExerciseId(null);
+        selectExercise(null);
       }
       return;
     }
 
     if (!exerciseId) {
-      setExerciseId(exercises[0].id);
+      selectExercise(exercises[0].id);
+      return;
+    }
+
+    if (pendingSelectedExerciseIdRef.current === exerciseId) {
+      const selectedExerciseHasLoaded = exercises.some((e) => e.id === exerciseId);
+      if (selectedExerciseHasLoaded) {
+        pendingSelectedExerciseIdRef.current = null;
+      }
       return;
     }
 
     const exists = exercises.some((e) => e.id === exerciseId);
     if (!exists) {
-      setExerciseId(exercises[0].id);
+      selectExercise(exercises[0].id);
     }
-  }, [exercises, exerciseId, exercisesFetched]);
+  }, [exercises, exerciseId, exercisesFetched, selectExercise]);
 
   useEffect(() => {
     if (!exerciseId || !exerciseLoadError) return;
-    setExerciseId(null);
+    selectExercise(null);
     localStorage.removeItem('exerciseId');
     message.warning('Saved exercise could not be loaded. Please select or create an exercise.');
-  }, [exerciseId, exerciseLoadError]);
+  }, [exerciseId, exerciseLoadError, selectExercise]);
 
   useEffect(() => {
     if (!exercisesLoadError || apiErrorNotifiedRef.current) return;
@@ -298,7 +314,7 @@ export default function AppLayout() {
       queryClient.setQueryData<Exercise[]>(['exercises'], (current) => upsertExerciseSummary(current, ex));
       queryClient.setQueryData(['exercise', ex.id], ex);
       queryClient.invalidateQueries({ queryKey: ['exercises'] });
-      setExerciseId(ex.id);
+      selectExercise(ex.id);
       setCreateOpen(false);
       form.resetFields();
       message.success('Exercise created');
@@ -529,7 +545,7 @@ export default function AppLayout() {
         ...current,
         [copiedExercise.id]: [],
       }));
-      setExerciseId(copiedExercise.id);
+      selectExercise(copiedExercise.id);
       message.success(`Copied exercise as ${copiedExercise.name}`);
     },
     onError: (error: any) => {
@@ -556,7 +572,7 @@ export default function AppLayout() {
       queryClient.setQueryData(['exercises'], nextExercises);
 
       if (exerciseId === id) {
-        setExerciseId(nextExercises[0]?.id ?? null);
+        selectExercise(nextExercises[0]?.id ?? null);
       }
 
       queryClient.removeQueries({ queryKey: ['exercise', id] });
@@ -567,7 +583,7 @@ export default function AppLayout() {
     onError: (_error, _id, context) => {
       if (!context) return;
       queryClient.setQueryData(['exercises'], context.previousExercises);
-      setExerciseId(context.previousExerciseId);
+      selectExercise(context.previousExerciseId);
       message.error('Failed to delete exercise');
     },
     onSuccess: (_data, id) => {
@@ -621,7 +637,7 @@ export default function AppLayout() {
       await api.importAllData(json);
       queryClient.invalidateQueries();
       setUndoStacks({});
-      setExerciseId(null);
+      selectExercise(null);
       localStorage.removeItem('exerciseId');
       message.success('Data restored from backup');
     } catch {
@@ -667,6 +683,7 @@ export default function AppLayout() {
       label: 'Reports',
       children: [
         { key: '/reports/pm-27-cost-projections', label: currentCostProjectionLabel },
+        { key: '/reports/utc-report', label: 'UTC Report' },
         { key: '/reports/sustainment', label: 'Exercise Sustainment' },
         { key: '/reports/balance', label: 'Balance' },
         { key: '/reports/comparison', label: 'Comparison' },
@@ -687,7 +704,7 @@ export default function AppLayout() {
     await api.logoutAccount();
     queryClient.clear();
     setUndoStacks({});
-    setExerciseId(null);
+    selectExercise(null);
     navigate('/auth');
     message.success('Signed out');
   };
@@ -729,7 +746,7 @@ export default function AppLayout() {
     Number(editBudgetDraft?.omBudgetTarget ?? Number(appConfig.BUDGET_TARGET_OM || 0));
 
   return (
-    <AppContext.Provider value={{ exercise, budget, exerciseId, setExerciseId, refetchBudget, refetchExercise, pushUndoSnapshot }}>
+    <AppContext.Provider value={{ exercise, budget, exerciseId, setExerciseId: selectExercise, refetchBudget, refetchExercise, pushUndoSnapshot }}>
       <Layout style={{ minHeight: '100vh' }}>
         <Sider width={240} className="ct-sider" breakpoint="lg" collapsedWidth={60}>
           {/* Logo */}
@@ -759,7 +776,7 @@ export default function AppLayout() {
               style={{ width: 260 }}
               placeholder="Select exercise"
               value={exerciseId}
-                onChange={setExerciseId}
+                onChange={selectExercise}
                 options={exerciseOptions}
                 optionRender={(option) => {
                   const targetId = String(option.data.value);

@@ -44,6 +44,11 @@ import { getRpaMealsResponsibilityByUnit } from '../utils/budgetSummary';
 import { calculateInclusiveDateRangeDays, normalizeDateString } from '../utils/dateRanges';
 import { sortUiPerDiemLocations } from '../utils/perDiemDefaults';
 import {
+  buildUtcTemplateEntries,
+  getUtcTemplatesForUnit,
+  getUtcTemplateLabel,
+} from '../utils/utcTemplates';
+import {
   getPlanningConferenceDutyDays,
   getPlanningConferenceRangeForNote,
 } from '../utils/planningConferenceDates';
@@ -614,7 +619,12 @@ export default function UnitView() {
     () => getExerciseDateDefaults(exercise),
     [exercise?.defaultDutyDays, exercise?.endDate, exercise?.startDate],
   );
+  const availableUtcTemplates = useMemo(
+    () => getUtcTemplatesForUnit(unitCode),
+    [unitCode],
+  );
   const [entryModal, setEntryModal] = useState<{ groupId: string } | null>(null);
+  const [utcModal, setUtcModal] = useState<{ groupId: string } | null>(null);
   const [entryModalNoteDraft, setEntryModalNoteDraft] = useState('');
   const [entryModalTravelOnlyDraft, setEntryModalTravelOnlyDraft] = useState(false);
   const [entryModalLongTermA7PlannerDraft, setEntryModalLongTermA7PlannerDraft] = useState(false);
@@ -623,6 +633,7 @@ export default function UnitView() {
   const [execModal, setExecModal] = useState(false);
   const [wrmCost, setWrmCost] = useState(0);
   const [entryForm] = Form.useForm();
+  const [utcForm] = Form.useForm();
   const [contractForm] = Form.useForm();
   const [gpcForm] = Form.useForm();
   const [execForm] = Form.useForm();
@@ -742,6 +753,53 @@ export default function UnitView() {
     },
     onError: (error: any) => {
       message.error(error?.message || 'Failed to add entry');
+    },
+  });
+
+  const addUtcMut = useMutation({
+    mutationFn: async ({ groupId, utcCode, paxOverride }: { groupId: string; utcCode: string; paxOverride?: number | null }) => {
+      const group = personnelGroups.find((item) => item.id === groupId);
+      const template = availableUtcTemplates.find((item) => item.code === utcCode);
+      if (!group || !template) throw new Error('Select a valid UTC package for this unit');
+
+      await pushUndoSnapshot('Add UTC Package');
+
+      const usesExerciseDates = group.role === 'PLAYER' || group.role === 'ANNUAL_TOUR';
+      const submittedDateRange = usesExerciseDates ? exerciseDateDefaults.dateRange : null;
+      const { startDate, endDate } = getDateRangePayload(submittedDateRange);
+      const dateRangeDutyDays = calculateInclusiveDateRangeDays(startDate, endDate);
+      const baseRowOrder = getNextPersonnelEntryRowOrder(group.personnelEntries || []);
+      const entries = buildUtcTemplateEntries(template, paxOverride);
+
+      for (const [index, entry] of entries.entries()) {
+        await api.addPersonnelEntry(groupId, {
+          rankCode: entry.rankCode,
+          count: entry.count,
+          rowOrder: baseRowOrder + (index * PERSONNEL_ENTRY_ORDER_STEP),
+          dutyDays: dateRangeDutyDays ?? (exercise?.defaultDutyDays ?? 1),
+          startDate,
+          endDate,
+          rentalCarCount: 0,
+          location: group.location || perDiemLocations[0] || 'FORT_HUNTER_LIGGETT',
+          isLocal: !!group.isLocal,
+          note: `UTC ${template.code}`,
+          utcCode: template.code,
+          utcTitle: template.title,
+          travelOnly: false,
+          longTermA7Planner: false,
+        });
+      }
+
+      return template;
+    },
+    onSuccess: async (template) => {
+      message.success(`${template.code} added`);
+      setUtcModal(null);
+      utcForm.resetFields();
+      await refreshExerciseAndBudget();
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to add UTC');
     },
   });
 
@@ -1214,6 +1272,20 @@ export default function UnitView() {
                   />
                 ),
               },
+              {
+                title: 'UTC',
+                dataIndex: 'utcCode',
+                width: 130,
+                render: (value: string | null, row: PersonnelEntry) => (
+                  value ? (
+                    <Tooltip title={row.utcTitle || value}>
+                      <span className="ct-badge-rpa">{value}</span>
+                    </Tooltip>
+                  ) : (
+                    <Typography.Text type="secondary">-</Typography.Text>
+                  )
+                ),
+              },
               ...(isPlanning ? [{
                 title: 'Months',
                 dataIndex: 'dutyDays',
@@ -1407,6 +1479,8 @@ export default function UnitView() {
                               location: row.location ?? group.location ?? null,
                               isLocal: !!row.isLocal,
                               note: row.note ?? null,
+                              utcCode: row.utcCode ?? null,
+                              utcTitle: row.utcTitle ?? null,
                               travelOnly: !!row.travelOnly,
                               longTermA7Planner: !!row.longTermA7Planner,
                             },
@@ -1423,15 +1497,29 @@ export default function UnitView() {
             ]}
           />
         )}
-        <Button
-          size="small"
-          type="dashed"
-          icon={<PlusOutlined />}
-          style={{ marginTop: 8 }}
-          onClick={() => setEntryModal({ groupId: group.id })}
-        >
-          + Add Details
-        </Button>
+        <Space wrap style={{ marginTop: 8 }}>
+          <Button
+            size="small"
+            type="dashed"
+            icon={<PlusOutlined />}
+            onClick={() => setEntryModal({ groupId: group.id })}
+          >
+            Add Details
+          </Button>
+          {availableUtcTemplates.length > 0 ? (
+            <Button
+              size="small"
+              type="dashed"
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setUtcModal({ groupId: group.id });
+                utcForm.resetFields();
+              }}
+            >
+              Add UTC
+            </Button>
+          ) : null}
+        </Space>
       </Card>
     );
   }
@@ -1984,6 +2072,62 @@ export default function UnitView() {
           />
         </div>
       </Card>
+
+      <Modal
+        title="Add UTC Package"
+        open={!!utcModal}
+        confirmLoading={addUtcMut.isPending}
+        okText="Add UTC"
+        onOk={async () => {
+          try {
+            const values = await utcForm.validateFields();
+            addUtcMut.mutate({
+              groupId: utcModal!.groupId,
+              utcCode: values.utcCode,
+              paxOverride: values.paxOverride,
+            });
+          } catch (error: any) {
+            if (Array.isArray(error?.errorFields) && error.errorFields.length > 0) {
+              message.warning('Select a UTC and PAX before saving.');
+            }
+          }
+        }}
+        onCancel={() => {
+          setUtcModal(null);
+          utcForm.resetFields();
+        }}
+        width={640}
+      >
+        <Form form={utcForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="utcCode" label="UTC" rules={[{ required: true, message: 'Select a UTC' }]}>
+            <Select
+              showSearch
+              placeholder="Select a UTC package"
+              options={availableUtcTemplates.map((template) => ({
+                value: template.code,
+                label: getUtcTemplateLabel(template),
+              }))}
+              optionFilterProp="label"
+              onChange={(code) => {
+                const template = availableUtcTemplates.find((item) => item.code === code);
+                utcForm.setFieldValue('paxOverride', template?.defaultPax ?? undefined);
+              }}
+            />
+          </Form.Item>
+          <Form.Item
+            name="paxOverride"
+            label="PAX"
+            rules={[{ required: true, message: 'Enter the PAX for this UTC' }]}
+            extra="PAX totals were seeded from the provided MISCAP PDFs where OCR found an authorized total. Review-needed UTCs require manual PAX."
+          >
+            <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Typography.Text type="secondary">
+            AE UTCs are available in the AE unit. All other UTCs are available in the SG unit.
+            Created rows are tagged with the UTC code for cost and ROI reporting.
+          </Typography.Text>
+        </Form>
+      </Modal>
 
       {/* Add rank entry modal */}
       <Modal
