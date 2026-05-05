@@ -2,6 +2,7 @@
 // Ported from server/src/services/calculationEngine.ts to run entirely in-browser.
 
 import type { BudgetResult, GroupCalc, UnitCalc, ExerciseDetail } from '../types';
+import { calculateLongTourLeaveAccrual } from '../utils/longTourLeave';
 
 export interface RateInputs {
   cpdRates: Record<string, number>;
@@ -40,10 +41,10 @@ function getPlayerExecutionExerciseDutyDays(exercise: Pick<ExerciseDetail, 'star
     ?? (exercise.defaultDutyDays ? Math.max(1, Number(exercise.defaultDutyDays || 1)) : null);
 }
 
-function resolveEntryDutyDays(params: {
+function resolveEntryOrderDutyDays(params: {
   exercise: Pick<ExerciseDetail, 'startDate' | 'endDate' | 'defaultDutyDays'>;
   group: { role?: string; dutyDays?: number | null };
-  entry: { startDate?: string | null; endDate?: string | null; dutyDays?: number | null };
+  entry: { startDate?: string | null; endDate?: string | null; dutyDays?: number | null; longTourLeaveDays?: number | null };
   defaultDays: number;
 }): number {
   const { exercise, group, entry, defaultDays } = params;
@@ -55,6 +56,16 @@ function resolveEntryDutyDays(params: {
   }
 
   return Number(entry.dutyDays || group.dutyDays || defaultDays || 1);
+}
+
+function getEntryLongTourLeaveDays(
+  entry: { startDate?: string | null; endDate?: string | null; dutyDays?: number | null; longTourLeaveDays?: number | null },
+  orderDays: number,
+): number {
+  const persistedLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
+  if (persistedLeaveDays > 0) return persistedLeaveDays;
+
+  return calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, orderDays).accruedLeaveDays;
 }
 
 function emptyGroup(pax = 0, days = 0): GroupCalc {
@@ -216,7 +227,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
 
       const calcEntries = entries.length > 0
         ? entries
-        : [{ count: pax, rankCode: null, dutyDays: pg.dutyDays, rentalCarCount: 0, location: pg.location, isLocal: pg.isLocal, travelOnly: false }];
+        : [{ count: pax, rankCode: null, dutyDays: pg.dutyDays, longTourLeaveDays: null, rentalCarCount: 0, location: pg.location, isLocal: pg.isLocal, travelOnly: false }];
 
       let groupMilPay = 0;
       let groupPerDiem = 0;
@@ -228,12 +239,13 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
 
       for (const entry of calcEntries) {
         const entryCount = entry.count || 0;
-        const entryDays = resolveEntryDutyDays({
+        const entryDays = resolveEntryOrderDutyDays({
           exercise,
           group: pg,
           entry,
           defaultDays,
         });
+        const entryPayDays = entryDays + getEntryLongTourLeaveDays(entry, entryDays);
         const entryLoc = entry.location || pg.location || 'FORT_HUNTER_LIGGETT';
         const entryIsLocal = isLocalFlag(entry.isLocal) || isLocalFlag(pg.isLocal);
         const entryTravelOnly = allowsTravelOnly && isTravelOnlyFlag(entry.travelOnly);
@@ -241,11 +253,11 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
         const includeEntryInRpaTravel = qualifiesForRpaTravel(pg.fundingType, entryIsLocal, entryTravelOnly);
         const pdRates = rates.perDiemRates[entryLoc] || { lodging: 0, mie: 0 };
 
-        dutyDaysAccumulator += entryDays * entryCount;
+        dutyDaysAccumulator += entryPayDays * entryCount;
 
         if (isWhiteCell && pg.fundingType === 'RPA') {
           if (!entryTravelOnly) {
-            groupMilPay += calcMilPay(pg, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryDays);
+            groupMilPay += calcMilPay(pg, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryPayDays);
           }
           if (usesLocationPerDiemRates && !entryIsLocal) {
             groupPerDiem += entryCount * (pdRates.lodging + pdRates.mie) * entryDays;
@@ -262,7 +274,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
           }
         } else if (isPlanningGroup && pg.fundingType === 'RPA') {
           if (!entryTravelOnly) {
-            groupMilPay += calcMilPay(pg, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryDays);
+            groupMilPay += calcMilPay(pg, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryPayDays);
           }
           if (usesLocationPerDiemRates && !entryIsLocal) {
             groupPerDiem += entryCount * (pdRates.lodging + pdRates.mie) * entryDays;
@@ -294,7 +306,7 @@ export function calculateBudget(exercise: ExerciseDetail, rates: RateInputs): Bu
             groupTravel += entryRentalCarCount * rentalDaily * entryDays;
           }
         } else if (isPlayerLike && pg.fundingType === 'RPA') {
-          groupMilPay += calcMilPay(pg, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryDays);
+          groupMilPay += calcMilPay(pg, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryPayDays);
           groupMeals += entryCount * playerRpaMealsPerDay * entryDays;
           if (usesPlayerPerDiemRates && !entryIsLocal) {
             groupPerDiem += entryCount * rates.playerPerDiemPerDay * entryDays;

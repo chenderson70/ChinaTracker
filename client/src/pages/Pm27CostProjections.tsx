@@ -4,6 +4,7 @@ import BudgetOverviewSection from '../components/BudgetOverviewSection';
 import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { ANNUAL_TOUR_MEALS_LABEL, ANNUAL_TOUR_MIL_PAY_LABEL, ANNUAL_TOUR_TRAVEL_PAY_LABEL, getPlayerOmResponsibilityByUnit, getRpaCategoryTotals, getUnitRpaCategoryTotals } from '../utils/budgetSummary';
 import { getCostProjectionLabel } from '../utils/exerciseTemplates';
+import { calculateLongTourLeaveAccrual } from '../utils/longTourLeave';
 import { ReportsPage } from './Reports';
 import type { ExecutionCostLine, FundingType, PersonnelEntry, PersonnelGroup, UnitBudget, UnitCalc } from '../types';
 
@@ -98,7 +99,12 @@ function buildPersonnelDetail(
   if (count <= 0) return null;
 
   const rank = String(entry.rankCode || 'Personnel').toUpperCase();
-  const duration = formatDuration(entry.dutyDays ?? group.dutyDays ?? defaultDutyDays);
+  const baseDutyDays = Number(entry.dutyDays ?? group.dutyDays ?? defaultDutyDays);
+  const persistedLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
+  const leaveDays = persistedLeaveDays > 0
+    ? persistedLeaveDays
+    : calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, baseDutyDays).accruedLeaveDays;
+  const duration = formatDuration(baseDutyDays + leaveDays);
   const location = formatLocation(entry.location ?? group.location);
   const locality = (entry.isLocal ?? group.isLocal) ? 'Local' : 'Not local';
   const note = String(entry.note || '').trim();

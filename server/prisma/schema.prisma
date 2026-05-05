@@ -116,6 +116,7 @@ model PersonnelEntry {
   dutyDays         Int?           @map("duty_days")
   startDate        DateTime?      @map("start_date")
   endDate          DateTime?      @map("end_date")
+  longTourLeaveDays Float?        @map("long_tour_leave_days")
   rentalCarCount   Int            @default(0) @map("rental_car_count")
   location         String?
   isLocal          Boolean        @default(false) @map("is_local")

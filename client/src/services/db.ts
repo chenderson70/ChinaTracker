@@ -37,8 +37,10 @@ export interface PersonnelEntryRow {
   rankCode: string;
   count: number;
   rowOrder?: number;
+  dutyDays?: number | null;
   startDate: string | null;
   endDate: string | null;
+  longTourLeaveDays?: number | null;
 }
 
 export interface TravelConfigRow {

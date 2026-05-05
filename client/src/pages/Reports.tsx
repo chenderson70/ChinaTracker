@@ -12,6 +12,7 @@ import { compareUnitCodes, getUnitDisplayLabel } from '../utils/unitLabels';
 import { getDisplayedPax, getPlanningEventPaxExclusions } from '../utils/paxDisplay';
 import { ANNUAL_TOUR_BILLETING_LABEL, ANNUAL_TOUR_MEALS_LABEL, ANNUAL_TOUR_MIL_PAY_LABEL, ANNUAL_TOUR_TRAVEL_PAY_LABEL, getAnnualTourBilletingOmTotal, getAnnualTourRpaMealsTotal, getPlayerOmResponsibilityByUnit, getRpaCategoryTotals, getRpaMealsResponsibilityByUnit, getUnitRpaCategoryTotals } from '../utils/budgetSummary';
 import { getExerciseTemplateLabel } from '../utils/exerciseTemplates';
+import { calculateLongTourLeaveAccrual } from '../utils/longTourLeave';
 import type { BudgetResult, ExerciseDetail } from '../types';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
@@ -163,15 +164,23 @@ function getPlanningSummaryEntries(exercise: ExerciseDetail): PlanningSummaryEnt
         .filter((group) => group.role === 'PLANNING')
         .flatMap((group) => {
           const entries = group.personnelEntries.length > 0
-            ? group.personnelEntries.map((entry) => ({
-                count: Number(entry.count || 0),
-                dutyDays: Number(entry.dutyDays ?? group.dutyDays ?? exercise.defaultDutyDays ?? 0),
-                isLocal: !!(entry.isLocal ?? group.isLocal),
-                note: String(entry.note || '').trim(),
-                longTermA7Planner: !!entry.longTermA7Planner,
-                fundingType: String(group.fundingType || ''),
-                location: String(entry.location ?? group.location ?? ''),
-              }))
+              ? group.personnelEntries.map((entry) => {
+                const baseDutyDays = Number(entry.dutyDays ?? group.dutyDays ?? exercise.defaultDutyDays ?? 0);
+                const persistedLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
+                const leaveDays = persistedLeaveDays > 0
+                  ? persistedLeaveDays
+                  : calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, baseDutyDays).accruedLeaveDays;
+
+                return {
+                  count: Number(entry.count || 0),
+                  dutyDays: baseDutyDays + leaveDays,
+                  isLocal: !!(entry.isLocal ?? group.isLocal),
+                  note: String(entry.note || '').trim(),
+                  longTermA7Planner: !!entry.longTermA7Planner,
+                  fundingType: String(group.fundingType || ''),
+                  location: String(entry.location ?? group.location ?? ''),
+                };
+              })
             : (group.paxCount || 0) > 0
               ? [{
                   count: Number(group.paxCount || 0),

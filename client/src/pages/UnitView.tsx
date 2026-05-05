@@ -49,6 +49,11 @@ import {
   getUtcTemplateLabel,
 } from '../utils/utcTemplates';
 import {
+  calculateLongTourLeaveAccrual,
+  formatLongTourLeaveDays,
+  type LongTourLeaveAccrual,
+} from '../utils/longTourLeave';
+import {
   getPlanningConferenceDutyDays,
   getPlanningConferenceRangeForNote,
 } from '../utils/planningConferenceDates';
@@ -181,6 +186,44 @@ function normalizePositiveDutyDays(value: number | null | undefined): number | n
   return Math.max(1, Math.round(value));
 }
 
+function getLongTourLeaveFieldValue(accrual: LongTourLeaveAccrual): number | null {
+  return accrual.accruedLeaveDays > 0 ? accrual.accruedLeaveDays : null;
+}
+
+function getPersonnelEntryOrderDays(entry: Pick<PersonnelEntry, 'startDate' | 'endDate' | 'dutyDays'>): number | null {
+  return calculateInclusiveDateRangeDays(entry.startDate, entry.endDate)
+    ?? normalizePositiveDutyDays(entry.dutyDays);
+}
+
+function getPersonnelEntryPayableDutyDays(
+  entry: Pick<PersonnelEntry, 'startDate' | 'endDate' | 'dutyDays' | 'longTourLeaveDays'>,
+): number | null {
+  const orderDays = getPersonnelEntryOrderDays(entry);
+  if (!orderDays) return null;
+
+  const leaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
+  return orderDays + leaveDays;
+}
+
+function getLongTourLeaveAccrualForEntry(
+  entry: Pick<PersonnelEntry, 'startDate' | 'endDate' | 'dutyDays' | 'longTourLeaveDays'>,
+): LongTourLeaveAccrual {
+  const calculated = calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, entry.dutyDays);
+  const persistedLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
+
+  if (persistedLeaveDays > 0 && calculated.accruedLeaveDays <= 0) {
+    const orderDays = calculated.orderDays ?? normalizePositiveDutyDays(entry.dutyDays);
+    return {
+      orderDays,
+      accruedLeaveDays: persistedLeaveDays,
+      payableDutyDays: orderDays ? orderDays + persistedLeaveDays : null,
+      applies: true,
+    };
+  }
+
+  return calculated;
+}
+
 function resolveDurationDutyDays(
   months: number | null | undefined,
   dutyDays: number | null | undefined,
@@ -222,19 +265,32 @@ function buildPersonnelEntryMonthsPatch(
 ) {
   const normalizedStartDate = normalizeDateString(entry.startDate);
   if (!normalizedStartDate) {
-    return { dutyDays: monthsToDutyDays(months) };
+    const dutyDays = monthsToDutyDays(months);
+    const leaveAccrual = calculateLongTourLeaveAccrual(null, null, dutyDays);
+    return {
+      dutyDays,
+      longTourLeaveDays: getLongTourLeaveFieldValue(leaveAccrual),
+    };
   }
 
   const startDate = dayjs(normalizedStartDate);
   if (!startDate.isValid()) {
-    return { dutyDays: monthsToDutyDays(months) };
+    const dutyDays = monthsToDutyDays(months);
+    const leaveAccrual = calculateLongTourLeaveAccrual(null, null, dutyDays);
+    return {
+      dutyDays,
+      longTourLeaveDays: getLongTourLeaveFieldValue(leaveAccrual),
+    };
   }
 
   const { dutyDays, endDate } = getCalendarDurationFromMonths(startDate, months);
+  const formattedEndDate = endDate.format('YYYY-MM-DD');
+  const leaveAccrual = calculateLongTourLeaveAccrual(normalizedStartDate, formattedEndDate, dutyDays);
 
   return {
     dutyDays,
-    endDate: endDate.format('YYYY-MM-DD'),
+    endDate: formattedEndDate,
+    longTourLeaveDays: getLongTourLeaveFieldValue(leaveAccrual),
   };
 }
 
@@ -342,28 +398,33 @@ function buildPlayerExecutionEntryDefaults(
     startDate: exerciseDefaults.startDate,
     endDate: exerciseDefaults.endDate,
     dutyDays: exerciseDefaults.dutyDays,
+    longTourLeaveDays: getLongTourLeaveFieldValue(
+      calculateLongTourLeaveAccrual(exerciseDefaults.startDate, exerciseDefaults.endDate, exerciseDefaults.dutyDays),
+    ),
   };
 }
 
 function buildPersonnelEntryDatePatch(
-  entry: Pick<PersonnelEntry, 'startDate' | 'endDate' | 'dutyDays'>,
+  entry: Pick<PersonnelEntry, 'startDate' | 'endDate' | 'dutyDays' | 'longTourLeaveDays'>,
   field: 'startDate' | 'endDate',
   value: string | null,
 ) {
   const nextStartDate = field === 'startDate' ? value : (entry.startDate ?? null);
-  const normalizedDutyDays = normalizePositiveDutyDays(entry.dutyDays);
+  const normalizedOrderDays = getPersonnelEntryOrderDays(entry);
   const normalizedStartDate = normalizeDateString(nextStartDate);
-  const nextEndDate = field === 'startDate' && normalizedStartDate && normalizedDutyDays
-    ? dayjs(normalizedStartDate).add(normalizedDutyDays - 1, 'day').format('YYYY-MM-DD')
+  const nextEndDate = field === 'startDate' && normalizedStartDate && normalizedOrderDays
+    ? dayjs(normalizedStartDate).add(normalizedOrderDays - 1, 'day').format('YYYY-MM-DD')
     : field === 'endDate'
       ? value
       : (entry.endDate ?? null);
-  const nextDutyDays = calculateInclusiveDateRangeDays(nextStartDate, nextEndDate);
+  const leaveAccrual = calculateLongTourLeaveAccrual(nextStartDate, nextEndDate, normalizedOrderDays);
+  const nextDutyDays = leaveAccrual.orderDays ?? calculateInclusiveDateRangeDays(nextStartDate, nextEndDate);
 
   return {
     [field]: value,
-    ...(field === 'startDate' && normalizedStartDate && normalizedDutyDays ? { endDate: nextEndDate } : {}),
+    ...(field === 'startDate' && normalizedStartDate && normalizedOrderDays ? { endDate: nextEndDate } : {}),
     ...(nextDutyDays ? { dutyDays: nextDutyDays } : {}),
+    longTourLeaveDays: getLongTourLeaveFieldValue(leaveAccrual),
   };
 }
 
@@ -386,6 +447,8 @@ function buildPlanningConferenceEntryPatch(
   if (dutyDays) {
     nextData.dutyDays = dutyDays;
   }
+  const leaveAccrual = calculateLongTourLeaveAccrual(range.startDate, range.endDate, dutyDays);
+  nextData.longTourLeaveDays = getLongTourLeaveFieldValue(leaveAccrual);
 
   return nextData;
 }
@@ -637,6 +700,8 @@ export default function UnitView() {
   const [contractForm] = Form.useForm();
   const [gpcForm] = Form.useForm();
   const [execForm] = Form.useForm();
+  const entryModalDateRange = Form.useWatch('dateRange', entryForm) as [Dayjs | null, Dayjs | null] | null | undefined;
+  const entryModalDutyDaysValue = Form.useWatch('dutyDays', entryForm) as number | null | undefined;
   const wrmAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isWrmAutoSaving = useRef(false);
 
@@ -768,6 +833,8 @@ export default function UnitView() {
       const submittedDateRange = usesExerciseDates ? exerciseDateDefaults.dateRange : null;
       const { startDate, endDate } = getDateRangePayload(submittedDateRange);
       const dateRangeDutyDays = calculateInclusiveDateRangeDays(startDate, endDate);
+      const defaultDutyDays = dateRangeDutyDays ?? (exercise?.defaultDutyDays ?? 1);
+      const leaveAccrual = calculateLongTourLeaveAccrual(startDate, endDate, defaultDutyDays);
       const baseRowOrder = getNextPersonnelEntryRowOrder(group.personnelEntries || []);
       const entries = buildUtcTemplateEntries(template, paxOverride);
 
@@ -776,9 +843,10 @@ export default function UnitView() {
           rankCode: entry.rankCode,
           count: entry.count,
           rowOrder: baseRowOrder + (index * PERSONNEL_ENTRY_ORDER_STEP),
-          dutyDays: dateRangeDutyDays ?? (exercise?.defaultDutyDays ?? 1),
+          dutyDays: leaveAccrual.orderDays ?? defaultDutyDays,
           startDate,
           endDate,
+          longTourLeaveDays: getLongTourLeaveFieldValue(leaveAccrual),
           rentalCarCount: 0,
           location: group.location || perDiemLocations[0] || 'FORT_HUNTER_LIGGETT',
           isLocal: !!group.isLocal,
@@ -911,6 +979,10 @@ export default function UnitView() {
     entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'WHITE_CELL' || entryModalGroup?.role === 'SUPPORT';
   const entryModalAllowsTravelOnly = entryModalGroup?.fundingType === 'RPA'
     && (entryModalGroup?.role === 'PLANNING' || entryModalGroup?.role === 'SUPPORT');
+  const entryModalLeavePreview = useMemo(() => {
+    const { startDate, endDate } = getDateRangePayload(entryModalDateRange);
+    return calculateLongTourLeaveAccrual(startDate, endDate, entryModalDutyDaysValue);
+  }, [entryModalDateRange, entryModalDutyDaysValue]);
   const entryModalNoteLabel = getPersonnelEntryNoteLabel(entryModalGroup?.role);
   const entryModalNoteOptions = getPersonnelEntryNoteOptions(entryModalGroup?.role);
   const entryModalNotePlaceholder = getPersonnelEntryNotePlaceholder(entryModalGroup?.role);
@@ -1341,29 +1413,67 @@ export default function UnitView() {
                 ),
               },
               {
-                title: 'Duty Days',
+                title: 'Order Days',
                 dataIndex: 'dutyDays',
                 width: 110,
                 render: (value, row) => (
                   <DraftNumberInput
                     min={1}
-                    value={value ?? exercise!.defaultDutyDays}
+                    value={getPersonnelEntryOrderDays(row as PersonnelEntry) ?? value ?? exercise!.defaultDutyDays}
                     style={{ width: '100%' }}
                     onSave={(nextValue) => {
-                      const normalizedDutyDays = normalizePositiveDutyDays(nextValue) ?? 1;
+                      const normalizedOrderDays = normalizePositiveDutyDays(nextValue) ?? 1;
                       const normalizedStartDate = normalizeDateString((row as PersonnelEntry).startDate);
+                      const nextEndDate = normalizedStartDate
+                        ? dayjs(normalizedStartDate).add(normalizedOrderDays - 1, 'day').format('YYYY-MM-DD')
+                        : ((row as PersonnelEntry).endDate ?? null);
+                      const leaveAccrual = calculateLongTourLeaveAccrual(normalizedStartDate, nextEndDate, normalizedOrderDays);
                       updateEntryMut.mutate({
                         id: row.id,
                         data: {
-                          dutyDays: normalizedDutyDays,
+                          dutyDays: leaveAccrual.orderDays ?? normalizedOrderDays,
                           ...(normalizedStartDate
-                            ? { endDate: dayjs(normalizedStartDate).add(normalizedDutyDays - 1, 'day').format('YYYY-MM-DD') }
+                            ? { endDate: nextEndDate }
                             : {}),
+                          longTourLeaveDays: getLongTourLeaveFieldValue(leaveAccrual),
                         },
                       });
                     }}
                   />
                 ),
+              },
+              {
+                title: 'Leave',
+                dataIndex: 'longTourLeaveDays',
+                width: 120,
+                render: (_value, row) => {
+                  const leaveAccrual = getLongTourLeaveAccrualForEntry(row as PersonnelEntry);
+                  if (!leaveAccrual.applies) {
+                    return <Typography.Text type="secondary">-</Typography.Text>;
+                  }
+
+                  return (
+                    <Tooltip
+                      title={`${formatLongTourLeaveDays(leaveAccrual.accruedLeaveDays)} accrued from ${leaveAccrual.orderDays || 0} order days`}
+                    >
+                      <Typography.Text type="success">
+                        +{formatLongTourLeaveDays(leaveAccrual.accruedLeaveDays)}
+                      </Typography.Text>
+                    </Tooltip>
+                  );
+                },
+              },
+              {
+                title: 'Pay Days',
+                dataIndex: 'longTourLeaveDays',
+                width: 100,
+                render: (_value, row) => {
+                  const leaveAccrual = getLongTourLeaveAccrualForEntry(row as PersonnelEntry);
+                  const payableDutyDays = leaveAccrual.payableDutyDays
+                    ?? getPersonnelEntryPayableDutyDays(row as PersonnelEntry)
+                    ?? Number((row as PersonnelEntry).dutyDays ?? exercise!.defaultDutyDays);
+                  return Number.isInteger(payableDutyDays) ? payableDutyDays : payableDutyDays.toFixed(1);
+                },
               },
               ...(supportsRentalCars ? [{
                 title: 'Rental Car',
@@ -1475,6 +1585,7 @@ export default function UnitView() {
                               dutyDays: row.dutyDays ?? exercise?.defaultDutyDays ?? 1,
                               startDate: row.startDate ?? null,
                               endDate: row.endDate ?? null,
+                              longTourLeaveDays: row.longTourLeaveDays ?? null,
                               rentalCarCount: row.rentalCarCount || 0,
                               location: row.location ?? group.location ?? null,
                               isLocal: !!row.isLocal,
@@ -2145,13 +2256,16 @@ export default function UnitView() {
             const calculatedDutyDays = entryModalIsPlanning && values.months !== undefined && values.months !== null
               ? resolveDurationDutyDays(values.months, values.dutyDays, submittedDateRange?.[0] ?? null)
               : values.dutyDays;
+            const orderDutyDays = dateRangeDutyDays ?? calculatedDutyDays;
+            const leaveAccrual = calculateLongTourLeaveAccrual(startDate, endDate, orderDutyDays);
             const payload = {
               rankCode: values.rankCode,
               count: values.count,
               rowOrder: getNextPersonnelEntryRowOrder(entryModalGroup?.personnelEntries || []),
-              dutyDays: dateRangeDutyDays ?? calculatedDutyDays,
+              dutyDays: leaveAccrual.orderDays ?? orderDutyDays,
               startDate,
               endDate,
+              longTourLeaveDays: getLongTourLeaveFieldValue(leaveAccrual),
               rentalCarCount: entryModalSupportsRentalCars
                 ? (values.rentalCarCount || 0)
                 : 0,
@@ -2257,7 +2371,7 @@ export default function UnitView() {
               }}
             />
           </Form.Item>
-          <Form.Item name="dutyDays" label="Duty Days" initialValue={exercise.defaultDutyDays} rules={[{ required: true }]}>
+          <Form.Item name="dutyDays" label="Order Days" initialValue={exercise.defaultDutyDays} rules={[{ required: true }]}>
             <InputNumber
               min={1}
               style={{ width: '100%' }}
@@ -2271,6 +2385,12 @@ export default function UnitView() {
               }}
             />
           </Form.Item>
+          {entryModalLeavePreview.applies && entryModalLeavePreview.payableDutyDays ? (
+            <Typography.Text type="success" style={{ display: 'block', marginBottom: 16 }}>
+              Long tour leave: +{formatLongTourLeaveDays(entryModalLeavePreview.accruedLeaveDays)} accrued;{' '}
+              {formatLongTourLeaveDays(entryModalLeavePreview.payableDutyDays)} total pay days.
+            </Typography.Text>
+          ) : null}
           {entryModalSupportsRentalCars && (
             <Form.Item name="rentalCarCount" label="Rental Car" initialValue={0}>
               <InputNumber min={0} precision={0} style={{ width: '100%' }} />

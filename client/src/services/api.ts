@@ -306,6 +306,7 @@ export async function addPersonnelEntry(
     dutyDays?: number | null;
     startDate?: string | null;
     endDate?: string | null;
+    longTourLeaveDays?: number | null;
     rentalCarCount?: number;
     location?: string | null;
     isLocal?: boolean;
@@ -321,7 +322,7 @@ export async function addPersonnelEntry(
 
 export async function updatePersonnelEntry(
   entryId: string,
-  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'rowOrder' | 'dutyDays' | 'startDate' | 'endDate' | 'rentalCarCount' | 'location' | 'isLocal' | 'note' | 'utcCode' | 'utcTitle' | 'travelOnly' | 'longTermA7Planner'>>,
+  data: Partial<Pick<PersonnelEntry, 'rankCode' | 'count' | 'rowOrder' | 'dutyDays' | 'startDate' | 'endDate' | 'longTourLeaveDays' | 'rentalCarCount' | 'location' | 'isLocal' | 'note' | 'utcCode' | 'utcTitle' | 'travelOnly' | 'longTermA7Planner'>>,
 ): Promise<PersonnelEntry> {
   return apiRequest<PersonnelEntry>(`/personnel-entries/${entryId}`, { method: 'PUT', body: data });
 }
@@ -514,6 +515,7 @@ export async function exportAllData(): Promise<string> {
           dutyDays: entry.dutyDays,
           startDate: entry.startDate,
           endDate: entry.endDate,
+          longTourLeaveDays: entry.longTourLeaveDays,
           rentalCarCount: entry.rentalCarCount,
           location: entry.location,
           isLocal: entry.isLocal,
@@ -576,6 +578,7 @@ export async function importAllData(json: string): Promise<void> {
       dutyDays?: number | null;
       startDate?: string | null;
       endDate?: string | null;
+      longTourLeaveDays?: number | null;
       rentalCarCount?: number;
       location?: string | null;
       isLocal?: boolean;
@@ -737,6 +740,7 @@ export async function importAllData(json: string): Promise<void> {
           dutyDays: entry.dutyDays ?? null,
           startDate: entry.startDate ?? null,
           endDate: entry.endDate ?? null,
+          longTourLeaveDays: entry.longTourLeaveDays ?? null,
           rentalCarCount: entry.rentalCarCount ?? 0,
           location: entry.location ?? null,
           isLocal: !!entry.isLocal,

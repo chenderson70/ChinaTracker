@@ -1,0 +1,142 @@
+export const LONG_TOUR_LEAVE_THRESHOLD_DAYS = 30;
+
+export interface LongTourLeaveAccrual {
+  orderDays: number | null;
+  accruedLeaveDays: number;
+  payableDutyDays: number | null;
+  applies: boolean;
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function normalizeDateValue(value: unknown): string | null {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
+}
+
+function normalizePositiveDays(value: number | null | undefined): number | null {
+  if (value === null || value === undefined || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+
+  return Math.max(1, Math.round(value));
+}
+
+function dateFromIso(value: string): Date {
+  return new Date(`${value}T00:00:00Z`);
+}
+
+function daysInUtcMonth(year: number, monthIndex: number): number {
+  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+}
+
+function addCalendarMonths(value: Date, months: number): Date {
+  const currentMonth = value.getUTCMonth();
+  const absoluteMonth = currentMonth + months;
+  const yearOffset = Math.floor(absoluteMonth / 12);
+  const normalizedMonth = ((absoluteMonth % 12) + 12) % 12;
+  const targetYear = value.getUTCFullYear() + yearOffset;
+  const targetDay = Math.min(value.getUTCDate(), daysInUtcMonth(targetYear, normalizedMonth));
+
+  return new Date(Date.UTC(targetYear, normalizedMonth, targetDay));
+}
+
+function roundToHalfDay(value: number): number {
+  return Math.round(value * 2) / 2;
+}
+
+function getResidualLeaveDays(residualDays: number): number {
+  if (residualDays <= 0) return 0;
+  if (residualDays <= 6) return 0.5;
+  if (residualDays <= 12) return 1;
+  if (residualDays <= 18) return 1.5;
+  if (residualDays <= 24) return 2;
+  return 2.5;
+}
+
+function calculateInclusiveDays(startDate: string | null, endDate: string | null): number | null {
+  if (!startDate || !endDate) return null;
+
+  const start = dateFromIso(startDate);
+  const end = dateFromIso(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() < start.getTime()) {
+    return null;
+  }
+
+  return Math.round((end.getTime() - start.getTime()) / MS_PER_DAY) + 1;
+}
+
+function calculateFallbackLeaveDays(orderDays: number): number {
+  if (orderDays <= LONG_TOUR_LEAVE_THRESHOLD_DAYS) return 0;
+
+  const fullThirtyDayPeriods = Math.floor(orderDays / 30);
+  const residualDays = orderDays - (fullThirtyDayPeriods * 30);
+  return roundToHalfDay((fullThirtyDayPeriods * 2.5) + getResidualLeaveDays(residualDays));
+}
+
+function calculateCalendarLeaveDays(startDate: string, endDate: string, orderDays: number): number {
+  if (orderDays <= LONG_TOUR_LEAVE_THRESHOLD_DAYS) return 0;
+
+  const start = dateFromIso(startDate);
+  const end = dateFromIso(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() < start.getTime()) {
+    return calculateFallbackLeaveDays(orderDays);
+  }
+
+  let cursor = start;
+  let fullYears = 0;
+  let nextYear = addCalendarMonths(cursor, 12);
+  while (nextYear.getTime() <= end.getTime()) {
+    cursor = nextYear;
+    fullYears += 1;
+    nextYear = addCalendarMonths(cursor, 12);
+  }
+
+  let fullMonths = 0;
+  let nextMonth = addCalendarMonths(cursor, 1);
+  while (nextMonth.getTime() <= end.getTime()) {
+    cursor = nextMonth;
+    fullMonths += 1;
+    nextMonth = addCalendarMonths(cursor, 1);
+  }
+
+  const residualDays = Math.max(0, Math.round((end.getTime() - cursor.getTime()) / MS_PER_DAY)) + 1;
+  return roundToHalfDay((fullYears * 30) + (fullMonths * 2.5) + getResidualLeaveDays(residualDays));
+}
+
+export function calculateLongTourLeaveAccrual(
+  startDate: unknown,
+  endDate: unknown,
+  fallbackOrderDays?: number | null,
+): LongTourLeaveAccrual {
+  const normalizedStartDate = normalizeDateValue(startDate);
+  const normalizedEndDate = normalizeDateValue(endDate);
+  const dateRangeOrderDays = calculateInclusiveDays(normalizedStartDate, normalizedEndDate);
+  const orderDays = dateRangeOrderDays ?? normalizePositiveDays(fallbackOrderDays);
+
+  if (!orderDays) {
+    return {
+      orderDays: null,
+      accruedLeaveDays: 0,
+      payableDutyDays: null,
+      applies: false,
+    };
+  }
+
+  const accruedLeaveDays = normalizedStartDate && normalizedEndDate
+    ? calculateCalendarLeaveDays(normalizedStartDate, normalizedEndDate, orderDays)
+    : calculateFallbackLeaveDays(orderDays);
+
+  return {
+    orderDays,
+    accruedLeaveDays,
+    payableDutyDays: orderDays + accruedLeaveDays,
+    applies: accruedLeaveDays > 0,
+  };
+}
+
+export function getLongTourLeaveFieldValue(accrual: LongTourLeaveAccrual): number | null {
+  return accrual.accruedLeaveDays > 0 ? accrual.accruedLeaveDays : null;
+}

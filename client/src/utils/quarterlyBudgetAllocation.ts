@@ -11,6 +11,7 @@ import type {
   RankCpdRate,
 } from '../types';
 import { calculateInclusiveDateRangeDays, formatDateRange, normalizeDateString } from './dateRanges';
+import { calculateLongTourLeaveAccrual } from './longTourLeave';
 
 export type QuarterlyBudgetCategoryKey =
   | 'omWrm'
@@ -251,6 +252,20 @@ function getExerciseRangeDutyDays(exercise: Pick<ExerciseDetail, 'startDate' | '
 function resolvePersonnelDutyDays(
   exercise: Pick<ExerciseDetail, 'startDate' | 'endDate'>,
   group: Pick<PersonnelGroup, 'role' | 'dutyDays'>,
+  entry: Pick<PersonnelEntry, 'startDate' | 'endDate' | 'dutyDays' | 'longTourLeaveDays'>,
+  defaultDays: number,
+): number {
+  const orderDays = resolvePersonnelOrderDays(exercise, group, entry, defaultDays);
+  const persistedLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
+  const leaveDays = persistedLeaveDays > 0
+    ? persistedLeaveDays
+    : calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, orderDays).accruedLeaveDays;
+  return orderDays + leaveDays;
+}
+
+function resolvePersonnelOrderDays(
+  exercise: Pick<ExerciseDetail, 'startDate' | 'endDate'>,
+  group: Pick<PersonnelGroup, 'role' | 'dutyDays'>,
   entry: Pick<PersonnelEntry, 'startDate' | 'endDate' | 'dutyDays'>,
   defaultDays: number,
 ): number {
@@ -272,7 +287,7 @@ function resolvePersonnelDateRange(
 ): ResolvedDateRange | null {
   const entryStartDate = normalizeDateString(entry.startDate);
   const entryEndDate = normalizeDateString(entry.endDate);
-  const durationDays = resolvePersonnelDutyDays(exercise, group, entry, defaultDays);
+  const durationDays = resolvePersonnelOrderDays(exercise, group, entry, defaultDays);
   const exerciseDates = getExerciseDateContext(exercise);
 
   if (entryStartDate && entryEndDate) {
@@ -439,6 +454,7 @@ function createFallbackEntry(
     dutyDays: group.dutyDays ?? null,
     startDate: null,
     endDate: null,
+    longTourLeaveDays: null,
     rentalCarCount: 0,
     location: group.location ?? null,
     isLocal: !!group.isLocal,
@@ -629,7 +645,8 @@ export function buildQuarterlyBudgetAllocation(
         const entryCount = Number(entry.count || 0);
         if (entryCount <= 0) continue;
 
-        const entryDays = resolvePersonnelDutyDays(exercise, group, entry, defaultDays);
+        const entryDays = resolvePersonnelOrderDays(exercise, group, entry, defaultDays);
+        const entryPayDays = resolvePersonnelDutyDays(exercise, group, entry, defaultDays);
         const entryLocation = String(entry.location ?? group.location ?? 'FORT_HUNTER_LIGGETT').trim() || 'FORT_HUNTER_LIGGETT';
         const entryIsLocal = isLocalFlag(entry.isLocal) || isLocalFlag(group.isLocal);
         const entryTravelOnly = allowsTravelOnly && isTravelOnlyFlag(entry.travelOnly);
@@ -643,7 +660,7 @@ export function buildQuarterlyBudgetAllocation(
         }
 
         const milPay = !entryTravelOnly
-          ? calcMilPay(group, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryDays)
+          ? calcMilPay(group, { rankCode: entry.rankCode || null, count: entryCount }, rates, entryPayDays)
           : 0;
         const locationPerDiem = (!entryIsLocal && usesLocationPerDiemRates)
           ? entryCount * (perDiemRates.lodging + perDiemRates.mie) * entryDays

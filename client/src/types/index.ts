@@ -128,6 +128,7 @@ export interface PersonnelEntry {
   dutyDays: number | null;
   startDate: string | null;
   endDate: string | null;
+  longTourLeaveDays: number | null;
   rentalCarCount: number;
   location: Location | null;
   isLocal: boolean;

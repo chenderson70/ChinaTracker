@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import { calculateLongTourLeaveAccrual, getLongTourLeaveFieldValue } from './services/longTourLeave';
 
 const SERVER_ROOT = path.resolve(__dirname, '..');
 const PRISMA_SCHEMA_ROOT = path.resolve(SERVER_ROOT, 'prisma');
@@ -115,6 +116,7 @@ async function ensureSqliteCompatibilityColumns(): Promise<void> {
 	await ensureSqliteColumn('personnel_entries', 'long_term_a7_planner', 'BOOLEAN NOT NULL DEFAULT false');
 	await ensureSqliteColumn('personnel_entries', 'start_date', 'DATETIME');
 	await ensureSqliteColumn('personnel_entries', 'end_date', 'DATETIME');
+	await ensureSqliteColumn('personnel_entries', 'long_tour_leave_days', 'REAL');
 
 	await ensureSqliteColumn('execution_cost_lines', 'start_date', 'DATETIME');
 	await ensureSqliteColumn('execution_cost_lines', 'end_date', 'DATETIME');
@@ -218,6 +220,36 @@ async function clearLegacyReportDefaults(): Promise<void> {
 	});
 }
 
+async function backfillLongTourLeaveDays(): Promise<void> {
+	const entries = await prisma.personnelEntry.findMany({
+		where: {
+			longTourLeaveDays: null,
+			OR: [
+				{ dutyDays: { gt: 30 } },
+				{ startDate: { not: null }, endDate: { not: null } },
+			],
+		},
+		select: {
+			id: true,
+			dutyDays: true,
+			startDate: true,
+			endDate: true,
+		},
+	});
+
+	for (const entry of entries) {
+		const longTourLeaveDays = getLongTourLeaveFieldValue(
+			calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, entry.dutyDays),
+		);
+		if (longTourLeaveDays === null) continue;
+
+		await prisma.personnelEntry.update({
+			where: { id: entry.id },
+			data: { longTourLeaveDays },
+		});
+	}
+}
+
 const BASE_CPD_RATES = [
 	{ rankCode: 'AB', costPerDay: 191 },
 	{ rankCode: 'AMN', costPerDay: 185 },
@@ -275,6 +307,7 @@ export async function ensureBaselineCpdRates(): Promise<void> {
 
 export async function ensureBaselineData(): Promise<void> {
 	await ensureSqliteSchema();
+	await backfillLongTourLeaveDays();
 	await clearLegacyReportDefaults();
 
 	await ensureBaselineCpdRates();

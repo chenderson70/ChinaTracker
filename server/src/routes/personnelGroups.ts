@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import { getRequestUserId } from '../services/auth';
+import { calculateLongTourLeaveAccrual, getLongTourLeaveFieldValue } from '../services/longTourLeave';
 
 const router = Router();
 
@@ -16,6 +17,24 @@ function normalizeRowOrder(value: unknown): number | undefined {
   if (value === undefined || value === null || String(value).trim() === '') return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeOptionalNonNegativeNumber(value: unknown): number | null {
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function resolveLongTourLeaveDays(
+  explicitValue: unknown,
+  startDate: unknown,
+  endDate: unknown,
+  dutyDays: number | null | undefined,
+): number | null {
+  const normalizedExplicitValue = normalizeOptionalNonNegativeNumber(explicitValue);
+  if (normalizedExplicitValue !== null) return normalizedExplicitValue;
+
+  return getLongTourLeaveFieldValue(calculateLongTourLeaveAccrual(startDate, endDate, dutyDays));
 }
 
 // ─── UPDATE PERSONNEL GROUP ───
@@ -136,7 +155,7 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
       return res.status(404).json({ error: 'Personnel group not found' });
     }
 
-    const { rankCode, count, dutyDays, startDate, endDate, rentalCarCount, location, isLocal, note, utcCode, utcTitle, travelOnly, longTermA7Planner, rowOrder } = req.body;
+    const { rankCode, count, dutyDays, startDate, endDate, longTourLeaveDays, rentalCarCount, location, isLocal, note, utcCode, utcTitle, travelOnly, longTermA7Planner, rowOrder } = req.body;
     const normalizedRentalCarCount = Math.max(0, Number(rentalCarCount ?? 0));
     const normalizedRowOrder = normalizeRowOrder(rowOrder);
     const existingEntryCount = Array.isArray(group.personnelEntries) ? group.personnelEntries.length : 0;
@@ -152,6 +171,7 @@ router.post('/personnel-groups/:groupId/entries', async (req: Request, res: Resp
         dutyDays,
         startDate: parseOptionalDateField(startDate),
         endDate: parseOptionalDateField(endDate),
+        longTourLeaveDays: resolveLongTourLeaveDays(longTourLeaveDays, startDate, endDate, dutyDays),
         rentalCarCount: normalizedRentalCarCount,
         location,
         isLocal,
@@ -200,13 +220,26 @@ router.put('/personnel-entries/:entryId', async (req: Request, res: Response) =>
       return res.status(404).json({ error: 'Personnel entry not found' });
     }
 
-    const { rankCode, count, dutyDays, startDate, endDate, rentalCarCount, location, isLocal, note, utcCode, utcTitle, travelOnly, longTermA7Planner } = req.body;
+    const { rankCode, count, dutyDays, startDate, endDate, longTourLeaveDays, rentalCarCount, location, isLocal, note, utcCode, utcTitle, travelOnly, longTermA7Planner } = req.body;
     const data: Record<string, unknown> = {};
     if (rankCode !== undefined) data.rankCode = rankCode;
     if (count !== undefined) data.count = count;
     if (dutyDays !== undefined) data.dutyDays = dutyDays;
     if (startDate !== undefined) data.startDate = parseOptionalDateField(startDate);
     if (endDate !== undefined) data.endDate = parseOptionalDateField(endDate);
+    if (
+      longTourLeaveDays !== undefined ||
+      dutyDays !== undefined ||
+      startDate !== undefined ||
+      endDate !== undefined
+    ) {
+      data.longTourLeaveDays = resolveLongTourLeaveDays(
+        longTourLeaveDays,
+        startDate !== undefined ? startDate : existing.startDate,
+        endDate !== undefined ? endDate : existing.endDate,
+        dutyDays !== undefined ? dutyDays : existing.dutyDays,
+      );
+    }
     if (rentalCarCount !== undefined) data.rentalCarCount = Math.max(0, Number(rentalCarCount ?? 0));
     if (location !== undefined) data.location = location;
     if (isLocal !== undefined) data.isLocal = isLocal;
