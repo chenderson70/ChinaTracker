@@ -9,7 +9,7 @@ import * as api from '../services/api';
 import { exportElementToPdf } from '../services/pdf';
 import type { ExerciseDetail, FundingType, GroupCalc, PersonnelGroup, UnitCalc } from '../types';
 import { getUnitDisplayLabel } from '../utils/unitLabels';
-import { getUtcAlignmentLabel, getUtcTemplateByCode, type UtcAlignment } from '../utils/utcTemplates';
+import { getUtcAlignmentLabel, getUtcDisplayTitle, getUtcTemplateByCode, type UtcAlignment } from '../utils/utcTemplates';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const filenameSafe = (value: string) => value.trim().replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'UTC_Report';
@@ -39,22 +39,33 @@ type UtcReportProps = {
 type UtcSummaryCardProps = {
   title: string;
   count: number;
-  pax: number;
-  cost: number;
-  tone: 'sg' | 'ae';
+  tone: 'total' | 'sg' | 'ae';
 };
 
-function UtcSummaryCard({ title, count, pax, cost, tone }: UtcSummaryCardProps) {
+type UtcMetricBubbleProps = {
+  label: string;
+  value: string;
+  detail?: string;
+  tone: 'cost' | 'per-pax';
+};
+
+function UtcMetricBubble({ label, value, detail, tone }: UtcMetricBubbleProps) {
+  return (
+    <div className={`ct-utc-metric-bubble ct-utc-metric-bubble-${tone}`}>
+      <div className="ct-utc-metric-value">{value}</div>
+      <div className="ct-utc-metric-label">{label}</div>
+      {detail ? <div className="ct-utc-metric-detail">{detail}</div> : null}
+    </div>
+  );
+}
+
+function UtcSummaryCard({ title, count, tone }: UtcSummaryCardProps) {
   return (
     <div className={`ct-utc-summary-card ct-utc-summary-card-${tone}`}>
       <div className="ct-utc-summary-card-body">
         <div className="ct-utc-summary-count-bubble">{count}</div>
         <div className="ct-utc-summary-content">
           <Typography.Text className="ct-utc-summary-label">{title}</Typography.Text>
-          <div className="ct-utc-summary-detail-row">
-            <span>{pax.toLocaleString('en-US')} PAX</span>
-            <span>{fmt(cost)}</span>
-          </div>
         </div>
       </div>
     </div>
@@ -135,6 +146,7 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
     return Array.from(byUtc.values())
       .map((row) => ({
         ...row,
+        utcTitle: getUtcDisplayTitle(row.utcCode, row.utcTitle),
         unitList: Array.from(row.units).sort().join(', '),
         alignmentLabel: getUtcAlignmentLabel(row.alignment),
         totalCost: row.rpaCost + row.omCost,
@@ -147,10 +159,6 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
   const totalCost = rows.reduce((sum, row) => sum + row.totalCost, 0);
   const sgRows = rows.filter((row) => row.alignment === 'SG');
   const aeRows = rows.filter((row) => row.alignment === 'AE');
-  const sgPax = sgRows.reduce((sum, row) => sum + row.pax, 0);
-  const aePax = aeRows.reduce((sum, row) => sum + row.pax, 0);
-  const sgCost = sgRows.reduce((sum, row) => sum + row.totalCost, 0);
-  const aeCost = aeRows.reduce((sum, row) => sum + row.totalCost, 0);
   const preparedByForExport = draftPreparedBy.trim();
   const utcColumns = [
     { title: 'UTC', dataIndex: 'utcCode', width: 110 },
@@ -164,17 +172,47 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
     { title: 'Cost / PAX', dataIndex: 'costPerPax', align: 'right' as const, render: fmt },
   ];
 
-  const renderUtcTable = (dataSource: UtcReportDisplayRow[], emptyText: string) => (
-    <div className="ct-table">
-      <Table
-        rowKey="key"
-        dataSource={dataSource}
-        pagination={false}
-        locale={{ emptyText }}
-        columns={utcColumns}
-      />
-    </div>
-  );
+  const renderUtcTable = (dataSource: UtcReportDisplayRow[], emptyText: string) => {
+    const sectionPax = dataSource.reduce((sum, row) => sum + row.pax, 0);
+    const sectionRpaCost = dataSource.reduce((sum, row) => sum + row.rpaCost, 0);
+    const sectionOmCost = dataSource.reduce((sum, row) => sum + row.omCost, 0);
+    const sectionTotalCost = dataSource.reduce((sum, row) => sum + row.totalCost, 0);
+    const sectionCostPerPax = sectionPax > 0 ? sectionTotalCost / sectionPax : 0;
+
+    return (
+      <div className="ct-table">
+        <Table
+          rowKey="key"
+          dataSource={dataSource}
+          pagination={false}
+          locale={{ emptyText }}
+          columns={utcColumns}
+          summary={() => dataSource.length > 0 ? (
+            <Table.Summary.Row>
+              <Table.Summary.Cell index={0} colSpan={4}>
+                <strong>Total</strong>
+              </Table.Summary.Cell>
+              <Table.Summary.Cell index={4} align="right">
+                <strong>{sectionPax.toLocaleString('en-US')}</strong>
+              </Table.Summary.Cell>
+              <Table.Summary.Cell index={5} align="right">
+                <strong>{fmt(sectionRpaCost)}</strong>
+              </Table.Summary.Cell>
+              <Table.Summary.Cell index={6} align="right">
+                <strong>{fmt(sectionOmCost)}</strong>
+              </Table.Summary.Cell>
+              <Table.Summary.Cell index={7} align="right">
+                <strong>{fmt(sectionTotalCost)}</strong>
+              </Table.Summary.Cell>
+              <Table.Summary.Cell index={8} align="right">
+                <strong>{fmt(sectionCostPerPax)}</strong>
+              </Table.Summary.Cell>
+            </Table.Summary.Row>
+          ) : null}
+        />
+      </div>
+    );
+  };
 
   const reportPreparedByMut = useMutation({
     mutationFn: async (data: Pick<ExerciseDetail, 'reportPreparedBy'>) => {
@@ -239,6 +277,7 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
       ['Report Generated', generatedOn],
       ['Prepared By', preparedByForExport],
       [],
+      ['Total UTC Packages Tasked', rows.length],
       ['Tracked UTC PAX', totalPax],
       ['Tracked UTC Cost', totalCost],
       ['Cost / PAX', totalPax > 0 ? totalCost / totalPax : 0],
@@ -285,8 +324,8 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
       })));
       XLSX.utils.book_append_sheet(workbook, sectionWorksheet, sheetName);
     };
-    appendSectionSheet('SG UTCs', sgRows);
-    appendSectionSheet('AE UTCs', aeRows);
+    appendSectionSheet('SG UTC Packages', sgRows);
+    appendSectionSheet('AE UTC Packages', aeRows);
     XLSX.writeFile(workbook, `${filenameSafe(exercise?.name || 'Exercise')}_UTC_Report.xlsx`);
   };
 
@@ -389,33 +428,46 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
       <Card className="ct-section-card ct-utc-summary-shell" style={{ marginBottom: 16 }}>
         <div className="ct-utc-summary-header">
           <Typography.Text strong>{exercise?.name || 'Current Exercise'}</Typography.Text>
-          <Typography.Text type="secondary">
-            {totalPax.toLocaleString('en-US')} tracked UTC PAX | {fmt(totalCost)} total tracked UTC cost | {fmt(totalPax > 0 ? totalCost / totalPax : 0)} cost / PAX
-          </Typography.Text>
         </div>
         <div className="ct-utc-summary-grid">
           <UtcSummaryCard
-            title="SG UTCs Tasked"
+            title="SG UTC Packages Tasked"
             count={sgRows.length}
-            pax={sgPax}
-            cost={sgCost}
             tone="sg"
           />
+          <span className="ct-utc-summary-operator" aria-hidden="true">+</span>
           <UtcSummaryCard
-            title="AE UTCs Tasked"
+            title="AE UTC Packages Tasked"
             count={aeRows.length}
-            pax={aePax}
-            cost={aeCost}
             tone="ae"
+          />
+          <span className="ct-utc-summary-operator" aria-hidden="true">=</span>
+          <UtcSummaryCard
+            title="Total UTC Packages Tasked"
+            count={rows.length}
+            tone="total"
+          />
+        </div>
+        <div className="ct-utc-metric-row" aria-label="UTC summary metrics">
+          <UtcMetricBubble
+            label="Total Tracked UTC Cost"
+            value={fmt(totalCost)}
+            tone="cost"
+          />
+          <UtcMetricBubble
+            label="Cost / PAX"
+            value={fmt(totalPax > 0 ? totalCost / totalPax : 0)}
+            detail={`Total PAX: ${totalPax.toLocaleString('en-US')}`}
+            tone="per-pax"
           />
         </div>
       </Card>
 
-      <Card title="SG UTCs" className="ct-section-card" style={{ marginBottom: 16 }}>
+      <Card title="SG UTC Packages" className="ct-section-card" style={{ marginBottom: 16 }}>
         {renderUtcTable(sgRows, 'No SG UTC-tagged personnel rows yet. Use Add UTC from the SG unit.')}
       </Card>
 
-      <Card title="AE UTCs" className="ct-section-card">
+      <Card title="AE UTC Packages" className="ct-section-card">
         {renderUtcTable(aeRows, 'No AE UTC-tagged personnel rows yet. Use Add UTC from the AE unit.')}
       </Card>
     </div>

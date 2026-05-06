@@ -46,7 +46,9 @@ function BuildReportSection({ title, children }: { title: string; children: Reac
 export default function BuildReport() {
   const { exercise } = useApp();
   const [selectedReportKeys, setSelectedReportKeys] = useState<BuildReportKey[]>(DEFAULT_REPORT_KEYS);
-  const costProjectionLabel = getCostProjectionLabel(exercise?.exerciseTemplate);
+  const costProjectionLabel = exercise?.name
+    ? `${exercise.name} Cost Projections`
+    : getCostProjectionLabel(exercise?.exerciseTemplate);
 
   const reportOptions = useMemo<BuildReportOption[]>(() => [
     {

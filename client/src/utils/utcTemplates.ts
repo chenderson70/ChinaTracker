@@ -18,10 +18,10 @@ export type UtcTemplateEntry = {
 
 export const PATRIOT_UTC_TEMPLATES: UtcTemplate[] = [
   { code: 'FFEP2', title: 'MED EMEDS/AFTH C2 MED', alignment: 'SG', defaultPax: 6, officers: 2, enlisted: 4, sourceFile: 'FFEP2_EMEDS C2 MISCAP.pdf' },
-  { code: 'FFEP3', title: 'MED EMEDS/AFTH 10 BED PSNL AUG', alignment: 'SG', defaultPax: 23, officers: 8, enlisted: 15, sourceFile: 'FFEP3 EMEDS 10 MISCAP.pdf' },
+  { code: 'FFEP3', title: 'EMEDS/AFTH 10', alignment: 'SG', defaultPax: 23, officers: 8, enlisted: 15, sourceFile: 'FFEP3 EMEDS 10 MISCAP.pdf' },
   {
     code: 'FFEP4',
-    title: 'EMEDS AFTH 25 BED PSNL AUG',
+    title: 'EMEDS/AFTH 25',
     alignment: 'SG',
     defaultPax: 24,
     officers: 9,
@@ -88,6 +88,12 @@ export function getUtcTemplatesForUnit(unitCode: string | null | undefined): Utc
 export function getUtcTemplateLabel(template: UtcTemplate): string {
   const paxLabel = template.defaultPax === null ? 'PAX review needed' : `${template.defaultPax} PAX`;
   return `${template.code} - ${template.title} (${paxLabel})`;
+}
+
+export function getUtcDisplayTitle(code: string | null | undefined, title: string | null | undefined): string {
+  const template = getUtcTemplateByCode(code);
+  if (template) return template.title;
+  return String(title || '').trim();
 }
 
 export function buildUtcTemplateEntries(template: UtcTemplate, overridePax?: number | null): UtcTemplateEntry[] {

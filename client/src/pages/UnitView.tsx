@@ -2232,12 +2232,12 @@ export default function UnitView() {
             name="paxOverride"
             label="PAX"
             rules={[{ required: true, message: 'Enter the PAX for this UTC' }]}
-            extra="PAX totals were seeded from the provided MISCAP PDFs where OCR found an authorized total. Review-needed UTCs require manual PAX."
+            extra="PAX totals were seeded from the provided MISCAP PDFs where OCR found an authorized total. Review-needed UTC packages require manual PAX."
           >
             <InputNumber min={1} precision={0} style={{ width: '100%' }} />
           </Form.Item>
           <Typography.Text type="secondary">
-            AE UTCs are available in the AE unit. All other UTCs are available in the SG unit.
+            AE UTC packages are available in the AE unit. All other UTC packages are available in the SG unit.
             Created rows are tagged with the UTC code for cost and ROI reporting.
           </Typography.Text>
         </Form>
