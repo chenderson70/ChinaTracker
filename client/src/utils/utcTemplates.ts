@@ -6,6 +6,7 @@ export type UtcTemplate = {
   officers: number | null;
   enlisted: number | null;
   sourceFile: string;
+  entries?: UtcTemplateEntry[];
 };
 
 export type UtcAlignment = 'SG' | 'AE';
@@ -18,12 +19,38 @@ export type UtcTemplateEntry = {
 export const PATRIOT_UTC_TEMPLATES: UtcTemplate[] = [
   { code: 'FFEP2', title: 'MED EMEDS/AFTH C2 MED', alignment: 'SG', defaultPax: 6, officers: 2, enlisted: 4, sourceFile: 'FFEP2_EMEDS C2 MISCAP.pdf' },
   { code: 'FFEP3', title: 'MED EMEDS/AFTH 10 BED PSNL AUG', alignment: 'SG', defaultPax: 23, officers: 8, enlisted: 15, sourceFile: 'FFEP3 EMEDS 10 MISCAP.pdf' },
-  { code: 'FFEP4', title: 'EMEDS AFTH 25 BED PSNL AUG', alignment: 'SG', defaultPax: null, officers: null, enlisted: null, sourceFile: 'FFEP4 EMEDS 25 MISCAP.pdf' },
+  {
+    code: 'FFEP4',
+    title: 'EMEDS AFTH 25 BED PSNL AUG',
+    alignment: 'SG',
+    defaultPax: 24,
+    officers: 9,
+    enlisted: 15,
+    sourceFile: 'FFEP4 EMEDS 25 MISCAP.pdf',
+    entries: [
+      { rankCode: 'LTCOL', count: 1 },
+      { rankCode: 'MAJ', count: 5 },
+      { rankCode: 'CAPT', count: 3 },
+      { rankCode: 'TSGT', count: 15 },
+    ],
+  },
   { code: 'FFEP6', title: 'MED EMEDS/AFTH-NURSIN-ANCIL AUG', alignment: 'SG', defaultPax: 10, officers: 4, enlisted: 6, sourceFile: 'FFEP6 EMEDS NURSING ANCIL AUG_MISCAP.pdf' },
   { code: 'FFEPS', title: 'ENR PT STAG SYS 10 (ERPSS)', alignment: 'AE', defaultPax: null, officers: null, enlisted: null, sourceFile: 'FFEPS_ERPSS 10 MISCAP.pdf' },
   { code: 'FFF0C', title: 'MED DENTAL AUGMENTATION TEAM', alignment: 'SG', defaultPax: 2, officers: 1, enlisted: 1, sourceFile: 'FFF0C EMEDS DENTAL AUG MISCAP.pdf' },
   { code: 'FFFPS', title: 'ERPSS - 50', alignment: 'AE', defaultPax: null, officers: null, enlisted: null, sourceFile: 'FFFPS_ERPSS 50 MISCAP.pdf' },
-  { code: 'FFGST', title: 'GROUND SURG TEAM', alignment: 'SG', defaultPax: null, officers: null, enlisted: null, sourceFile: 'FFGST GROUND SURG TEAM MISCAP.pdf' },
+  {
+    code: 'FFGST',
+    title: 'GROUND SURG TEAM',
+    alignment: 'SG',
+    defaultPax: 6,
+    officers: 5,
+    enlisted: 1,
+    sourceFile: 'FFGST GROUND SURG TEAM MISCAP.pdf',
+    entries: [
+      { rankCode: 'MAJ', count: 5 },
+      { rankCode: 'TSGT', count: 1 },
+    ],
+  },
   { code: 'FFHPS', title: 'ERPSS - 100', alignment: 'AE', defaultPax: null, officers: null, enlisted: null, sourceFile: 'FFHPS_ERPSS 100 MISCAP.pdf' },
   { code: 'FFP01', title: 'MED EMEDS SPEC CARE TM', alignment: 'SG', defaultPax: 7, officers: 4, enlisted: 3, sourceFile: 'FFP01 EMEDS SPEC CARE TEAM MISCAP.pdf' },
   { code: 'FFPCM', title: 'MED PRIMARY CARE TEAM', alignment: 'SG', defaultPax: 3, officers: 1, enlisted: 2, sourceFile: 'FFPCM EMEDS PRI CARE TEAM MISCAP.pdf' },
@@ -64,6 +91,10 @@ export function getUtcTemplateLabel(template: UtcTemplate): string {
 }
 
 export function buildUtcTemplateEntries(template: UtcTemplate, overridePax?: number | null): UtcTemplateEntry[] {
+  if (template.entries && template.entries.length > 0 && !overridePax) {
+    return template.entries.map((entry) => ({ ...entry }));
+  }
+
   const total = Math.max(1, Number(overridePax ?? template.defaultPax ?? 1));
   const officers = template.officers === null ? 0 : Math.max(0, Number(template.officers || 0));
   const enlisted = template.enlisted === null ? total : Math.max(0, Number(template.enlisted || 0));
