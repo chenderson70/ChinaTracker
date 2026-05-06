@@ -200,7 +200,15 @@ export function getUtcPackageCount(
 }
 
 export function buildUtcTemplateEntries(template: UtcTemplate, overridePax?: number | null): UtcTemplateEntry[] {
-  if (template.entries && template.entries.length > 0 && !overridePax) {
+  const hasOverride = overridePax !== null && overridePax !== undefined;
+  const normalizedOverride = hasOverride ? Math.max(1, Number(overridePax || 1)) : null;
+  const defaultPax = template.defaultPax === null ? null : Math.max(1, Number(template.defaultPax || 1));
+
+  if (
+    template.entries
+    && template.entries.length > 0
+    && (!hasOverride || (defaultPax !== null && Math.abs((normalizedOverride ?? 0) - defaultPax) < 0.0001))
+  ) {
     return template.entries.map((entry) => ({ ...entry }));
   }
 

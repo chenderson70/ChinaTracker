@@ -45,6 +45,10 @@ import { calculateInclusiveDateRangeDays, normalizeDateString } from '../utils/d
 import { sortUiPerDiemLocations } from '../utils/perDiemDefaults';
 import {
   buildUtcTemplateEntries,
+  getUtcDisplayTitle,
+  getUtcPackageCount,
+  getUtcPackageCountFromNote,
+  getUtcTemplateByCode,
   getUtcTemplatesForUnit,
   getUtcTemplateLabel,
 } from '../utils/utcTemplates';
@@ -301,6 +305,10 @@ type OrderedPersonnelEntry = PersonnelEntry & {
   _effectiveRowOrder: number;
 };
 
+type DisplayPersonnelEntry = OrderedPersonnelEntry & {
+  _sourceEntries?: OrderedPersonnelEntry[];
+};
+
 function getOrderedPersonnelEntries(entries: PersonnelEntry[]): OrderedPersonnelEntry[] {
   return entries
     .map((entry, index) => {
@@ -331,6 +339,99 @@ function getNextPersonnelEntryRowOrder(entries: PersonnelEntry[]): number {
 function normalizeUtcPackageCount(value: number | null | undefined): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.max(1, Math.round(parsed)) : 1;
+}
+
+function normalizeUtcCode(value: string | null | undefined): string {
+  return String(value || '').trim().toUpperCase();
+}
+
+function buildUtcNote(code: string, packageCount: number, rowIndex: number): string {
+  const baseNote = `UTC ${code}`;
+  return rowIndex === 0 && packageCount > 1 ? `${baseNote} x${packageCount}` : baseNote;
+}
+
+function getUtcAggregateKey(entry: OrderedPersonnelEntry): string {
+  return JSON.stringify([
+    normalizeUtcCode(entry.utcCode),
+    entry.rankCode,
+    normalizeDateString(entry.startDate),
+    normalizeDateString(entry.endDate),
+    entry.dutyDays ?? null,
+    entry.longTourLeaveDays ?? null,
+    entry.rentalCarCount || 0,
+    entry.location || '',
+    !!entry.isLocal,
+    !!entry.travelOnly,
+    !!entry.longTermA7Planner,
+  ]);
+}
+
+function getDisplayPersonnelEntries(entries: PersonnelEntry[]): DisplayPersonnelEntry[] {
+  const orderedEntries = getOrderedPersonnelEntries(entries);
+  const utcAggregateRows = new Map<string, DisplayPersonnelEntry>();
+  const displayEntries: DisplayPersonnelEntry[] = [];
+
+  for (const entry of orderedEntries) {
+    const code = normalizeUtcCode(entry.utcCode);
+    if (!code) {
+      displayEntries.push(entry);
+      continue;
+    }
+
+    const key = getUtcAggregateKey(entry);
+    const existingRow = utcAggregateRows.get(key);
+    if (!existingRow) {
+      const nextRow: DisplayPersonnelEntry = {
+        ...entry,
+        _sourceEntries: [entry],
+      };
+      utcAggregateRows.set(key, nextRow);
+      displayEntries.push(nextRow);
+      continue;
+    }
+
+    existingRow.count += Number(entry.count || 0);
+    existingRow._sourceEntries = [...(existingRow._sourceEntries || []), entry];
+  }
+
+  return displayEntries;
+}
+
+type UtcPackageSummary = {
+  code: string;
+  title: string;
+  entries: PersonnelEntry[];
+  packageCount: number;
+  pax: number;
+  paxPerPackage: number;
+};
+
+function getUtcPackageSummaries(entries: PersonnelEntry[]): UtcPackageSummary[] {
+  const byCode = new Map<string, PersonnelEntry[]>();
+  for (const entry of entries) {
+    const code = normalizeUtcCode(entry.utcCode);
+    if (!code) continue;
+    byCode.set(code, [...(byCode.get(code) || []), entry]);
+  }
+
+  return Array.from(byCode.entries())
+    .map(([code, utcEntries]) => {
+      const pax = utcEntries.reduce((sum, entry) => sum + Number(entry.count || 0), 0);
+      const notePackageCount = utcEntries.reduce(
+        (sum, entry) => sum + getUtcPackageCountFromNote(entry.note),
+        0,
+      );
+      const packageCount = getUtcPackageCount(code, pax, notePackageCount);
+      return {
+        code,
+        title: getUtcDisplayTitle(code, utcEntries.find((entry) => entry.utcTitle)?.utcTitle || ''),
+        entries: getOrderedPersonnelEntries(utcEntries),
+        packageCount,
+        pax,
+        paxPerPackage: packageCount > 0 ? Math.max(1, Math.round(pax / packageCount)) : pax,
+      };
+    })
+    .sort((left, right) => left.code.localeCompare(right.code));
 }
 
 function getDuplicatedPersonnelEntryRowOrder(entries: PersonnelEntry[], sourceEntryId: string): number {
@@ -934,6 +1035,195 @@ export default function UnitView() {
     },
   });
 
+  const updateUtcPackageMut = useMutation({
+    mutationFn: async ({
+      groupId,
+      utcCode,
+      packageCount,
+    }: {
+      groupId: string;
+      utcCode: string;
+      packageCount: number;
+    }) => {
+      const code = normalizeUtcCode(utcCode);
+      const group = personnelGroups.find((item) => item.id === groupId);
+      if (!group || !code) throw new Error('Select a valid UTC package');
+
+      const summary = getUtcPackageSummaries(group.personnelEntries || []).find((item) => item.code === code);
+      if (!summary || summary.entries.length === 0) throw new Error(`${code} is not in this section`);
+
+      const nextPackageCount = normalizeUtcPackageCount(packageCount);
+      if (nextPackageCount === summary.packageCount) {
+        return { code, packageCount: nextPackageCount };
+      }
+
+      await pushUndoSnapshot('Update UTC Package Quantity');
+
+      const template = getUtcTemplateByCode(code);
+      const firstEntry = summary.entries[0];
+      const utcTitle = template?.title || firstEntry.utcTitle || summary.title;
+      const paxPerPackage = summary.paxPerPackage || template?.defaultPax || summary.pax || 1;
+      const packageEntries = template
+        ? buildUtcTemplateEntries(template, paxPerPackage)
+        : (() => {
+            const rankTotals = new Map<string, number>();
+            for (const entry of summary.entries) {
+              rankTotals.set(entry.rankCode, (rankTotals.get(entry.rankCode) || 0) + Number(entry.count || 0));
+            }
+            const inferredEntries = Array.from(rankTotals.entries()).map(([rankCode, count]) => ({
+              rankCode,
+              count: Math.max(1, Math.round(count / Math.max(1, summary.packageCount))),
+            }));
+            return inferredEntries.length > 0 ? inferredEntries : [{ rankCode: firstEntry.rankCode || 'TSGT', count: paxPerPackage }];
+          })();
+
+      const targetEntries = packageEntries.map((entry, index) => ({
+        rankCode: entry.rankCode,
+        count: Math.max(1, Math.round(entry.count * nextPackageCount)),
+        note: buildUtcNote(code, nextPackageCount, index),
+      }));
+      const nextRowOrder = getNextPersonnelEntryRowOrder(group.personnelEntries || []);
+
+      for (const [index, targetEntry] of targetEntries.entries()) {
+        const existingEntry = summary.entries[index];
+        const data = {
+          rankCode: targetEntry.rankCode,
+          count: targetEntry.count,
+          note: targetEntry.note,
+          utcCode: code,
+          utcTitle,
+        };
+
+        if (existingEntry) {
+          await api.updatePersonnelEntry(existingEntry.id, data);
+        } else {
+          await api.addPersonnelEntry(groupId, {
+            ...data,
+            rowOrder: nextRowOrder + ((index - summary.entries.length) * PERSONNEL_ENTRY_ORDER_STEP),
+            dutyDays: firstEntry.dutyDays,
+            startDate: firstEntry.startDate,
+            endDate: firstEntry.endDate,
+            longTourLeaveDays: firstEntry.longTourLeaveDays,
+            rentalCarCount: firstEntry.rentalCarCount || 0,
+            location: firstEntry.location ?? group.location ?? null,
+            isLocal: !!firstEntry.isLocal,
+            travelOnly: !!firstEntry.travelOnly,
+            longTermA7Planner: !!firstEntry.longTermA7Planner,
+          });
+        }
+      }
+
+      for (const extraEntry of summary.entries.slice(targetEntries.length)) {
+        await api.deletePersonnelEntry(extraEntry.id);
+      }
+
+      return { code, packageCount: nextPackageCount };
+    },
+    onSuccess: async ({ code, packageCount }) => {
+      message.success(`${code} set to ${packageCount} package${packageCount === 1 ? '' : 's'}`);
+      await refreshExerciseAndBudget();
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to update UTC package');
+    },
+  });
+
+  const deleteUtcPackageMut = useMutation({
+    mutationFn: async ({ groupId, utcCode }: { groupId: string; utcCode: string }) => {
+      const code = normalizeUtcCode(utcCode);
+      const group = personnelGroups.find((item) => item.id === groupId);
+      if (!group || !code) throw new Error('Select a valid UTC package');
+
+      const entries = (group.personnelEntries || []).filter((entry) => normalizeUtcCode(entry.utcCode) === code);
+      if (entries.length === 0) throw new Error(`${code} is not in this section`);
+
+      await pushUndoSnapshot('Remove UTC Package');
+      for (const entry of entries) {
+        await api.deletePersonnelEntry(entry.id);
+      }
+
+      return { code };
+    },
+    onSuccess: async ({ code }) => {
+      message.success(`${code} removed`);
+      await refreshExerciseAndBudget();
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to remove UTC package');
+    },
+  });
+
+  const updateEntrySetMut = useMutation({
+    mutationFn: async ({
+      ids,
+      data,
+      snapshotLabel = 'Update Personnel Entries',
+    }: {
+      ids: string[];
+      data: any;
+      snapshotLabel?: string;
+    }) => {
+      const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+      if (uniqueIds.length === 0) throw new Error('Select a valid personnel row');
+
+      await pushUndoSnapshot(snapshotLabel);
+      for (const id of uniqueIds) {
+        await api.updatePersonnelEntry(id, data);
+      }
+
+      return uniqueIds.length;
+    },
+    onSuccess: refreshExerciseAndBudget,
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to update personnel rows');
+    },
+  });
+
+  const replaceEntryAggregateMut = useMutation({
+    mutationFn: async ({
+      keepId,
+      removeIds,
+      data,
+    }: {
+      keepId: string;
+      removeIds: string[];
+      data: any;
+    }) => {
+      if (!keepId) throw new Error('Select a valid personnel row');
+
+      await pushUndoSnapshot('Update Personnel Entry');
+      await api.updatePersonnelEntry(keepId, data);
+      for (const id of Array.from(new Set(removeIds.filter((item) => item && item !== keepId)))) {
+        await api.deletePersonnelEntry(id);
+      }
+    },
+    onSuccess: refreshExerciseAndBudget,
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to update personnel row');
+    },
+  });
+
+  const deleteEntrySetMut = useMutation({
+    mutationFn: async ({ ids }: { ids: string[] }) => {
+      const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+      if (uniqueIds.length === 0) throw new Error('Select a valid personnel row');
+
+      await pushUndoSnapshot('Remove Personnel Entries');
+      for (const id of uniqueIds) {
+        await api.deletePersonnelEntry(id);
+      }
+
+      return uniqueIds.length;
+    },
+    onSuccess: async (count) => {
+      message.success(count > 1 ? 'Rows removed' : 'Entry removed');
+      await refreshExerciseAndBudget();
+    },
+    onError: (error: any) => {
+      message.error(error?.message || 'Failed to remove entries');
+    },
+  });
+
   const updateEntryMut = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       await pushUndoSnapshot('Update Personnel Entry');
@@ -1288,6 +1578,44 @@ export default function UnitView() {
         : entry
     ));
     const orderedPersonnelEntriesForDisplay = getOrderedPersonnelEntries(personnelEntriesForDisplay);
+    const displayPersonnelEntriesForTable = getDisplayPersonnelEntries(personnelEntriesForDisplay);
+    const utcPackageSummaries = getUtcPackageSummaries(group.personnelEntries || []);
+    const getDisplaySourceEntries = (row: DisplayPersonnelEntry) =>
+      row._sourceEntries && row._sourceEntries.length > 0 ? row._sourceEntries : [row];
+    const getDisplaySourceIds = (row: DisplayPersonnelEntry) =>
+      getDisplaySourceEntries(row).map((entry) => entry.id);
+    const updateDisplayEntry = (row: DisplayPersonnelEntry, data: any, snapshotLabel?: string) => {
+      const sourceIds = getDisplaySourceIds(row);
+      if (sourceIds.length > 1) {
+        updateEntrySetMut.mutate({ ids: sourceIds, data, snapshotLabel });
+        return;
+      }
+
+      updateEntryMut.mutate({ id: row.id, data });
+    };
+    const updateDisplayEntryCount = (row: DisplayPersonnelEntry, count: number) => {
+      const sourceEntries = getDisplaySourceEntries(row);
+      const nextCount = count || 1;
+      if (sourceEntries.length > 1) {
+        replaceEntryAggregateMut.mutate({
+          keepId: sourceEntries[0].id,
+          removeIds: sourceEntries.slice(1).map((entry) => entry.id),
+          data: { count: nextCount },
+        });
+        return;
+      }
+
+      updateEntryMut.mutate({ id: row.id, data: { count: nextCount } });
+    };
+    const deleteDisplayEntry = (row: DisplayPersonnelEntry) => {
+      const sourceIds = getDisplaySourceIds(row);
+      if (sourceIds.length > 1) {
+        deleteEntrySetMut.mutate({ ids: sourceIds });
+        return;
+      }
+
+      deleteEntryMut.mutate(row.id);
+    };
 
     return (
       <Card
@@ -1329,25 +1657,84 @@ export default function UnitView() {
                 : nonPlayerSummary}
         </Typography.Text>
 
+        {utcPackageSummaries.length > 0 ? (
+          <div className="ct-utc-package-manager" aria-label="UTC package controls">
+            <div className="ct-utc-package-manager-header">
+              <Typography.Text strong>UTC Packages</Typography.Text>
+            </div>
+            <div className="ct-utc-package-manager-grid">
+              {utcPackageSummaries.map((summary) => (
+                <div className="ct-utc-package-control" key={`${group.id}-${summary.code}`}>
+                  <Tooltip title={summary.title || summary.code}>
+                    <span className="ct-badge-rpa">{summary.code}</span>
+                  </Tooltip>
+                  <div className="ct-utc-package-control-main">
+                    <Typography.Text className="ct-utc-package-control-title">{summary.title}</Typography.Text>
+                    <Typography.Text type="secondary" className="ct-utc-package-control-meta">
+                      {summary.pax.toLocaleString('en-US')} PAX
+                    </Typography.Text>
+                  </div>
+                  <div className="ct-utc-package-quantity">
+                    <Typography.Text type="secondary" className="ct-utc-package-quantity-label">
+                      Packages
+                    </Typography.Text>
+                    <DraftNumberInput
+                      min={1}
+                      precision={0}
+                      value={summary.packageCount}
+                      style={{ width: 78 }}
+                      onSave={(nextValue) => updateUtcPackageMut.mutate({
+                        groupId: group.id,
+                        utcCode: summary.code,
+                        packageCount: nextValue,
+                      })}
+                    />
+                  </div>
+                  <Popconfirm
+                    title={`Remove ${summary.code}?`}
+                    description={`This removes all ${summary.code} personnel rows from this section.`}
+                    okText="Remove UTC"
+                    cancelText="Cancel"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => deleteUtcPackageMut.mutate({ groupId: group.id, utcCode: summary.code })}
+                  >
+                    <Button
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      loading={deleteUtcPackageMut.isPending}
+                      disabled={updateUtcPackageMut.isPending}
+                      aria-label={`Remove ${summary.code}`}
+                    />
+                  </Popconfirm>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         {/* Rank-level detail */}
         {group.personnelEntries.length > 0 && (
           <Table
             size="small"
             pagination={false}
             scroll={{ x: 'max-content' }}
-            dataSource={orderedPersonnelEntriesForDisplay.map((e) => ({ ...e, key: e.id }))}
+            dataSource={displayPersonnelEntriesForTable.map((entry) => ({
+              ...entry,
+              key: getDisplaySourceIds(entry).join('|'),
+            }))}
             columns={[
               {
                 title: 'Rank',
                 dataIndex: 'rankCode',
                 width: 110,
-                render: (value: string, row: { id: string }) => (
+                render: (value: string, row: DisplayPersonnelEntry) => (
                   <Select
                     size="small"
                     value={value}
                     style={{ width: '100%' }}
                     options={RANKS.map((r) => ({ value: r, label: r }))}
-                    onChange={(v) => updateEntryMut.mutate({ id: row.id, data: { rankCode: v } })}
+                    onChange={(v) => updateDisplayEntry(row, { rankCode: v })}
                   />
                 ),
               },
@@ -1360,7 +1747,7 @@ export default function UnitView() {
                     min={1}
                     value={value}
                     style={{ width: '100%' }}
-                    onSave={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { count: nextValue || 1 } })}
+                    onSave={(nextValue) => updateDisplayEntryCount(row as DisplayPersonnelEntry, nextValue)}
                   />
                 ),
               },
@@ -1394,10 +1781,10 @@ export default function UnitView() {
                     )}
                     style={{ width: '100%' }}
                     onSave={(nextValue) => {
-                      updateEntryMut.mutate({
-                        id: row.id,
-                        data: buildPersonnelEntryMonthsPatch(row as PersonnelEntry, nextValue),
-                      });
+                      updateDisplayEntry(
+                        row as DisplayPersonnelEntry,
+                        buildPersonnelEntryMonthsPatch(row as PersonnelEntry, nextValue),
+                      );
                     }}
                   />
                 ),
@@ -1410,10 +1797,10 @@ export default function UnitView() {
                   <InlineDateInput
                     value={value}
                     style={{ width: '100%' }}
-                    onSave={(nextValue) => updateEntryMut.mutate({
-                      id: row.id,
-                      data: buildPersonnelEntryDatePatch(row as PersonnelEntry, 'startDate', nextValue),
-                    })}
+                    onSave={(nextValue) => updateDisplayEntry(
+                      row as DisplayPersonnelEntry,
+                      buildPersonnelEntryDatePatch(row as PersonnelEntry, 'startDate', nextValue),
+                    )}
                   />
                 ),
               },
@@ -1425,10 +1812,10 @@ export default function UnitView() {
                   <InlineDateInput
                     value={value}
                     style={{ width: '100%' }}
-                    onSave={(nextValue) => updateEntryMut.mutate({
-                      id: row.id,
-                      data: buildPersonnelEntryDatePatch(row as PersonnelEntry, 'endDate', nextValue),
-                    })}
+                    onSave={(nextValue) => updateDisplayEntry(
+                      row as DisplayPersonnelEntry,
+                      buildPersonnelEntryDatePatch(row as PersonnelEntry, 'endDate', nextValue),
+                    )}
                   />
                 ),
               },
@@ -1448,16 +1835,16 @@ export default function UnitView() {
                         ? dayjs(normalizedStartDate).add(normalizedOrderDays - 1, 'day').format('YYYY-MM-DD')
                         : ((row as PersonnelEntry).endDate ?? null);
                       const leaveAccrual = calculateLongTourLeaveAccrual(normalizedStartDate, nextEndDate, normalizedOrderDays);
-                      updateEntryMut.mutate({
-                        id: row.id,
-                        data: {
+                      updateDisplayEntry(
+                        row as DisplayPersonnelEntry,
+                        {
                           dutyDays: leaveAccrual.orderDays ?? normalizedOrderDays,
                           ...(normalizedStartDate
                             ? { endDate: nextEndDate }
                             : {}),
                           longTourLeaveDays: getLongTourLeaveFieldValue(leaveAccrual),
                         },
-                      });
+                      );
                     }}
                   />
                 ),
@@ -1499,13 +1886,13 @@ export default function UnitView() {
                 title: 'Rental Car',
                 dataIndex: 'rentalCarCount',
                 width: 110,
-                render: (value: number, row: { id: string }) => (
+                render: (value: number, row: DisplayPersonnelEntry) => (
                   <DraftNumberInput
                     min={0}
                     precision={0}
                     value={value || 0}
                     style={{ width: '100%' }}
-                    onSave={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { rentalCarCount: nextValue || 0 } })}
+                    onSave={(nextValue) => updateDisplayEntry(row, { rentalCarCount: nextValue || 0 })}
                   />
                 ),
               }] : []),
@@ -1513,13 +1900,13 @@ export default function UnitView() {
                 title: 'Location',
                 dataIndex: 'location',
                 width: 160,
-                render: (value: string | null, row: { id: string }) => (
+                render: (value: string | null, row: DisplayPersonnelEntry) => (
                   <Select
                     size="small"
                     value={value || 'FORT_HUNTER_LIGGETT'}
                     style={{ width: '100%' }}
                     options={perDiemLocations.map((loc) => ({ value: loc, label: loc }))}
-                    onChange={(v) => updateEntryMut.mutate({ id: row.id, data: { location: v } })}
+                    onChange={(v) => updateDisplayEntry(row, { location: v })}
                   />
                 ),
               },
@@ -1527,16 +1914,16 @@ export default function UnitView() {
                 title: noteLabel,
                 dataIndex: 'note',
                 width: 180,
-                render: (value: string | null, row: { id: string }) => (
+                render: (value: string | null, row: DisplayPersonnelEntry) => (
                   <EntryAutoCompleteInput
                     value={value}
                     options={noteOptions}
                     placeholder={notePlaceholder}
                     onSave={(nextValue) => {
-                      updateEntryMut.mutate({
-                        id: row.id,
-                        data: buildPersonnelEntryNotePatch(role, nextValue, exercise?.planningConferenceDates),
-                      });
+                      updateDisplayEntry(
+                        row,
+                        buildPersonnelEntryNotePatch(role, nextValue, exercise?.planningConferenceDates),
+                      );
                     }}
                   />
                 ),
@@ -1545,14 +1932,14 @@ export default function UnitView() {
                 title: 'Travel Only',
                 dataIndex: 'travelOnly',
                 width: 120,
-                render: (value: boolean, row: { id: string }) => (
+                render: (value: boolean, row: DisplayPersonnelEntry) => (
                   <Switch
                     className="ct-travel-only-switch"
                     size="small"
                     checked={!!value}
                     checkedChildren="Travel Only"
                     unCheckedChildren=""
-                    onChange={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { travelOnly: nextValue } })}
+                    onChange={(nextValue) => updateDisplayEntry(row, { travelOnly: nextValue })}
                   />
                 ),
               }] : []),
@@ -1560,14 +1947,14 @@ export default function UnitView() {
                 title: 'Long Tour A7 Planner',
                 dataIndex: 'longTermA7Planner',
                 width: 140,
-                render: (value: boolean, row: { id: string }) => (
+                render: (value: boolean, row: DisplayPersonnelEntry) => (
                   <Switch
                     className="ct-long-term-a7-planner-switch"
                     size="small"
                     checked={!!value}
                     checkedChildren="Yes"
                     unCheckedChildren=""
-                    onChange={(nextValue) => updateEntryMut.mutate({ id: row.id, data: { longTermA7Planner: nextValue } })}
+                    onChange={(nextValue) => updateDisplayEntry(row, { longTermA7Planner: nextValue })}
                   />
                 ),
               }] : []),
@@ -1582,14 +1969,14 @@ export default function UnitView() {
                     checked={!!value}
                     checkedChildren="Local"
                     unCheckedChildren="Not local"
-                    onChange={(v) => updateEntryMut.mutate({ id: row.id, data: { isLocal: v } })}
+                    onChange={(v) => updateDisplayEntry(row as DisplayPersonnelEntry, { isLocal: v })}
                   />
                 ),
               },
               {
                 title: '',
                 width: 90,
-                render: (_: unknown, row: OrderedPersonnelEntry) => (
+                render: (_: unknown, row: DisplayPersonnelEntry) => (
                   <Space size={6}>
                     <Tooltip title="Duplicate row">
                       <Button
@@ -1619,7 +2006,7 @@ export default function UnitView() {
                         }}
                       />
                     </Tooltip>
-                    <Popconfirm title="Remove?" onConfirm={() => deleteEntryMut.mutate(row.id)}>
+                    <Popconfirm title="Remove?" onConfirm={() => deleteDisplayEntry(row)}>
                       <Button size="small" danger icon={<DeleteOutlined />} />
                     </Popconfirm>
                   </Space>
