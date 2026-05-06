@@ -350,7 +350,7 @@ export default function Dashboard() {
       />
 
       {/* Primary stat cards */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger" justify="center">
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger ct-print-stat-row" justify="center">
         {statCards.map((s) => (
           <Col xs={24} sm={12} lg={8} key={s.label}>
             <Card size="small" className={`ct-stat-card ${s.accent}`} style={{ padding: '4px 0' }}>
@@ -382,7 +382,7 @@ export default function Dashboard() {
         ))}
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger">
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} className="ct-stagger ct-print-plusup-row">
         {plusUpStatCards.map((s) => (
           <Col xs={24} sm={12} xl={6} key={s.label}>
             <Card size="small" className={`ct-stat-card ct-stat-plusup-card ${s.accent}`} style={{ padding: '4px 0' }}>
@@ -434,7 +434,7 @@ export default function Dashboard() {
       </Row>
 
       {/* Detail stat cards */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 28 }} className="ct-stagger">
+      <Row gutter={[16, 16]} style={{ marginBottom: 28 }} className="ct-stagger ct-print-detail-row">
         {detailCards.map((s) => (
           <Col key={s.label} flex="1 1 0" style={{ minWidth: 220 }}>
             <Card size="small" className={`ct-stat-card ${s.accent || ''}`} style={{ padding: '4px 0' }}>

@@ -380,6 +380,7 @@ export function ReportsPage({
   const cleanedReportAssumptionsSignatureRef = useRef<string | null>(null);
   const printableReportAssumptions = draftReportAssumptions.filter((line) => String(line || '').trim().length > 0);
   const printableReportLimfacs = draftReportLimfacs.filter((line) => String(line || '').trim().length > 0);
+  const hasPrintableReportNotes = printableReportAssumptions.length > 0 || printableReportLimfacs.length > 0;
 
   const travelMut = useMutation({
     mutationFn: async (data: any) => {
@@ -1138,8 +1139,9 @@ export function ReportsPage({
               </Space>
             </Descriptions.Item>
           ) : null}
-          <Descriptions.Item label="Exercise Duration">
+          <Descriptions.Item label="Exercise Duration" className="ct-exercise-duration-item">
             <InputNumber
+              className="ct-screen-only"
               size="small"
               min={1}
               value={draftDutyDays}
@@ -1148,20 +1150,23 @@ export function ReportsPage({
               parser={(value) => Number((value ?? '').replace(/\s*days?$/i, '').trim())}
               style={{ width: 110 }}
             />
+            <Typography.Text className="ct-print-only ct-exercise-duration-print">
+              {draftDutyDays} days
+            </Typography.Text>
           </Descriptions.Item>
         </Descriptions>
-        <div className="ct-report-notes-layout">
-          <div className="ct-report-notes-section">
+        <div className={`ct-report-notes-layout ${hasPrintableReportNotes ? '' : 'ct-report-notes-layout-empty-print'}`}>
+          <div className="ct-report-notes-section ct-screen-only">
             <Typography.Text strong>Estimations include:</Typography.Text>
             <div className="ct-report-notes-list">
               {draftReportAssumptions.map((line, index) => (
                 <div
                   key={`report-assumption-${index + 1}`}
-                  className="ct-report-notes-row ct-screen-only"
+                  className="ct-report-notes-row"
                 >
                   <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
                   <Input.TextArea
-                    className="ct-report-notes-input ct-screen-only"
+                    className="ct-report-notes-input"
                     value={line}
                     autoSize
                     onChange={(event) => {
@@ -1175,33 +1180,20 @@ export function ReportsPage({
                   />
                 </div>
               ))}
-              {printableReportAssumptions.length === 0 ? null : (
-                <div className="ct-print-only">
-                  {printableReportAssumptions.map((line, index) => (
-                    <div
-                      key={`print-report-assumption-${index + 1}`}
-                      className="ct-report-notes-row"
-                    >
-                      <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
-                      <span className="ct-report-notes-text">{line}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 
-          <div className="ct-report-notes-section">
+          <div className="ct-report-notes-section ct-screen-only">
             <Typography.Text strong>LIMFACs</Typography.Text>
             <div className="ct-report-notes-list">
               {draftReportLimfacs.map((line, index) => (
                 <div
                   key={`report-limfac-${index + 1}`}
-                  className="ct-report-notes-row ct-screen-only"
+                  className="ct-report-notes-row"
                 >
                   <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
                   <Input.TextArea
-                    className="ct-report-notes-input ct-screen-only"
+                    className="ct-report-notes-input"
                     value={line}
                     autoSize
                     onChange={(event) => {
@@ -1215,21 +1207,42 @@ export function ReportsPage({
                   />
                 </div>
               ))}
-              {printableReportLimfacs.length === 0 ? null : (
-                <div className="ct-print-only">
-                  {printableReportLimfacs.map((line, index) => (
-                    <div
-                      key={`print-report-limfac-${index + 1}`}
-                      className="ct-report-notes-row"
-                    >
-                      <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
-                      <span className="ct-report-notes-text">{line}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
+
+          {printableReportAssumptions.length === 0 ? null : (
+            <div className="ct-report-notes-section ct-print-only">
+              <Typography.Text strong>Estimations include:</Typography.Text>
+              <div className="ct-report-notes-list">
+                {printableReportAssumptions.map((line, index) => (
+                  <div
+                    key={`print-report-assumption-${index + 1}`}
+                    className="ct-report-notes-row"
+                  >
+                    <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
+                    <span className="ct-report-notes-text">{line}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {printableReportLimfacs.length === 0 ? null : (
+            <div className="ct-report-notes-section ct-print-only">
+              <Typography.Text strong>LIMFACs</Typography.Text>
+              <div className="ct-report-notes-list">
+                {printableReportLimfacs.map((line, index) => (
+                  <div
+                    key={`print-report-limfac-${index + 1}`}
+                    className="ct-report-notes-row"
+                  >
+                    <Typography.Text className="ct-report-notes-bullet">•</Typography.Text>
+                    <span className="ct-report-notes-text">{line}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </Card>
       ) : null}
@@ -1238,37 +1251,74 @@ export function ReportsPage({
 
       {showQuickPlanningSummary ? (
       <Card title="Quick Planning Summary" className="ct-section-card ct-quick-summary-card" style={{ marginBottom: 24 }}>
-        <div className="ct-quick-summary-grid">
-          {quickPlanningSummaryItems.map((item) => (
-            <div key={item.key} className="ct-quick-summary-item">
-              <div className="ct-quick-summary-item-header">
-                <div className="ct-quick-summary-label">{item.label}</div>
-                <div className="ct-quick-summary-count">{item.count}</div>
+        <div className="ct-screen-only">
+          <div className="ct-quick-summary-grid">
+            {quickPlanningSummaryItems.map((item) => (
+              <div key={item.key} className="ct-quick-summary-item">
+                <div className="ct-quick-summary-item-header">
+                  <div className="ct-quick-summary-label">{item.label}</div>
+                  <div className="ct-quick-summary-count">{item.count}</div>
+                </div>
+                <div className="ct-quick-summary-text">{item.detail}</div>
               </div>
-              <div className="ct-quick-summary-text">{item.detail}</div>
+            ))}
+          </div>
+          <div className="ct-quick-summary-rates">
+            <div className="ct-quick-summary-rates-title">Player Cost Rates</div>
+            <div className="ct-quick-summary-rate-list">
+              {quickPlanningRateItems.map((item) => (
+                <div key={item.key} className="ct-quick-summary-rate-item">
+                  <div className="ct-quick-summary-rate-label">{item.label}</div>
+                  <div className="ct-quick-summary-rate-value">{item.value}</div>
+                  <div
+                    className={`ct-quick-summary-rate-detail ${
+                      item.detail === 'RPA'
+                        ? 'ct-quick-summary-rate-detail-rpa'
+                        : item.detail === 'O&M'
+                          ? 'ct-quick-summary-rate-detail-om'
+                          : ''
+                    }`}
+                  >
+                    {item.detail}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
-        <div className="ct-quick-summary-rates">
-          <div className="ct-quick-summary-rates-title">Player Cost Rates</div>
-          <div className="ct-quick-summary-rate-list">
-            {quickPlanningRateItems.map((item) => (
-              <div key={item.key} className="ct-quick-summary-rate-item">
-                <div className="ct-quick-summary-rate-label">{item.label}</div>
-                <div className="ct-quick-summary-rate-value">{item.value}</div>
-                <div
-                  className={`ct-quick-summary-rate-detail ${
-                    item.detail === 'RPA'
-                      ? 'ct-quick-summary-rate-detail-rpa'
-                      : item.detail === 'O&M'
-                        ? 'ct-quick-summary-rate-detail-om'
-                        : ''
-                  }`}
-                >
-                  {item.detail}
+        <div className="ct-print-only ct-quick-summary-print">
+          <div className="ct-quick-summary-print-grid">
+            {quickPlanningSummaryItems.map((item) => (
+              <div key={`print-${item.key}`} className="ct-quick-summary-print-item">
+                <div className="ct-quick-summary-print-label">{item.label}</div>
+                <div className="ct-quick-summary-print-main">
+                  <span className="ct-quick-summary-print-count">{item.count}</span>
+                  <span className="ct-quick-summary-print-detail">{item.detail}</span>
                 </div>
               </div>
             ))}
+          </div>
+          <div className="ct-quick-summary-print-rates">
+            <div className="ct-quick-summary-print-section-title">Player Cost Rates</div>
+            <div className="ct-quick-summary-print-rate-grid">
+              {quickPlanningRateItems.map((item) => (
+                <div key={`print-${item.key}`} className="ct-quick-summary-print-rate">
+                  <span className="ct-quick-summary-print-rate-label">{item.label}</span>
+                  <span className="ct-quick-summary-print-rate-value">{item.value}</span>
+                  <span
+                    className={`ct-quick-summary-print-rate-detail ${
+                      item.detail === 'RPA'
+                        ? 'ct-quick-summary-rate-detail-rpa'
+                        : item.detail === 'O&M'
+                          ? 'ct-quick-summary-rate-detail-om'
+                          : ''
+                    }`}
+                  >
+                    {item.detail}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </Card>

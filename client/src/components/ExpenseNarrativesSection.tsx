@@ -178,7 +178,7 @@ export default function ExpenseNarrativesSection() {
           >
             {section.title}
           </Typography.Title>
-          <div className="ct-table">
+          <div className="ct-table ct-screen-only">
             <Table
               dataSource={section.rows.map((row) => ({ ...row, key: row.expenseKey }))}
               columns={columns}
@@ -186,6 +186,30 @@ export default function ExpenseNarrativesSection() {
               size="small"
               tableLayout="fixed"
             />
+          </div>
+          <div className="ct-print-only ct-expense-narratives-print-list">
+            {section.rows.map((row) => (
+              <div key={`print-${row.expenseKey}`} className="ct-expense-narratives-print-row">
+                <div className="ct-expense-narratives-print-header">
+                  <div className="ct-expense-narratives-print-expense">{row.expenseLabel}</div>
+                  <div className="ct-expense-narratives-print-amount">{fmt(row.amount)}</div>
+                </div>
+                <div className="ct-expense-narratives-print-grid">
+                  <div className="ct-expense-narratives-print-field">
+                    <div className="ct-expense-narratives-print-label">Justification</div>
+                    <div className="ct-expense-narratives-print-text">
+                      {row.justification.trim() || 'Not provided'}
+                    </div>
+                  </div>
+                  <div className="ct-expense-narratives-print-field">
+                    <div className="ct-expense-narratives-print-label">Impact</div>
+                    <div className="ct-expense-narratives-print-text">
+                      {row.impact.trim() || 'Not provided'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ))}

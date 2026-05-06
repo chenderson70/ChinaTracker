@@ -183,7 +183,7 @@ export default function QuarterlyBudgetAllocationSection({
                 >
                   {section.label}
                 </Typography.Title>
-                <div className="ct-table">
+                <div className="ct-table ct-screen-only">
                   <Table
                     size="small"
                     pagination={false}
@@ -192,6 +192,56 @@ export default function QuarterlyBudgetAllocationSection({
                     scroll={{ x: Math.max(820, 220 + (displayedBuckets.length + 1) * 150) }}
                     rowKey="key"
                   />
+                </div>
+                <div className="ct-print-only ct-quarterly-print-table-wrap">
+                  <table className="ct-quarterly-print-table">
+                    <thead>
+                      <tr>
+                        <th>Category</th>
+                        {displayedBuckets.map((bucket) => (
+                          <th key={`print-${bucket.key}`}>{bucket.label}</th>
+                        ))}
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sectionRows.map((row) => (
+                        <tr key={`print-${section.key}-${row.key}`}>
+                          <td>
+                            <span
+                              className={`ct-quarterly-print-category ${
+                                row.key === 'totalOm' || row.key === 'totalRpa' ? 'ct-quarterly-print-total-label' : ''
+                              }`}
+                              style={row.tone ? { color: getValueColor(row.tone) } : undefined}
+                            >
+                              {row.category}
+                            </span>
+                          </td>
+                          {displayedBuckets.map((bucket) => {
+                            const value = Number(row[bucket.key] || 0);
+                            return (
+                              <td key={`print-${section.key}-${row.key}-${bucket.key}`}>
+                                <span
+                                  className={value && row.tone ? 'ct-quarterly-print-amount-strong' : ''}
+                                  style={value && row.tone ? { color: getValueColor(row.tone) } : undefined}
+                                >
+                                  {value ? fmt(value) : '-'}
+                                </span>
+                              </td>
+                            );
+                          })}
+                          <td>
+                            <span
+                              className="ct-quarterly-print-amount-strong"
+                              style={row.tone ? { color: getValueColor(row.tone) } : undefined}
+                            >
+                              {fmt(row.total || 0)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             );
