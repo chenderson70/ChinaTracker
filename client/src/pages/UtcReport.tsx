@@ -9,7 +9,14 @@ import * as api from '../services/api';
 import { exportElementToPdf } from '../services/pdf';
 import type { ExerciseDetail, FundingType, GroupCalc, PersonnelGroup, UnitCalc } from '../types';
 import { getUnitDisplayLabel } from '../utils/unitLabels';
-import { getUtcAlignmentLabel, getUtcDisplayTitle, getUtcTemplateByCode, type UtcAlignment } from '../utils/utcTemplates';
+import {
+  getUtcAlignmentLabel,
+  getUtcDisplayTitle,
+  getUtcPackageCount,
+  getUtcPackageCountFromNote,
+  getUtcTemplateByCode,
+  type UtcAlignment,
+} from '../utils/utcTemplates';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 const filenameSafe = (value: string) => value.trim().replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'UTC_Report';
@@ -20,14 +27,16 @@ type UtcReportRow = {
   utcTitle: string;
   alignment: UtcAlignment;
   units: Set<string>;
+  packageCountHint: number;
   pax: number;
   rpaCost: number;
   omCost: number;
 };
 
-type UtcReportDisplayRow = Omit<UtcReportRow, 'units'> & {
+type UtcReportDisplayRow = Omit<UtcReportRow, 'units' | 'packageCountHint'> & {
   unitList: string;
   alignmentLabel: string;
+  packageCount: number;
   totalCost: number;
   costPerPax: number;
 };
@@ -126,6 +135,7 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
             utcTitle: entry.utcTitle || '',
             alignment,
             units: new Set<string>(),
+            packageCountHint: 0,
             pax: 0,
             rpaCost: 0,
             omCost: 0,
@@ -135,6 +145,7 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
           const allocatedCost = totalGroupPax > 0 ? groupCost * (pax / totalGroupPax) : 0;
           row.utcTitle = row.utcTitle || entry.utcTitle || '';
           row.units.add(unitLabel);
+          row.packageCountHint += getUtcPackageCountFromNote(entry.note);
           row.pax += pax;
           if (group.fundingType === 'RPA') row.rpaCost += allocatedCost;
           else row.omCost += allocatedCost;
@@ -149,6 +160,7 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
         utcTitle: getUtcDisplayTitle(row.utcCode, row.utcTitle),
         unitList: Array.from(row.units).sort().join(', '),
         alignmentLabel: getUtcAlignmentLabel(row.alignment),
+        packageCount: getUtcPackageCount(row.utcCode, row.pax, row.packageCountHint),
         totalCost: row.rpaCost + row.omCost,
         costPerPax: row.pax > 0 ? (row.rpaCost + row.omCost) / row.pax : 0,
       }))
@@ -156,16 +168,30 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
   })();
 
   const totalPax = rows.reduce((sum, row) => sum + row.pax, 0);
+  const totalPackages = rows.reduce((sum, row) => sum + row.packageCount, 0);
   const totalCost = rows.reduce((sum, row) => sum + row.totalCost, 0);
   const sgRows = rows.filter((row) => row.alignment === 'SG');
   const aeRows = rows.filter((row) => row.alignment === 'AE');
+  const sgPackages = sgRows.reduce((sum, row) => sum + row.packageCount, 0);
+  const aePackages = aeRows.reduce((sum, row) => sum + row.packageCount, 0);
   const preparedByForExport = draftPreparedBy.trim();
   const utcColumns = [
-    { title: 'UTC', dataIndex: 'utcCode', width: 110 },
+    {
+      title: 'UTC',
+      dataIndex: 'utcCode',
+      width: 140,
+      render: (_value: string, row: UtcReportDisplayRow) => (
+        <Space size={8} className="ct-utc-code-cell">
+          <span>{row.utcCode}</span>
+          {row.packageCount > 1 ? <span className="ct-utc-package-badge">x{row.packageCount}</span> : null}
+        </Space>
+      ),
+    },
     { title: 'Description', dataIndex: 'utcTitle' },
     { title: 'Alignment', dataIndex: 'alignmentLabel', width: 110 },
     { title: 'Units', dataIndex: 'unitList' },
-    { title: 'PAX', dataIndex: 'pax', align: 'right' as const, width: 90 },
+    { title: 'Packages', dataIndex: 'packageCount', align: 'right' as const, width: 110 },
+    { title: 'Total PAX', dataIndex: 'pax', align: 'right' as const, width: 110 },
     { title: 'RPA Cost', dataIndex: 'rpaCost', align: 'right' as const, render: fmt },
     { title: 'O&M Cost', dataIndex: 'omCost', align: 'right' as const, render: fmt },
     { title: 'Total Cost', dataIndex: 'totalCost', align: 'right' as const, render: fmt },
@@ -173,6 +199,7 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
   ];
 
   const renderUtcTable = (dataSource: UtcReportDisplayRow[], emptyText: string) => {
+    const sectionPackages = dataSource.reduce((sum, row) => sum + row.packageCount, 0);
     const sectionPax = dataSource.reduce((sum, row) => sum + row.pax, 0);
     const sectionRpaCost = dataSource.reduce((sum, row) => sum + row.rpaCost, 0);
     const sectionOmCost = dataSource.reduce((sum, row) => sum + row.omCost, 0);
@@ -193,18 +220,21 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
                 <strong>Total</strong>
               </Table.Summary.Cell>
               <Table.Summary.Cell index={4} align="right">
-                <strong>{sectionPax.toLocaleString('en-US')}</strong>
+                <strong>{sectionPackages.toLocaleString('en-US')}</strong>
               </Table.Summary.Cell>
               <Table.Summary.Cell index={5} align="right">
-                <strong>{fmt(sectionRpaCost)}</strong>
+                <strong>{sectionPax.toLocaleString('en-US')}</strong>
               </Table.Summary.Cell>
               <Table.Summary.Cell index={6} align="right">
-                <strong>{fmt(sectionOmCost)}</strong>
+                <strong>{fmt(sectionRpaCost)}</strong>
               </Table.Summary.Cell>
               <Table.Summary.Cell index={7} align="right">
-                <strong>{fmt(sectionTotalCost)}</strong>
+                <strong>{fmt(sectionOmCost)}</strong>
               </Table.Summary.Cell>
               <Table.Summary.Cell index={8} align="right">
+                <strong>{fmt(sectionTotalCost)}</strong>
+              </Table.Summary.Cell>
+              <Table.Summary.Cell index={9} align="right">
                 <strong>{fmt(sectionCostPerPax)}</strong>
               </Table.Summary.Cell>
             </Table.Summary.Row>
@@ -277,17 +307,18 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
       ['Report Generated', generatedOn],
       ['Prepared By', preparedByForExport],
       [],
-      ['Total UTC Packages Tasked', rows.length],
+      ['Total UTC Packages Tasked', totalPackages],
       ['Tracked UTC PAX', totalPax],
       ['Tracked UTC Cost', totalCost],
       ['Cost / PAX', totalPax > 0 ? totalCost / totalPax : 0],
       [],
-      ['UTC', 'Description', 'Alignment', 'Units', 'PAX', 'RPA Cost', 'O&M Cost', 'Total Cost', 'Cost / PAX'],
+      ['UTC', 'Description', 'Alignment', 'Units', 'Packages', 'PAX', 'RPA Cost', 'O&M Cost', 'Total Cost', 'Cost / PAX'],
       ...rows.map((row) => [
         row.utcCode,
         row.utcTitle,
         row.alignmentLabel,
         row.unitList,
+        row.packageCount,
         row.pax,
         row.rpaCost,
         row.omCost,
@@ -316,6 +347,7 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
         Description: row.utcTitle,
         Alignment: row.alignmentLabel,
         Units: row.unitList,
+        Packages: row.packageCount,
         PAX: row.pax,
         'RPA Cost': row.rpaCost,
         'O&M Cost': row.omCost,
@@ -432,19 +464,19 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
         <div className="ct-utc-summary-grid">
           <UtcSummaryCard
             title="SG UTC Packages Tasked"
-            count={sgRows.length}
+            count={sgPackages}
             tone="sg"
           />
           <span className="ct-utc-summary-operator" aria-hidden="true">+</span>
           <UtcSummaryCard
             title="AE UTC Packages Tasked"
-            count={aeRows.length}
+            count={aePackages}
             tone="ae"
           />
           <span className="ct-utc-summary-operator" aria-hidden="true">=</span>
           <UtcSummaryCard
             title="Total UTC Packages Tasked"
-            count={rows.length}
+            count={totalPackages}
             tone="total"
           />
         </div>

@@ -1246,6 +1246,24 @@ body {
   border-top: 2px solid #e8ecf1 !important;
 }
 
+.ct-utc-code-cell {
+  font-weight: 700;
+}
+
+.ct-utc-package-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: var(--ct-primary);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 /* --- Buttons --- */
 .ant-btn-primary {
   border-radius: 8px !important;

@@ -99,11 +99,48 @@ export const PATRIOT_UTC_TEMPLATES: UtcTemplate[] = [
   { code: 'FFPM1', title: 'MED PREV & AERO MED TM 1', alignment: 'SG', defaultPax: 4, officers: 3, enlisted: 1, sourceFile: 'FFPM1 PREV MED TEAM MISCAP.pdf' },
   { code: 'FFPM2', title: 'MED PREV & AERO MED TM 2', alignment: 'SG', defaultPax: 2, officers: 0, enlisted: 2, sourceFile: 'FFPM2 BIO PUB HEALTH PAM TEAM MISCAP.pdf' },
   { code: 'FFPM3', title: 'MED PREV & AERO MED TM 3', alignment: 'SG', defaultPax: 3, officers: 0, enlisted: 3, sourceFile: 'FFPM3 BIO PUB HEALTH PAM 1 AND 2 MISCAP.pdf' },
-  { code: 'FFQCC', title: 'AE COMMAND SQUADRON', alignment: 'AE', defaultPax: null, officers: null, enlisted: null, sourceFile: 'FFQCC_AE COMMAND SQ MISCAP.pdf' },
+  {
+    code: 'FFQCC',
+    title: 'AE Command Squadron',
+    alignment: 'AE',
+    defaultPax: 8,
+    officers: 4,
+    enlisted: 4,
+    sourceFile: 'FFQCC_AE COMMAND SQ MISCAP.pdf',
+    entries: [
+      { rankCode: 'LTCOL', count: 1 },
+      { rankCode: 'MAJ', count: 3 },
+      { rankCode: 'TSGT', count: 4 },
+    ],
+  },
   { code: 'FFQCR', title: 'COMMUNICATIONS TM', alignment: 'AE', defaultPax: 2, officers: 0, enlisted: 2, sourceFile: 'FFQCR_AE COMM MISCAP.pdf' },
   { code: 'FFQDE', title: 'INTRATHEATER AIR CREW', alignment: 'AE', defaultPax: 5, officers: 2, enlisted: 3, sourceFile: 'FFQDE_AE CREW MISCAP.pdf' },
-  { code: 'FFQLL', title: 'LIAISON TEAM (AELT)', alignment: 'AE', defaultPax: null, officers: null, enlisted: null, sourceFile: 'FFQLL_AE LIAISON TEAM MISCAP.pdf' },
-  { code: 'FFQNT', title: 'OPERATIONS TEAM', alignment: 'AE', defaultPax: null, officers: null, enlisted: null, sourceFile: 'FFQNT_AE OPERATIONS TEAM MISCAP.pdf' },
+  {
+    code: 'FFQLL',
+    title: 'Liaison Team (AELT)',
+    alignment: 'AE',
+    defaultPax: 2,
+    officers: 2,
+    enlisted: 0,
+    sourceFile: 'FFQLL_AE LIAISON TEAM MISCAP.pdf',
+    entries: [
+      { rankCode: 'CAPT', count: 2 },
+    ],
+  },
+  {
+    code: 'FFQNT',
+    title: 'AE Operations Team (AEOT)',
+    alignment: 'AE',
+    defaultPax: 10,
+    officers: 4,
+    enlisted: 6,
+    sourceFile: 'FFQNT_AE OPERATIONS TEAM MISCAP.pdf',
+    entries: [
+      { rankCode: 'LTCOL', count: 2 },
+      { rankCode: 'CAPT', count: 2 },
+      { rankCode: 'TSGT', count: 6 },
+    ],
+  },
 ];
 
 const UTC_TEMPLATES_BY_CODE = new Map(PATRIOT_UTC_TEMPLATES.map((template) => [template.code, template]));
@@ -136,6 +173,30 @@ export function getUtcDisplayTitle(code: string | null | undefined, title: strin
   const template = getUtcTemplateByCode(code);
   if (template) return template.title;
   return String(title || '').trim();
+}
+
+export function getUtcPackageCountFromNote(note: string | null | undefined): number {
+  const match = String(note || '').match(/^\s*UTC\s+\S+\s+x\s*(\d+)\s*$/i);
+  return match ? Math.max(1, Number(match[1] || 1)) : 0;
+}
+
+export function getUtcPackageCount(
+  code: string | null | undefined,
+  pax: number,
+  notePackageCount = 0,
+): number {
+  const template = getUtcTemplateByCode(code);
+  const defaultPax = Number(template?.defaultPax || 0);
+
+  if (notePackageCount > 0) {
+    return Math.max(1, Math.round(Number(notePackageCount || 0)));
+  }
+
+  if (defaultPax > 0) {
+    return Math.max(1, Math.round(Number(pax || 0) / defaultPax));
+  }
+
+  return 1;
 }
 
 export function buildUtcTemplateEntries(template: UtcTemplate, overridePax?: number | null): UtcTemplateEntry[] {

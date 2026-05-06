@@ -328,6 +328,11 @@ function getNextPersonnelEntryRowOrder(entries: PersonnelEntry[]): number {
   return lastEntry ? lastEntry._effectiveRowOrder + PERSONNEL_ENTRY_ORDER_STEP : PERSONNEL_ENTRY_ORDER_STEP;
 }
 
+function normalizeUtcPackageCount(value: number | null | undefined): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(1, Math.round(parsed)) : 1;
+}
+
 function getDuplicatedPersonnelEntryRowOrder(entries: PersonnelEntry[], sourceEntryId: string): number {
   const orderedEntries = getOrderedPersonnelEntries(entries);
   const sourceIndex = orderedEntries.findIndex((entry) => entry.id === sourceEntryId);
@@ -825,7 +830,17 @@ export default function UnitView() {
   });
 
   const addUtcMut = useMutation({
-    mutationFn: async ({ groupId, utcCode, paxOverride }: { groupId: string; utcCode: string; paxOverride?: number | null }) => {
+    mutationFn: async ({
+      groupId,
+      utcCode,
+      paxOverride,
+      packageCount,
+    }: {
+      groupId: string;
+      utcCode: string;
+      paxOverride?: number | null;
+      packageCount?: number | null;
+    }) => {
       const group = personnelGroups.find((item) => item.id === groupId);
       const template = availableUtcTemplates.find((item) => item.code === utcCode);
       if (!group || !template) throw new Error('Select a valid UTC package for this unit');
@@ -840,11 +855,13 @@ export default function UnitView() {
       const leaveAccrual = calculateLongTourLeaveAccrual(startDate, endDate, defaultDutyDays);
       const baseRowOrder = getNextPersonnelEntryRowOrder(group.personnelEntries || []);
       const entries = buildUtcTemplateEntries(template, paxOverride);
+      const utcPackageCount = normalizeUtcPackageCount(packageCount);
+      const utcBaseNote = `UTC ${template.code}`;
 
       for (const [index, entry] of entries.entries()) {
         await api.addPersonnelEntry(groupId, {
           rankCode: entry.rankCode,
-          count: entry.count,
+          count: entry.count * utcPackageCount,
           rowOrder: baseRowOrder + (index * PERSONNEL_ENTRY_ORDER_STEP),
           dutyDays: leaveAccrual.orderDays ?? defaultDutyDays,
           startDate,
@@ -853,7 +870,7 @@ export default function UnitView() {
           rentalCarCount: 0,
           location: group.location || perDiemLocations[0] || 'FORT_HUNTER_LIGGETT',
           isLocal: !!group.isLocal,
-          note: `UTC ${template.code}`,
+          note: index === 0 && utcPackageCount > 1 ? `${utcBaseNote} x${utcPackageCount}` : utcBaseNote,
           utcCode: template.code,
           utcTitle: template.title,
           travelOnly: false,
@@ -861,10 +878,10 @@ export default function UnitView() {
         });
       }
 
-      return template;
+      return { template, packageCount: utcPackageCount };
     },
-    onSuccess: async (template) => {
-      message.success(`${template.code} added`);
+    onSuccess: async ({ template, packageCount }) => {
+      message.success(packageCount > 1 ? `${packageCount} ${template.code} packages added` : `${template.code} added`);
       setUtcModal(null);
       utcForm.resetFields();
       await refreshExerciseAndBudget();
@@ -2199,10 +2216,11 @@ export default function UnitView() {
               groupId: utcModal!.groupId,
               utcCode: values.utcCode,
               paxOverride: values.paxOverride,
+              packageCount: values.packageCount,
             });
           } catch (error: any) {
             if (Array.isArray(error?.errorFields) && error.errorFields.length > 0) {
-              message.warning('Select a UTC and PAX before saving.');
+              message.warning('Select a UTC, package quantity, and PAX before saving.');
             }
           }
         }}
@@ -2225,14 +2243,24 @@ export default function UnitView() {
               onChange={(code) => {
                 const template = availableUtcTemplates.find((item) => item.code === code);
                 utcForm.setFieldValue('paxOverride', template?.defaultPax ?? undefined);
+                utcForm.setFieldValue('packageCount', utcForm.getFieldValue('packageCount') || 1);
               }}
             />
           </Form.Item>
           <Form.Item
+            name="packageCount"
+            label="UTC Packages"
+            initialValue={1}
+            rules={[{ required: true, message: 'Enter the number of UTC packages' }]}
+            extra="Use this when you need multiple copies of the same UTC package, such as 3 FFQDE packages."
+          >
+            <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
             name="paxOverride"
-            label="PAX"
-            rules={[{ required: true, message: 'Enter the PAX for this UTC' }]}
-            extra="PAX totals were seeded from the provided MISCAP PDFs where OCR found an authorized total. Review-needed UTC packages require manual PAX."
+            label="PAX Per Package"
+            rules={[{ required: true, message: 'Enter the PAX for each UTC package' }]}
+            extra="PAX totals were seeded from the provided MISCAP PDFs where OCR found an authorized total. Review-needed UTC packages require manual PAX per package."
           >
             <InputNumber min={1} precision={0} style={{ width: '100%' }} />
           </Form.Item>
