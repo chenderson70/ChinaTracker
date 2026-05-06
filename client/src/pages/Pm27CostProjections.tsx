@@ -86,7 +86,13 @@ function formatDuration(dutyDays: number | null | undefined): string {
   const days = Number(dutyDays || 0);
   if (!days) return '0 days';
   const months = days / DAYS_PER_MONTH;
-  return Number.isInteger(months) ? pluralize(months, 'month') : pluralize(days, 'day');
+  return Number.isInteger(months)
+    ? pluralize(months, 'month')
+    : `${formatDayCount(days)} ${days === 1 ? 'day' : 'days'}`;
+}
+
+function formatDayCount(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function buildPersonnelDetail(
@@ -100,11 +106,16 @@ function buildPersonnelDetail(
 
   const rank = String(entry.rankCode || 'Personnel').toUpperCase();
   const baseDutyDays = Number(entry.dutyDays ?? group.dutyDays ?? defaultDutyDays);
+  const calculatedLeaveAccrual = calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, baseDutyDays);
+  const orderDays = calculatedLeaveAccrual.orderDays ?? baseDutyDays;
   const persistedLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
   const leaveDays = persistedLeaveDays > 0
     ? persistedLeaveDays
-    : calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, baseDutyDays).accruedLeaveDays;
-  const duration = formatDuration(baseDutyDays + leaveDays);
+    : calculatedLeaveAccrual.accruedLeaveDays;
+  const leaveBreakdown = leaveDays > 0
+    ? ` (order days ${formatDayCount(orderDays)} + ${formatDayCount(leaveDays)} leave)`
+    : '';
+  const duration = `${formatDuration(orderDays + leaveDays)}${leaveBreakdown}`;
   const location = formatLocation(entry.location ?? group.location);
   const locality = (entry.isLocal ?? group.isLocal) ? 'Local' : 'Not local';
   const note = String(entry.note || '').trim();
