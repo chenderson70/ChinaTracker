@@ -2000,6 +2000,20 @@ body {
   color: var(--ct-success);
 }
 
+.ct-expense-narrative-textarea.ant-input {
+  display: block;
+  width: 100%;
+  min-height: 126px;
+  max-height: 126px;
+  line-height: 1.5;
+  resize: none;
+  overflow-y: auto;
+}
+
+.ct-table .ant-table-tbody > tr > td.ct-expense-narrative-cell {
+  vertical-align: top;
+}
+
 .ct-inline-om-highlight {
   display: inline-block;
   padding: 1px 8px;

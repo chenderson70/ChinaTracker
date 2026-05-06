@@ -134,11 +134,13 @@ export default function ExpenseNarrativesSection() {
       title: 'Justification',
       dataIndex: 'justification',
       key: 'justification',
+      onCell: () => ({ className: 'ct-expense-narrative-cell' }),
       render: (value: string, row: DerivedExpenseNarrativeRow) => (
         <Input.TextArea
+          className="ct-expense-narrative-textarea"
           value={value}
           onChange={(event) => updateDraftField(row.expenseKey, 'justification', event.target.value)}
-          autoSize={{ minRows: 2, maxRows: 5 }}
+          rows={5}
           placeholder="Enter justification"
         />
       ),
@@ -147,11 +149,13 @@ export default function ExpenseNarrativesSection() {
       title: 'Impact',
       dataIndex: 'impact',
       key: 'impact',
+      onCell: () => ({ className: 'ct-expense-narrative-cell' }),
       render: (value: string, row: DerivedExpenseNarrativeRow) => (
         <Input.TextArea
+          className="ct-expense-narrative-textarea"
           value={value}
           onChange={(event) => updateDraftField(row.expenseKey, 'impact', event.target.value)}
-          autoSize={{ minRows: 2, maxRows: 5 }}
+          rows={5}
           placeholder="Enter impact"
         />
       ),
