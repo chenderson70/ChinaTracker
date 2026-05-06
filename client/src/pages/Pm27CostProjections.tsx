@@ -56,6 +56,18 @@ type MealResponsibilityContext = {
 
 type PlayerOmResponsibilityContext = ReturnType<typeof getPlayerOmResponsibilityByUnit>;
 
+type PersonnelDetailParts = {
+  count: number;
+  rank: string;
+  duration: string;
+  location: string;
+  locality: string;
+  travelOnly: string;
+  note: string;
+  utcCode: string;
+  prefix?: string;
+};
+
 function pluralize(value: number, label: string): string {
   return `${value} ${label}${value === 1 ? '' : 's'}`;
 }
@@ -95,12 +107,12 @@ function formatDayCount(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-function buildPersonnelDetail(
+function getPersonnelDetailParts(
   entry: Partial<PersonnelEntry>,
   group: PersonnelGroup,
   defaultDutyDays: number,
   prefix?: string,
-): string | null {
+): PersonnelDetailParts | null {
   const count = Number(entry.count ?? group.paxCount ?? 0);
   if (count <= 0) return null;
 
@@ -109,9 +121,7 @@ function buildPersonnelDetail(
   const calculatedLeaveAccrual = calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, baseDutyDays);
   const orderDays = calculatedLeaveAccrual.orderDays ?? baseDutyDays;
   const persistedLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
-  const leaveDays = persistedLeaveDays > 0
-    ? persistedLeaveDays
-    : calculatedLeaveAccrual.accruedLeaveDays;
+  const leaveDays = Math.max(persistedLeaveDays, calculatedLeaveAccrual.accruedLeaveDays);
   const leaveBreakdown = leaveDays > 0
     ? ` (order days ${formatDayCount(orderDays)} + ${formatDayCount(leaveDays)} leave)`
     : '';
@@ -120,9 +130,51 @@ function buildPersonnelDetail(
   const locality = (entry.isLocal ?? group.isLocal) ? 'Local' : 'Not local';
   const note = String(entry.note || '').trim();
   const travelOnly = entry.travelOnly ? ' - Travel only' : '';
-  const detail = `${count} ${rank} - ${duration} - ${location} - ${locality}${travelOnly}${note ? ` (${note})` : ''}`;
+  const utcCode = String(entry.utcCode || '').trim().toUpperCase();
 
-  return prefix ? `${prefix} - ${detail}` : detail;
+  return {
+    count,
+    rank,
+    duration,
+    location,
+    locality,
+    travelOnly,
+    note,
+    utcCode,
+    prefix,
+  };
+}
+
+function buildPersonnelDetailFromParts(parts: PersonnelDetailParts): string {
+  const note = parts.note ? ` (${parts.note})` : '';
+  const detail = `${parts.count} ${parts.rank} - ${parts.duration} - ${parts.location} - ${parts.locality}${parts.travelOnly}${note}`;
+
+  return parts.prefix ? `${parts.prefix} - ${detail}` : detail;
+}
+
+function getUtcNote(parts: PersonnelDetailParts[]): string {
+  const utcNote = `UTC ${parts[0]?.utcCode || ''}`.trim().toLowerCase();
+  const notes = Array.from(new Set(parts
+    .map((part) => part.note)
+    .filter((note) => note && note.toLowerCase() !== utcNote)));
+
+  return notes.length > 0 ? ` (${notes.join('; ')})` : '';
+}
+
+function buildUtcPersonnelDetail(parts: PersonnelDetailParts[]): string | null {
+  if (parts.length === 0) return null;
+
+  const first = parts[0];
+  const countsByRank = new Map<string, number>();
+  parts.forEach((part) => {
+    countsByRank.set(part.rank, (countsByRank.get(part.rank) || 0) + part.count);
+  });
+  const rankSummary = Array.from(countsByRank.entries())
+    .map(([rank, count]) => `${count} ${rank}`)
+    .join(', ');
+  const detail = `UTC ${first.utcCode} - ${rankSummary} - ${first.duration} - ${first.location} - ${first.locality}${first.travelOnly}${getUtcNote(parts)}`;
+
+  return first.prefix ? `${first.prefix} - ${detail}` : detail;
 }
 
 function getPersonnelDetails(groups: PersonnelGroup[], defaultDutyDays: number, includeRolePrefix = false): string[] {
@@ -135,9 +187,35 @@ function getPersonnelDetails(groups: PersonnelGroup[], defaultDutyDays: number, 
     };
     const entries = group.personnelEntries.length > 0 ? group.personnelEntries : [fallbackEntry];
     const prefix = includeRolePrefix ? (group.role === 'SUPPORT' ? 'Support' : 'Support Personnel - Execution') : undefined;
+    const details = entries
+      .map((entry) => getPersonnelDetailParts(entry, group, defaultDutyDays, prefix))
+      .filter((detail): detail is PersonnelDetailParts => !!detail);
+    const utcGroups = new Map<string, PersonnelDetailParts[]>();
+    const ungroupedDetails: string[] = [];
 
-    return entries
-      .map((entry) => buildPersonnelDetail(entry, group, defaultDutyDays, prefix))
+    details.forEach((detail) => {
+      if (!detail.utcCode) {
+        ungroupedDetails.push(buildPersonnelDetailFromParts(detail));
+        return;
+      }
+
+      const key = [
+        detail.prefix || '',
+        detail.utcCode,
+        detail.duration,
+        detail.location,
+        detail.locality,
+        detail.travelOnly,
+      ].join('::');
+      utcGroups.set(key, [...(utcGroups.get(key) || []), detail]);
+    });
+
+    return [
+      ...Array.from(utcGroups.values())
+        .map((parts) => buildUtcPersonnelDetail(parts))
+        .filter((detail): detail is string => !!detail),
+      ...ungroupedDetails,
+    ]
       .filter((detail): detail is string => !!detail);
   });
 }
@@ -332,7 +410,7 @@ function buildProjectionRow(
   };
 }
 
-function A7RpaFundingSummary() {
+export function A7RpaFundingSummary() {
   const { budget } = useApp();
 
   if (!budget) return null;
@@ -387,7 +465,7 @@ function A7RpaFundingSummary() {
   );
 }
 
-function Pm27UnitProjectionTables() {
+export function Pm27UnitProjectionTables() {
   const { exercise, budget } = useApp();
 
   if (!exercise || !budget) return null;
@@ -495,10 +573,7 @@ export default function Pm27CostProjections() {
       showQuarterlyBudgetAllocation={false}
       beforeBudgetBreakdownSection={<BudgetOverviewSection />}
       extraSections={(
-        <>
-          <A7RpaFundingSummary />
-          <Pm27UnitProjectionTables />
-        </>
+        <A7RpaFundingSummary />
       )}
     />
   );

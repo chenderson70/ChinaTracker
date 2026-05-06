@@ -5,7 +5,9 @@ import AppLayout from './components/AppLayout';
 import Dashboard from './pages/Dashboard';
 import UnitView from './pages/UnitView';
 import RateConfig from './pages/RateConfig';
+import BuildReport from './pages/BuildReport';
 import Pm27CostProjections from './pages/Pm27CostProjections';
+import FullBudgetDetails from './pages/FullBudgetDetails';
 import UtcReport from './pages/UtcReport';
 import Sustainment from './pages/Sustainment';
 import Balance from './pages/Balance';
@@ -65,7 +67,9 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/units/:unitCode" element={<UnitView />} />
         <Route path="/rates" element={<RateConfig />} />
+        <Route path="/reports/build" element={<BuildReport />} />
         <Route path="/reports/pm-27-cost-projections" element={<Pm27CostProjections />} />
+        <Route path="/reports/full-budget-details" element={<FullBudgetDetails />} />
         <Route path="/reports/utc-report" element={<UtcReport />} />
         <Route path="/reports/sustainment" element={<Sustainment />} />
         <Route path="/reports/balance" element={<Balance />} />

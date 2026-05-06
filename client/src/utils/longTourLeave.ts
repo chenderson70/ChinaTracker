@@ -1,4 +1,3 @@
-import dayjs from 'dayjs';
 import { calculateInclusiveDateRangeDays, normalizeDateString } from './dateRanges';
 
 export const LONG_TOUR_LEAVE_THRESHOLD_DAYS = 30;
@@ -39,32 +38,6 @@ function calculateFallbackLeaveDays(orderDays: number): number {
   return roundToHalfDay((fullThirtyDayPeriods * 2.5) + getResidualLeaveDays(residualDays));
 }
 
-function calculateCalendarLeaveDays(startDate: string, endDate: string, orderDays: number): number {
-  if (orderDays <= LONG_TOUR_LEAVE_THRESHOLD_DAYS) return 0;
-
-  const start = dayjs(startDate);
-  const end = dayjs(endDate);
-  if (!start.isValid() || !end.isValid() || end.isBefore(start, 'day')) {
-    return calculateFallbackLeaveDays(orderDays);
-  }
-
-  let cursor = start;
-  let fullYears = 0;
-  while (cursor.add(1, 'year').isSame(end, 'day') || cursor.add(1, 'year').isBefore(end, 'day')) {
-    cursor = cursor.add(1, 'year');
-    fullYears += 1;
-  }
-
-  let fullMonths = 0;
-  while (cursor.add(1, 'month').isSame(end, 'day') || cursor.add(1, 'month').isBefore(end, 'day')) {
-    cursor = cursor.add(1, 'month');
-    fullMonths += 1;
-  }
-
-  const residualDays = Math.max(0, end.diff(cursor, 'day')) + 1;
-  return roundToHalfDay((fullYears * 30) + (fullMonths * 2.5) + getResidualLeaveDays(residualDays));
-}
-
 export function calculateLongTourLeaveAccrual(
   startDate: string | null | undefined,
   endDate: string | null | undefined,
@@ -84,9 +57,7 @@ export function calculateLongTourLeaveAccrual(
     };
   }
 
-  const accruedLeaveDays = normalizedStartDate && normalizedEndDate
-    ? calculateCalendarLeaveDays(normalizedStartDate, normalizedEndDate, orderDays)
-    : calculateFallbackLeaveDays(orderDays);
+  const accruedLeaveDays = calculateFallbackLeaveDays(orderDays);
 
   return {
     orderDays,

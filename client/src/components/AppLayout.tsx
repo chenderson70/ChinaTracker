@@ -682,7 +682,9 @@ export default function AppLayout() {
       icon: <FileExcelOutlined />,
       label: 'Reports',
       children: [
+        { key: '/reports/build', label: 'Build a Report' },
         { key: '/reports/pm-27-cost-projections', label: currentCostProjectionLabel },
+        { key: '/reports/full-budget-details', label: 'Full Budget Details' },
         { key: '/reports/utc-report', label: 'UTC Report' },
         { key: '/reports/sustainment', label: 'Exercise Sustainment' },
         { key: '/reports/balance', label: 'Balance' },

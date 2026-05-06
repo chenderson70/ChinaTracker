@@ -32,9 +32,10 @@ function resolveLongTourLeaveDays(
   dutyDays: number | null | undefined,
 ): number | null {
   const normalizedExplicitValue = normalizeOptionalNonNegativeNumber(explicitValue);
-  if (normalizedExplicitValue !== null) return normalizedExplicitValue;
-
-  return getLongTourLeaveFieldValue(calculateLongTourLeaveAccrual(startDate, endDate, dutyDays));
+  const calculatedValue = getLongTourLeaveFieldValue(calculateLongTourLeaveAccrual(startDate, endDate, dutyDays));
+  if (normalizedExplicitValue === null) return calculatedValue;
+  if (calculatedValue === null) return normalizedExplicitValue;
+  return Math.max(normalizedExplicitValue, calculatedValue);
 }
 
 // ─── UPDATE PERSONNEL GROUP ───

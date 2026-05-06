@@ -11,7 +11,11 @@ import { getUnitDisplayLabel, compareUnitCodes } from '../utils/unitLabels';
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
-export default function Balance() {
+type BalanceProps = {
+  showHeader?: boolean;
+};
+
+export default function Balance({ showHeader = true }: BalanceProps = {}) {
   const { exercise, budget } = useApp();
   const { data: appConfig = {} } = useQuery({ queryKey: ['appConfig'], queryFn: api.getAppConfig });
 
@@ -132,9 +136,11 @@ export default function Balance() {
 
   return (
     <div>
-      <div className="ct-page-header">
-        <Typography.Title level={4} className="ct-page-title">Balance</Typography.Title>
-      </div>
+      {showHeader ? (
+        <div className="ct-page-header">
+          <Typography.Title level={4} className="ct-page-title">Balance</Typography.Title>
+        </div>
+      ) : null}
 
       <Card title="Budget Balance Summary" className="ct-section-card" style={{ marginBottom: 24 }}>
         <Table

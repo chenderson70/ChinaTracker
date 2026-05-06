@@ -201,7 +201,9 @@ function getPersonnelEntryPayableDutyDays(
   const orderDays = getPersonnelEntryOrderDays(entry);
   if (!orderDays) return null;
 
-  const leaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
+  const calculatedLeaveDays = calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, orderDays).accruedLeaveDays;
+  const persistedLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
+  const leaveDays = Math.max(persistedLeaveDays, calculatedLeaveDays);
   return orderDays + leaveDays;
 }
 
@@ -210,13 +212,14 @@ function getLongTourLeaveAccrualForEntry(
 ): LongTourLeaveAccrual {
   const calculated = calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, entry.dutyDays);
   const persistedLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
+  const accruedLeaveDays = Math.max(persistedLeaveDays, calculated.accruedLeaveDays);
 
-  if (persistedLeaveDays > 0 && calculated.accruedLeaveDays <= 0) {
+  if (accruedLeaveDays > 0 && accruedLeaveDays !== calculated.accruedLeaveDays) {
     const orderDays = calculated.orderDays ?? normalizePositiveDutyDays(entry.dutyDays);
     return {
       orderDays,
-      accruedLeaveDays: persistedLeaveDays,
-      payableDutyDays: orderDays ? orderDays + persistedLeaveDays : null,
+      accruedLeaveDays,
+      payableDutyDays: orderDays ? orderDays + accruedLeaveDays : null,
       applies: true,
     };
   }

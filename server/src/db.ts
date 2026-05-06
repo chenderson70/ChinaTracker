@@ -223,7 +223,6 @@ async function clearLegacyReportDefaults(): Promise<void> {
 async function backfillLongTourLeaveDays(): Promise<void> {
 	const entries = await prisma.personnelEntry.findMany({
 		where: {
-			longTourLeaveDays: null,
 			OR: [
 				{ dutyDays: { gt: 30 } },
 				{ startDate: { not: null }, endDate: { not: null } },
@@ -234,14 +233,19 @@ async function backfillLongTourLeaveDays(): Promise<void> {
 			dutyDays: true,
 			startDate: true,
 			endDate: true,
+			longTourLeaveDays: true,
 		},
 	});
 
 	for (const entry of entries) {
-		const longTourLeaveDays = getLongTourLeaveFieldValue(
+		const calculatedLongTourLeaveDays = getLongTourLeaveFieldValue(
 			calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, entry.dutyDays),
 		);
-		if (longTourLeaveDays === null) continue;
+		if (calculatedLongTourLeaveDays === null) continue;
+
+		const existingLongTourLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
+		const longTourLeaveDays = Math.max(existingLongTourLeaveDays, calculatedLongTourLeaveDays);
+		if (Math.abs(longTourLeaveDays - existingLongTourLeaveDays) < 0.001) continue;
 
 		await prisma.personnelEntry.update({
 			where: { id: entry.id },

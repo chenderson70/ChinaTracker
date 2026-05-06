@@ -167,9 +167,8 @@ function getPlanningSummaryEntries(exercise: ExerciseDetail): PlanningSummaryEnt
               ? group.personnelEntries.map((entry) => {
                 const baseDutyDays = Number(entry.dutyDays ?? group.dutyDays ?? exercise.defaultDutyDays ?? 0);
                 const persistedLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
-                const leaveDays = persistedLeaveDays > 0
-                  ? persistedLeaveDays
-                  : calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, baseDutyDays).accruedLeaveDays;
+                const calculatedLeaveDays = calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, baseDutyDays).accruedLeaveDays;
+                const leaveDays = Math.max(persistedLeaveDays, calculatedLeaveDays);
 
                 return {
                   count: Number(entry.count || 0),
@@ -290,6 +289,7 @@ interface ReportsPageProps {
   showQuarterlyBudgetAllocation?: boolean;
   showFullBudgetBreakdown?: boolean;
   showTravelConfiguration?: boolean;
+  showExcelExport?: boolean;
   beforeBudgetBreakdownSection?: ReactNode;
   extraSections?: ReactNode;
 }
@@ -347,6 +347,7 @@ export function ReportsPage({
   showQuarterlyBudgetAllocation = true,
   showFullBudgetBreakdown = true,
   showTravelConfiguration = true,
+  showExcelExport = true,
   beforeBudgetBreakdownSection,
   extraSections,
 }: ReportsPageProps) {
@@ -1047,7 +1048,9 @@ export function ReportsPage({
         <div className="ct-page-actions">
           <Space wrap>
             <Button icon={<FilePdfOutlined />} onClick={handleExportPdf}>Export to PDF</Button>
-            <Button icon={<FileExcelOutlined />} type="primary" onClick={handleExport}>Export to Excel</Button>
+            {showExcelExport ? (
+              <Button icon={<FileExcelOutlined />} type="primary" onClick={handleExport}>Export to Excel</Button>
+            ) : null}
             <Button icon={<PrinterOutlined />} onClick={handlePrint}>Print</Button>
           </Space>
         </div>

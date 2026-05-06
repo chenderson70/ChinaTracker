@@ -82,6 +82,18 @@ type SnapshotMetric = {
 
 type MetricFormatter = (value: number) => string;
 
+type ComparisonProps = {
+  showHeader?: boolean;
+};
+
+function ComparisonHeader() {
+  return (
+    <div className="ct-page-header">
+      <Typography.Title level={4} className="ct-page-title">Comparison</Typography.Title>
+    </div>
+  );
+}
+
 type ComparisonBandSectionProps = {
   title: string;
   description: string;
@@ -459,7 +471,7 @@ function hasUnitChange(row: UnitComparisonRow): boolean {
     || row.localHotelRoomDelta !== 0;
 }
 
-export default function Comparison() {
+export default function Comparison({ showHeader = true }: ComparisonProps = {}) {
   const { exercise, budget, exerciseId } = useApp();
   const [comparisonExerciseId, setComparisonExerciseId] = useState<string | null>(null);
 
@@ -505,9 +517,7 @@ export default function Comparison() {
   if (comparisonOptions.length === 0) {
     return (
       <div>
-        <div className="ct-page-header">
-          <Typography.Title level={4} className="ct-page-title">Comparison</Typography.Title>
-        </div>
+        {showHeader ? <ComparisonHeader /> : null}
         <Card className="ct-section-card">
           <Empty description="Create at least one more exercise to compare it against the current one." />
         </Card>
@@ -525,9 +535,7 @@ export default function Comparison() {
   if (!comparisonExercise || !comparisonBudget) {
     return (
       <div>
-        <div className="ct-page-header">
-          <Typography.Title level={4} className="ct-page-title">Comparison</Typography.Title>
-        </div>
+        {showHeader ? <ComparisonHeader /> : null}
         <Card className="ct-section-card">
           <Empty description="Select another exercise to generate the comparison report." />
         </Card>
@@ -764,9 +772,7 @@ export default function Comparison() {
 
   return (
     <div>
-      <div className="ct-page-header">
-        <Typography.Title level={4} className="ct-page-title">Comparison</Typography.Title>
-      </div>
+      {showHeader ? <ComparisonHeader /> : null}
 
       <Card className="ct-section-card ct-comparison-hero-card" style={{ marginBottom: 24 }}>
         <div className="ct-comparison-hero-grid">

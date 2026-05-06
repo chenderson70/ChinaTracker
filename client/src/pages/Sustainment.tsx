@@ -96,7 +96,7 @@ function formatQuantity(value: number): string {
   return value.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
-function SustainmentWorkspace() {
+export function SustainmentWorkspace() {
   const { exercise } = useApp();
 
   if (!exercise) return null;

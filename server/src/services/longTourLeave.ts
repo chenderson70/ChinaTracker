@@ -28,21 +28,6 @@ function dateFromIso(value: string): Date {
   return new Date(`${value}T00:00:00Z`);
 }
 
-function daysInUtcMonth(year: number, monthIndex: number): number {
-  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
-}
-
-function addCalendarMonths(value: Date, months: number): Date {
-  const currentMonth = value.getUTCMonth();
-  const absoluteMonth = currentMonth + months;
-  const yearOffset = Math.floor(absoluteMonth / 12);
-  const normalizedMonth = ((absoluteMonth % 12) + 12) % 12;
-  const targetYear = value.getUTCFullYear() + yearOffset;
-  const targetDay = Math.min(value.getUTCDate(), daysInUtcMonth(targetYear, normalizedMonth));
-
-  return new Date(Date.UTC(targetYear, normalizedMonth, targetDay));
-}
-
 function roundToHalfDay(value: number): number {
   return Math.round(value * 2) / 2;
 }
@@ -76,36 +61,6 @@ function calculateFallbackLeaveDays(orderDays: number): number {
   return roundToHalfDay((fullThirtyDayPeriods * 2.5) + getResidualLeaveDays(residualDays));
 }
 
-function calculateCalendarLeaveDays(startDate: string, endDate: string, orderDays: number): number {
-  if (orderDays <= LONG_TOUR_LEAVE_THRESHOLD_DAYS) return 0;
-
-  const start = dateFromIso(startDate);
-  const end = dateFromIso(endDate);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() < start.getTime()) {
-    return calculateFallbackLeaveDays(orderDays);
-  }
-
-  let cursor = start;
-  let fullYears = 0;
-  let nextYear = addCalendarMonths(cursor, 12);
-  while (nextYear.getTime() <= end.getTime()) {
-    cursor = nextYear;
-    fullYears += 1;
-    nextYear = addCalendarMonths(cursor, 12);
-  }
-
-  let fullMonths = 0;
-  let nextMonth = addCalendarMonths(cursor, 1);
-  while (nextMonth.getTime() <= end.getTime()) {
-    cursor = nextMonth;
-    fullMonths += 1;
-    nextMonth = addCalendarMonths(cursor, 1);
-  }
-
-  const residualDays = Math.max(0, Math.round((end.getTime() - cursor.getTime()) / MS_PER_DAY)) + 1;
-  return roundToHalfDay((fullYears * 30) + (fullMonths * 2.5) + getResidualLeaveDays(residualDays));
-}
-
 export function calculateLongTourLeaveAccrual(
   startDate: unknown,
   endDate: unknown,
@@ -125,9 +80,7 @@ export function calculateLongTourLeaveAccrual(
     };
   }
 
-  const accruedLeaveDays = normalizedStartDate && normalizedEndDate
-    ? calculateCalendarLeaveDays(normalizedStartDate, normalizedEndDate, orderDays)
-    : calculateFallbackLeaveDays(orderDays);
+  const accruedLeaveDays = calculateFallbackLeaveDays(orderDays);
 
   return {
     orderDays,

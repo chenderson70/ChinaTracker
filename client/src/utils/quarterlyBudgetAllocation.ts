@@ -257,9 +257,8 @@ function resolvePersonnelDutyDays(
 ): number {
   const orderDays = resolvePersonnelOrderDays(exercise, group, entry, defaultDays);
   const persistedLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
-  const leaveDays = persistedLeaveDays > 0
-    ? persistedLeaveDays
-    : calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, orderDays).accruedLeaveDays;
+  const calculatedLeaveDays = calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, orderDays).accruedLeaveDays;
+  const leaveDays = Math.max(persistedLeaveDays, calculatedLeaveDays);
   return orderDays + leaveDays;
 }
 

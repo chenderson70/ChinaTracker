@@ -105,9 +105,8 @@ function getEntryLongTourLeaveDays(
   orderDays: number,
 ): number {
   const persistedLeaveDays = Math.max(0, Number(entry.longTourLeaveDays || 0));
-  if (persistedLeaveDays > 0) return persistedLeaveDays;
-
-  return calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, orderDays).accruedLeaveDays;
+  const calculatedLeaveDays = calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, orderDays).accruedLeaveDays;
+  return Math.max(persistedLeaveDays, calculatedLeaveDays);
 }
 
 function emptyGroup(pax = 0, days = 0): GroupCalc {

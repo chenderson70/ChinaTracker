@@ -32,6 +32,35 @@ type UtcReportDisplayRow = Omit<UtcReportRow, 'units'> & {
   costPerPax: number;
 };
 
+type UtcReportProps = {
+  showHeader?: boolean;
+};
+
+type UtcSummaryCardProps = {
+  title: string;
+  count: number;
+  pax: number;
+  cost: number;
+  tone: 'sg' | 'ae';
+};
+
+function UtcSummaryCard({ title, count, pax, cost, tone }: UtcSummaryCardProps) {
+  return (
+    <div className={`ct-utc-summary-card ct-utc-summary-card-${tone}`}>
+      <div className="ct-utc-summary-card-body">
+        <div className="ct-utc-summary-count-bubble">{count}</div>
+        <div className="ct-utc-summary-content">
+          <Typography.Text className="ct-utc-summary-label">{title}</Typography.Text>
+          <div className="ct-utc-summary-detail-row">
+            <span>{pax.toLocaleString('en-US')} PAX</span>
+            <span>{fmt(cost)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function getGroupCalc(unitCalc: UnitCalc | undefined, group: PersonnelGroup): GroupCalc | null {
   if (!unitCalc) return null;
   const role = String(group.role || '').toUpperCase();
@@ -47,7 +76,7 @@ function getGroupCalc(unitCalc: UnitCalc | undefined, group: PersonnelGroup): Gr
   return null;
 }
 
-export default function UtcReport() {
+export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
   const { exercise, budget, exerciseId, pushUndoSnapshot } = useApp();
   const queryClient = useQueryClient();
   const exportRef = useRef<HTMLDivElement>(null);
@@ -118,6 +147,10 @@ export default function UtcReport() {
   const totalCost = rows.reduce((sum, row) => sum + row.totalCost, 0);
   const sgRows = rows.filter((row) => row.alignment === 'SG');
   const aeRows = rows.filter((row) => row.alignment === 'AE');
+  const sgPax = sgRows.reduce((sum, row) => sum + row.pax, 0);
+  const aePax = aeRows.reduce((sum, row) => sum + row.pax, 0);
+  const sgCost = sgRows.reduce((sum, row) => sum + row.totalCost, 0);
+  const aeCost = aeRows.reduce((sum, row) => sum + row.totalCost, 0);
   const preparedByForExport = draftPreparedBy.trim();
   const utcColumns = [
     { title: 'UTC', dataIndex: 'utcCode', width: 110 },
@@ -307,56 +340,74 @@ export default function UtcReport() {
 
   return (
     <div ref={exportRef}>
-      <div className="ct-page-header">
-        <Typography.Title level={4} className="ct-page-title">UTC Report</Typography.Title>
-        <div className="ct-page-actions">
-          <Space wrap>
-            <Button icon={<FilePdfOutlined />} onClick={handleExportPdf}>Export to PDF</Button>
-            <Button icon={<FileExcelOutlined />} type="primary" onClick={handleExportExcel}>Export to Excel</Button>
-            <Button icon={<PrinterOutlined />} onClick={handlePrint}>Print</Button>
-          </Space>
-        </div>
-        <div className="ct-report-header-meta">
-          <div className="ct-report-header-meta-row">
-            <Typography.Text className="ct-report-header-meta-label">
-              Report Generated:
-            </Typography.Text>
-            <Typography.Text className="ct-report-header-meta-value">
-              {reportGeneratedOn}
-            </Typography.Text>
+      {showHeader ? (
+        <div className="ct-page-header">
+          <Typography.Title level={4} className="ct-page-title">UTC Report</Typography.Title>
+          <div className="ct-page-actions">
+            <Space wrap>
+              <Button icon={<FilePdfOutlined />} onClick={handleExportPdf}>Export to PDF</Button>
+              <Button icon={<FileExcelOutlined />} type="primary" onClick={handleExportExcel}>Export to Excel</Button>
+              <Button icon={<PrinterOutlined />} onClick={handlePrint}>Print</Button>
+            </Space>
           </div>
-          <div className="ct-report-header-meta-row ct-report-header-prepared-by-row">
-            <Typography.Text className="ct-report-header-meta-label">
-              Prepared By
-            </Typography.Text>
-            <Input
-              className="ct-screen-only ct-report-header-name-input"
-              type="text"
-              value={draftPreparedBy}
-              onChange={(event) => setDraftPreparedBy(event.target.value)}
-              onBlur={(event) => persistPreparedBy(event.target.value)}
-              onPressEnter={(event) => {
-                persistPreparedBy((event.target as HTMLInputElement).value);
-                (event.target as HTMLInputElement).blur();
-              }}
-              aria-label="Prepared By"
-              placeholder="Enter your name"
-              maxLength={120}
-              autoComplete="name"
-            />
-            <Typography.Text className="ct-print-only ct-report-header-meta-value">
-              {preparedByForExport || '________________'}
-            </Typography.Text>
+          <div className="ct-report-header-meta">
+            <div className="ct-report-header-meta-row">
+              <Typography.Text className="ct-report-header-meta-label">
+                Report Generated:
+              </Typography.Text>
+              <Typography.Text className="ct-report-header-meta-value">
+                {reportGeneratedOn}
+              </Typography.Text>
+            </div>
+            <div className="ct-report-header-meta-row ct-report-header-prepared-by-row">
+              <Typography.Text className="ct-report-header-meta-label">
+                Prepared By
+              </Typography.Text>
+              <Input
+                className="ct-screen-only ct-report-header-name-input"
+                type="text"
+                value={draftPreparedBy}
+                onChange={(event) => setDraftPreparedBy(event.target.value)}
+                onBlur={(event) => persistPreparedBy(event.target.value)}
+                onPressEnter={(event) => {
+                  persistPreparedBy((event.target as HTMLInputElement).value);
+                  (event.target as HTMLInputElement).blur();
+                }}
+                aria-label="Prepared By"
+                placeholder="Enter your name"
+                maxLength={120}
+                autoComplete="name"
+              />
+              <Typography.Text className="ct-print-only ct-report-header-meta-value">
+                {preparedByForExport || '________________'}
+              </Typography.Text>
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
 
-      <Card className="ct-section-card" style={{ marginBottom: 16 }}>
-        <Typography.Text strong>{exercise?.name || 'Current Exercise'}</Typography.Text>
-        <div style={{ display: 'flex', gap: 24, marginTop: 12, flexWrap: 'wrap' }}>
-          <div><Typography.Text type="secondary">Tracked UTC PAX</Typography.Text><div style={{ fontSize: 24, fontWeight: 700 }}>{totalPax}</div></div>
-          <div><Typography.Text type="secondary">Tracked UTC Cost</Typography.Text><div style={{ fontSize: 24, fontWeight: 700 }}>{fmt(totalCost)}</div></div>
-          <div><Typography.Text type="secondary">Cost / PAX</Typography.Text><div style={{ fontSize: 24, fontWeight: 700 }}>{fmt(totalPax > 0 ? totalCost / totalPax : 0)}</div></div>
+      <Card className="ct-section-card ct-utc-summary-shell" style={{ marginBottom: 16 }}>
+        <div className="ct-utc-summary-header">
+          <Typography.Text strong>{exercise?.name || 'Current Exercise'}</Typography.Text>
+          <Typography.Text type="secondary">
+            {totalPax.toLocaleString('en-US')} tracked UTC PAX | {fmt(totalCost)} total tracked UTC cost | {fmt(totalPax > 0 ? totalCost / totalPax : 0)} cost / PAX
+          </Typography.Text>
+        </div>
+        <div className="ct-utc-summary-grid">
+          <UtcSummaryCard
+            title="SG UTCs Tasked"
+            count={sgRows.length}
+            pax={sgPax}
+            cost={sgCost}
+            tone="sg"
+          />
+          <UtcSummaryCard
+            title="AE UTCs Tasked"
+            count={aeRows.length}
+            pax={aePax}
+            cost={aeCost}
+            tone="ae"
+          />
         </div>
       </Card>
 

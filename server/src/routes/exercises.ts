@@ -689,9 +689,10 @@ router.post('/:id/copy', async (req: Request, res: Response) => {
                     dutyDays: entry.dutyDays == null ? null : Math.max(0, Number(entry.dutyDays || 0)),
                     startDate: entry.startDate == null ? null : entry.startDate,
                     endDate: entry.endDate == null ? null : entry.endDate,
-                    longTourLeaveDays: entry.longTourLeaveDays == null
-                      ? getLongTourLeaveFieldValue(calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, entry.dutyDays))
-                      : Math.max(0, Number(entry.longTourLeaveDays || 0)),
+                    longTourLeaveDays: Math.max(
+                      entry.longTourLeaveDays == null ? 0 : Number(entry.longTourLeaveDays || 0),
+                      getLongTourLeaveFieldValue(calculateLongTourLeaveAccrual(entry.startDate, entry.endDate, entry.dutyDays)) || 0,
+                    ) || null,
                     rentalCarCount: Math.max(0, Number(entry.rentalCarCount || 0)),
                     location: entry.location,
                     isLocal: !!entry.isLocal,
@@ -925,13 +926,14 @@ router.put('/:id/restore', async (req: Request, res: Response) => {
                 dutyDays: sourcePersonnelEntry.dutyDays == null ? null : Math.max(0, Number(sourcePersonnelEntry.dutyDays || 0)),
                 startDate: parseOptionalDateField(sourcePersonnelEntry.startDate),
                 endDate: parseOptionalDateField(sourcePersonnelEntry.endDate),
-                longTourLeaveDays: sourcePersonnelEntry.longTourLeaveDays == null
-                  ? getLongTourLeaveFieldValue(calculateLongTourLeaveAccrual(
+                longTourLeaveDays: Math.max(
+                  sourcePersonnelEntry.longTourLeaveDays == null ? 0 : Number(sourcePersonnelEntry.longTourLeaveDays || 0),
+                  getLongTourLeaveFieldValue(calculateLongTourLeaveAccrual(
                     sourcePersonnelEntry.startDate,
                     sourcePersonnelEntry.endDate,
                     sourcePersonnelEntry.dutyDays == null ? null : Number(sourcePersonnelEntry.dutyDays || 0),
-                  ))
-                  : Math.max(0, Number(sourcePersonnelEntry.longTourLeaveDays || 0)),
+                  )) || 0,
+                ) || null,
                 rentalCarCount: Math.max(0, Number(sourcePersonnelEntry.rentalCarCount || 0)),
                 location: sourcePersonnelEntry.location == null ? null : String(sourcePersonnelEntry.location || ''),
                 isLocal: !!sourcePersonnelEntry.isLocal,
