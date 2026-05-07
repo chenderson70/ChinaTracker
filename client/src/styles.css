@@ -2262,9 +2262,38 @@ body {
   text-align: left;
 }
 
+.ct-quarterly-print-table-consolidated th:first-child,
+.ct-quarterly-print-table-consolidated td:first-child {
+  width: 12%;
+  text-align: left;
+}
+
+.ct-quarterly-print-table-consolidated th:nth-child(2),
+.ct-quarterly-print-table-consolidated td:nth-child(2) {
+  width: 22%;
+  text-align: left;
+}
+
+.ct-quarterly-print-table .ct-quarterly-print-amount-cell {
+  text-align: right;
+}
+
+.ct-quarterly-print-section {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
 .ct-quarterly-print-category,
 .ct-quarterly-print-amount-strong {
   font-weight: 700;
+}
+
+.ct-quarterly-print-amount-strong {
+  font-variant-numeric: tabular-nums;
 }
 
 .ct-quarterly-print-total-label {
@@ -2808,11 +2837,15 @@ body {
 
   .ct-quarterly-print-table th,
   .ct-quarterly-print-table td {
-    padding: 6px 7px;
-    font-size: 10px;
+    padding: 4px 6px;
+    font-size: 9px;
   }
 
   .ct-quarterly-print-table th {
+    font-size: 7px;
+  }
+
+  .ct-quarterly-print-section {
     font-size: 8px;
   }
 

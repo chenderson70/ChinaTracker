@@ -111,10 +111,22 @@ export default function QuarterlyBudgetAllocationSection({
       }))
     : [];
   const displayedBuckets = visibleBuckets.length > 0 ? visibleBuckets : buckets;
+  const visibleSections = QUARTERLY_BUDGET_SECTION_META.map((section) => {
+    const sectionRows = section.rowKeys
+      .map((rowKey) => rowsByKey.get(rowKey))
+      .filter((row): row is AllocationRow => !!row)
+      .filter((row) => {
+        const rowMeta = rowMetaByKey.get(row.key);
+        return !!rowMeta?.alwaysShow || row.total > 0.000001;
+      });
+
+    return { section, sectionRows };
+  }).filter(({ sectionRows }) => sectionRows.length > 0);
+
   return (
     <Card
       title={title}
-      className="ct-section-card"
+      className="ct-section-card ct-quarterly-cost-card"
       style={{ marginBottom: 24 }}
       extra={(
         <Typography.Text type="secondary">
@@ -128,17 +140,7 @@ export default function QuarterlyBudgetAllocationSection({
         </div>
       ) : (
         <>
-          {QUARTERLY_BUDGET_SECTION_META.map((section, index) => {
-            const sectionRows = section.rowKeys
-              .map((rowKey) => rowsByKey.get(rowKey))
-              .filter((row): row is AllocationRow => !!row)
-              .filter((row) => {
-                const rowMeta = rowMetaByKey.get(row.key);
-                return !!rowMeta?.alwaysShow || row.total > 0.000001;
-              });
-
-            if (sectionRows.length === 0) return null;
-
+          {visibleSections.map(({ section, sectionRows }, index) => {
             const columns = [
               {
                 title: 'Category',
@@ -178,7 +180,7 @@ export default function QuarterlyBudgetAllocationSection({
               <div key={section.key} style={{ marginTop: index === 0 ? 0 : 24 }}>
                 <Typography.Title
                   level={5}
-                  className={section.tone === 'annualTour' ? 'ct-expense-narratives-section-title' : `ct-expense-narratives-section-title ct-expense-narratives-section-title-${section.key}`}
+                  className={`ct-screen-only ${section.tone === 'annualTour' ? 'ct-expense-narratives-section-title' : `ct-expense-narratives-section-title ct-expense-narratives-section-title-${section.key}`}`}
                   style={section.tone === 'annualTour' ? { marginBottom: 12, color: '#0958d9', textTransform: 'uppercase' } : { marginBottom: 12 }}
                 >
                   {section.label}
@@ -193,59 +195,72 @@ export default function QuarterlyBudgetAllocationSection({
                     rowKey="key"
                   />
                 </div>
-                <div className="ct-print-only ct-quarterly-print-table-wrap">
-                  <table className="ct-quarterly-print-table">
-                    <thead>
-                      <tr>
-                        <th>Category</th>
-                        {displayedBuckets.map((bucket) => (
-                          <th key={`print-${bucket.key}`}>{bucket.label}</th>
-                        ))}
-                        <th>Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sectionRows.map((row) => (
-                        <tr key={`print-${section.key}-${row.key}`}>
-                          <td>
-                            <span
-                              className={`ct-quarterly-print-category ${
-                                row.key === 'totalOm' || row.key === 'totalRpa' ? 'ct-quarterly-print-total-label' : ''
-                              }`}
-                              style={row.tone ? { color: getValueColor(row.tone) } : undefined}
-                            >
-                              {row.category}
-                            </span>
-                          </td>
-                          {displayedBuckets.map((bucket) => {
-                            const value = Number(row[bucket.key] || 0);
-                            return (
-                              <td key={`print-${section.key}-${row.key}-${bucket.key}`}>
-                                <span
-                                  className={value && row.tone ? 'ct-quarterly-print-amount-strong' : ''}
-                                  style={value && row.tone ? { color: getValueColor(row.tone) } : undefined}
-                                >
-                                  {value ? fmt(value) : '-'}
-                                </span>
-                              </td>
-                            );
-                          })}
-                          <td>
-                            <span
-                              className="ct-quarterly-print-amount-strong"
-                              style={row.tone ? { color: getValueColor(row.tone) } : undefined}
-                            >
-                              {fmt(row.total || 0)}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
               </div>
             );
           })}
+          <div className="ct-print-only ct-quarterly-print-table-wrap">
+            <table className="ct-quarterly-print-table ct-quarterly-print-table-consolidated">
+              <thead>
+                <tr>
+                  <th>Section</th>
+                  <th>Category</th>
+                  {displayedBuckets.map((bucket) => (
+                    <th key={`print-${bucket.key}`} className="ct-quarterly-print-amount-cell">{bucket.label}</th>
+                  ))}
+                  <th className="ct-quarterly-print-amount-cell">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleSections.flatMap(({ section, sectionRows }) =>
+                  sectionRows.map((row, rowIndex) => (
+                    <tr key={`print-${section.key}-${row.key}`}>
+                      {rowIndex === 0 ? (
+                        <td rowSpan={sectionRows.length}>
+                          <span
+                            className="ct-quarterly-print-section"
+                            style={section.tone ? { color: getValueColor(section.tone) } : undefined}
+                          >
+                            {section.label}
+                          </span>
+                        </td>
+                      ) : null}
+                      <td>
+                        <span
+                          className={`ct-quarterly-print-category ${
+                            row.key === 'totalOm' || row.key === 'totalRpa' ? 'ct-quarterly-print-total-label' : ''
+                          }`}
+                          style={row.tone ? { color: getValueColor(row.tone) } : undefined}
+                        >
+                          {row.category}
+                        </span>
+                      </td>
+                      {displayedBuckets.map((bucket) => {
+                        const value = Number(row[bucket.key] || 0);
+                        return (
+                          <td key={`print-${section.key}-${row.key}-${bucket.key}`} className="ct-quarterly-print-amount-cell">
+                            <span
+                              className={value && row.tone ? 'ct-quarterly-print-amount-strong' : ''}
+                              style={value && row.tone ? { color: getValueColor(row.tone) } : undefined}
+                            >
+                              {value ? fmt(value) : '-'}
+                            </span>
+                          </td>
+                        );
+                      })}
+                      <td className="ct-quarterly-print-amount-cell">
+                        <span
+                          className="ct-quarterly-print-amount-strong"
+                          style={row.tone ? { color: getValueColor(row.tone) } : undefined}
+                        >
+                          {fmt(row.total || 0)}
+                        </span>
+                      </td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </Card>
