@@ -2600,9 +2600,11 @@ body {
   }
 
   .ct-print-plusup-row {
-    break-before: page;
-    page-break-before: always;
+    break-before: auto;
+    page-break-before: auto;
     margin-top: 0 !important;
+    margin-bottom: 14px !important;
+    row-gap: 10px !important;
   }
 
   .ct-print-plusup-row > .ant-col {
@@ -2719,12 +2721,13 @@ body {
   }
 
   .ct-stat-card .ant-card-body {
-    padding: 8px 10px !important;
+    padding: 7px 9px !important;
   }
 
   .ct-stat-card .ct-stat-value {
-    font-size: 22px;
+    font-size: 20px;
     margin-top: 2px;
+    line-height: 1.12;
   }
 
   .ct-stat-breakdown {
@@ -2748,6 +2751,27 @@ body {
   .ct-stat-plusup-chip {
     padding: 1px 6px;
     font-size: 9px;
+  }
+
+  .ct-print-plusup-row .ct-stat-card .ant-card-body > div {
+    gap: 10px !important;
+    padding: 2px 6px !important;
+  }
+
+  .ct-print-plusup-row .ct-stat-card .ant-card-body > div > div:first-child {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 9px !important;
+    font-size: 16px !important;
+  }
+
+  .ct-print-plusup-row .ct-stat-card .ct-stat-breakdown {
+    margin-top: 3px;
+  }
+
+  .ct-print-plusup-row .ct-stat-card .ct-stat-breakdown-line {
+    font-size: 11px !important;
+    line-height: 1.15;
   }
 
   .ct-quick-summary-card .ant-card-body {
