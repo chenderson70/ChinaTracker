@@ -2476,6 +2476,14 @@ body {
   line-height: 1.25;
 }
 
+.ct-utc-support-breakdown-card .ant-card-body {
+  padding-top: 12px;
+}
+
+.ct-utc-support-breakdown-card .ant-table-tbody > tr > td:first-child {
+  font-weight: 700;
+}
+
 .ct-utc-summary-grid {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr) auto minmax(220px, 1fr);

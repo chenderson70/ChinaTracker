@@ -31,6 +31,8 @@ type UtcReportRow = {
   pax: number;
   rpaCost: number;
   omCost: number;
+  mealsCost: number;
+  billetingCost: number;
 };
 
 type UtcReportDisplayRow = Omit<UtcReportRow, 'units' | 'packageCountHint'> & {
@@ -139,14 +141,21 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
             pax: 0,
             rpaCost: 0,
             omCost: 0,
+            mealsCost: 0,
+            billetingCost: 0,
           };
 
           const pax = Number(entry.count || 0);
-          const allocatedCost = totalGroupPax > 0 ? groupCost * (pax / totalGroupPax) : 0;
+          const allocationShare = totalGroupPax > 0 ? pax / totalGroupPax : 0;
+          const allocatedCost = groupCost * allocationShare;
+          const allocatedMeals = Number(groupCalc?.meals || 0) * allocationShare;
+          const allocatedBilleting = Number(groupCalc?.billeting || 0) * allocationShare;
           row.utcTitle = row.utcTitle || entry.utcTitle || '';
           row.units.add(unitLabel);
           row.packageCountHint += getUtcPackageCountFromNote(entry.note);
           row.pax += pax;
+          row.mealsCost += allocatedMeals;
+          row.billetingCost += allocatedBilleting;
           if (group.fundingType === 'RPA') row.rpaCost += allocatedCost;
           else row.omCost += allocatedCost;
           byUtc.set(utcCode, row);
@@ -172,6 +181,18 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
   const totalCost = rows.reduce((sum, row) => sum + row.totalCost, 0);
   const sgRows = rows.filter((row) => row.alignment === 'SG');
   const aeRows = rows.filter((row) => row.alignment === 'AE');
+  const supportBreakdownRows = [
+    {
+      key: 'meals',
+      category: 'Meals',
+      amount: [...sgRows, ...aeRows].reduce((sum, row) => sum + Number(row.mealsCost || 0), 0),
+    },
+    {
+      key: 'billeting',
+      category: 'Billeting',
+      amount: [...sgRows, ...aeRows].reduce((sum, row) => sum + Number(row.billetingCost || 0), 0),
+    },
+  ];
   const sgPackages = sgRows.reduce((sum, row) => sum + row.packageCount, 0);
   const aePackages = aeRows.reduce((sum, row) => sum + row.packageCount, 0);
   const preparedByForExport = draftPreparedBy.trim();
@@ -196,6 +217,10 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
     { title: 'O&M Cost', dataIndex: 'omCost', align: 'right' as const, render: fmt },
     { title: 'Total Cost', dataIndex: 'totalCost', align: 'right' as const, render: fmt },
     { title: 'Cost / PAX', dataIndex: 'costPerPax', align: 'right' as const, render: fmt },
+  ];
+  const supportBreakdownColumns = [
+    { title: 'Cost Category', dataIndex: 'category' },
+    { title: 'Combined SG + AE UTC Cost', dataIndex: 'amount', align: 'right' as const, render: fmt },
   ];
 
   const renderUtcTable = (dataSource: UtcReportDisplayRow[], emptyText: string) => {
@@ -325,6 +350,10 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
         row.totalCost,
         row.costPerPax,
       ]),
+      [],
+      ['SG + AE Cost Breakdown'],
+      ['Cost Category', 'Combined SG + AE UTC Cost'],
+      ...supportBreakdownRows.map((row) => [row.category, row.amount]),
     ];
 
     const worksheet = XLSX.utils.aoa_to_sheet(summaryRows);
@@ -501,6 +530,17 @@ export default function UtcReport({ showHeader = true }: UtcReportProps = {}) {
 
       <Card title="AE UTC Packages" className="ct-section-card">
         {renderUtcTable(aeRows, 'No AE UTC-tagged personnel rows yet. Use Add UTC from the AE unit.')}
+      </Card>
+
+      <Card title="SG + AE Cost Breakdown" className="ct-section-card ct-utc-support-breakdown-card" style={{ marginTop: 16 }}>
+        <div className="ct-table">
+          <Table
+            rowKey="key"
+            dataSource={supportBreakdownRows}
+            pagination={false}
+            columns={supportBreakdownColumns}
+          />
+        </div>
       </Card>
     </div>
   );
